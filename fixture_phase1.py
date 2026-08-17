@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -59,14 +60,93 @@ class FixtureResult:
 # ─────────────────────────────────────────────────────────────
 # 步骤 1: 解析 Gerber
 # ─────────────────────────────────────────────────────────────
+def parse_drills_regex(d: Path) -> list[tuple[float, float, float]]:
+    """用正则解析 DRL 钻孔文件（兼容 KiCad 10 的 G85 新语法）。
+
+    优先尝试 gerbonara ExcellonFile（旧格式）；失败（G85 等新语法）
+    则正则回退：T<code>C<dia> 孔径表 + X<coord>Y<coord> 坐标行。
+    返回 [(x, y, 直径_mm)]
+    """
+    drills: list[tuple[float, float, float]] = []
+    for f in sorted(d.rglob("*")):
+        if f.suffix.lower() not in (".drl", ".txt", ".xln"):
+            continue
+        try:
+            drl = ExcellonFile.open(str(f))
+            for obj in drl.objects:
+                if obj.__class__.__name__ == "Flash":
+                    dia = obj.aperture.diameter  # mm
+                    drills.append((float(obj.x), float(obj.y), float(dia)))
+            continue  # gerbonara 成功，跳过正则
+        except Exception as e:
+            log.warning(f"  钻孔 {f.name} gerbonara 失败，正则回退: {e}")
+        try:
+            raw = f.read_text(encoding="utf-8", errors="replace")
+            # 孔径表: T1C0.8 / T1C0.0300（0.03 是英寸→*25.4）
+            ap_sizes = {}
+            for m in re.finditer(r"T(\d+)C([0-9.]+)", raw):
+                val = float(m.group(2))
+                ap_sizes[int(m.group(1))] = val * 25.4 if val < 3 else val
+            # G85 多段钻孔: X..Y.. X..Y.. G85X..Y..
+            # KiCad 10 的 "T" 行切孔径，坐标行可能一次多个 X/Y
+            cur_t = None
+            for line in raw.splitlines():
+                tm = re.match(r"\s*T(\d+)", line)
+                if tm:
+                    cur_t = int(tm.group(1))
+                for m in re.finditer(r"X(-?[\d.]+)Y(-?[\d.]+)", line):
+                    x, y = float(m.group(1)), float(m.group(2))
+                    # KiCad 10 导出单位 mm（M71 或 header），坐标通常几百 mm
+                    # 英寸板坐标会 >1000mm，若都大则按下/25.4 处理
+                    if abs(x) > 600 or abs(y) > 600:
+                        x, y = x / 25.4, y / 25.4  # 英寸→mm
+                    dia = (ap_sizes.get(cur_t, 1.0) if cur_t else 1.0)
+                    drills.append((x, y, dia))
+        except Exception as e2:
+            log.warning(f"  钻孔 {f.name} 正则回退也失败: {e2}")
+    # 去重（同一孔可能被多段指令重复）
+    seen = set()
+    dedup = []
+    for x, y, dia in drills:
+        key = (round(x, 3), round(y, 3))
+        if key not in seen:
+            seen.add(key)
+            dedup.append((x, y, dia))
+    if len(dedup) != len(drills):
+        log.info(f"  钻孔去重: {len(drills)} -> {len(dedup)}")
+    return dedup
+
+
 def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, float, float]]]:
     """解析 Gerber 目录 → (外形多边形列表, 钻孔列表[(x,y,r)])"""
     d = Path(gerber_dir)
-    stack = LayerStack.open(str(d))
+    # ⚠️ 排除 .drl/.txt DRL 文件——KiCad 10 的 G85 新语法会让 gerbonara 崩，
+    #    钻孔单独用 _parse_drills_regex 处理
+    gerber_files = [f for f in d.rglob("*")
+                    if f.suffix.lower() in (".gbr", ".gba", ".gbl", ".gbs", ".gbo",
+                                             ".gtl", ".gts", ".gto", ".gtp", ".gbp",
+                                             ".gm1", ".g2", ".g3", ".gko")]
+    stack = None
+    if gerber_files:
+        try:
+            stack = LayerStack.from_files(gerber_files)
+        except Exception as e:
+            log.warning(f"  from_files 失败({e})，退 open_dir")
+    else:
+        log.warning("  无 Gerber 文件(.gbr 等)，改试 open_dir")
+    if stack is None:
+        try:
+            stack = LayerStack.open_dir(str(d))
+        except Exception as e:
+            log.warning(f"  open_dir 失败: {e}")
+            stack = None
 
     # 外形：从 outline 图形对象构建 shapely 多边形
     board_polys = []
     outline_objs = []
+    if stack is None:
+        log.warning("  ⚠️ stack 解析失败（可能目录无 Gerber 文件或格式不支持），跳过外形")
+        return board_polys, parse_drills_regex(d)
     try:
         op = stack.outline_polygons() if callable(stack.outline_polygons) else stack.outline_polygons
         if op is not None:
@@ -120,17 +200,7 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
             log.warning(f"  线段围合失败: {e}")
 
     # 钻孔：找 .drl/.txt/.xln 文件
-    drills: list[tuple[float, float, float]] = []
-    for f in sorted(d.iterdir()):
-        if f.suffix.lower() in (".drl", ".txt", ".xln"):
-            try:
-                drl = ExcellonFile.open(str(f))
-                for obj in drl.objects:
-                    if obj.__class__.__name__ == "Flash":
-                        dia = obj.aperture.diameter  # mm
-                        drills.append((float(obj.x), float(obj.y), float(dia)))
-            except Exception as e:
-                log.warning(f"  钻孔文件 {f.name} 解析失败: {e}")
+    drills = parse_drills_regex(d)
 
     return board_polys, drills
 

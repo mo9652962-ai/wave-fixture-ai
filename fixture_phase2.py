@@ -17,7 +17,30 @@ import ezdxf
 from shapely.geometry import Polygon, box, Point, LineString
 from shapely.ops import unary_union
 
-from gerbonara import LayerStack
+from gerbonara import LayerStack, GerberFile
+
+
+def layer_pts_from_files(gerber_dir: str, key: str) -> list[tuple[float, float, float]]:
+    """按层名直接从文件读点（绕过 LayerStack 的 KiCad10 命名歧义）。
+
+    key: 'bottom mask' | 'top mask' | 'bottom silk' | 'top silk'
+    文件名匹配：bottom→*.gbs / top→*.gts（mask），bottom silk→*.gbo / top silk→*.gto
+    """
+    d = Path(gerber_dir)
+    side_ext = {
+        "bottom mask": ".gbs", "top mask": ".gts",
+        "bottom silk": ".gbo", "top silk": ".gto",
+    }
+    ext = side_ext.get(key, ".gbs")
+    # 找该扩展名文件（KiCad10 命名如 dev-board-B_Mask.gbs）
+    for f in sorted(d.rglob(f"*{ext}")):
+        try:
+            from gerbonara.rs274x import GerberFile
+            gf = GerberFile.open(str(f))
+            return objects_to_points(gf)
+        except Exception as e:
+            log.warning(f"  层文件 {f.name} 解析失败: {e}")
+    return []
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("fixture2")
@@ -122,10 +145,22 @@ def convex_hull_buffer(points: list[tuple], extra: float, fillet_r: float) -> Po
 # ─────────────────────────────────────────────────────────────
 # 步骤 6: 避位区（BOT 贴片）
 # ─────────────────────────────────────────────────────────────
-def make_avoid_regions(stack: LayerStack, drills: list, p: Phase2Params) -> list[Polygon]:
-    """BOT 面贴片 → 避位区（成片包围）"""
-    # 贴片焊盘来源：bottom mask Flash（阻焊开窗=贴片/插件焊盘）
-    pad_pts = objects_to_points(stack["bottom mask"])
+def make_avoid_regions(stack_or_dir, drills: list, p: Phase2Params) -> list[Polygon]:
+    """BOT+TOP 面贴片 → 避位区（成片包围）。
+
+    stack_or_dir: LayerStack 或 Gerber 目录字符串（后者用文件名直读层，兼容 KiCad10）
+    """
+    # 贴片焊盘来源：bottom+top mask Flash（阻焊开窗=贴片/插件焊盘）
+    if isinstance(stack_or_dir, str):
+        pad_pts_bot = layer_pts_from_files(stack_or_dir, "bottom mask")
+        pad_pts_top = layer_pts_from_files(stack_or_dir, "top mask")
+        pad_pts = pad_pts_bot + pad_pts_top
+    else:
+        pad_pts = objects_to_points(stack_or_dir["bottom mask"])
+        try:
+            pad_pts += objects_to_points(stack_or_dir["top mask"])
+        except Exception:
+            pass
 
     # 判定插件：焊盘中心附近有钻孔 = 插件脚（排除出避位区）
     drill_pts = [(x, y) for x, y, r in drills]
@@ -152,9 +187,12 @@ def make_avoid_regions(stack: LayerStack, drills: list, p: Phase2Params) -> list
 # ─────────────────────────────────────────────────────────────
 # 步骤 7: 上锡区（TOP 插件焊脚包围）
 # ─────────────────────────────────────────────────────────────
-def make_solder_regions(stack: LayerStack, drills: list, avoid_polys: list, p: Phase2Params) -> list[Polygon]:
+def make_solder_regions(stack_or_dir, drills: list, avoid_polys: list, p: Phase2Params) -> list[Polygon]:
     """插件焊脚 → 上锡区（与避位区保持 ≥0.7mm）"""
-    pad_pts = objects_to_points(stack["bottom mask"])
+    if isinstance(stack_or_dir, str):
+        pad_pts = layer_pts_from_files(stack_or_dir, "bottom mask")
+    else:
+        pad_pts = objects_to_points(stack_or_dir["bottom mask"])
     drill_pts = [(x, y) for x, y, r in drills]
 
     # 插件判定：mask 焊盘中心 + 有钻孔 = 插件焊脚
@@ -188,9 +226,12 @@ def make_solder_regions(stack: LayerStack, drills: list, avoid_polys: list, p: P
 # ─────────────────────────────────────────────────────────────
 # 步骤 8: 盖板弹力柱孔（TOP 插件丝印中心）
 # ─────────────────────────────────────────────────────────────
-def make_cap_holes(stack: LayerStack, p: Phase2Params) -> list[tuple[float, float, float]]:
+def make_cap_holes(stack_or_dir, p: Phase2Params) -> list[tuple[float, float, float]]:
     """TOP 丝印(GTO) → 每个丝印元素中心 → Φ2.45（半径）圆"""
-    silk_pts = objects_to_points(stack["top silk"])
+    if isinstance(stack_or_dir, str):
+        silk_pts = layer_pts_from_files(stack_or_dir, "top silk")
+    else:
+        silk_pts = objects_to_points(stack_or_dir["top silk"])
     holes = []
     for x, y, _ in silk_pts:
         holes.append((x, y, p.cap_hole_r))
@@ -340,11 +381,10 @@ def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None):
     screws = make_screws(sink, params1)
     pins = make_pins(drills, params1)
 
-    # Phase 2
-    stack = LayerStack.open(gerber_dir)
-    avoid = make_avoid_regions(stack, drills, params2)
-    solder = make_solder_regions(stack, drills, avoid, params2)
-    caps = make_cap_holes(stack, params2)
+    # Phase 2（直接用目录字符串，内部按文件名读层——兼容 KiCad10 无 LPC 命名）
+    avoid = make_avoid_regions(gerber_dir, drills, params2)
+    solder = make_solder_regions(gerber_dir, drills, avoid, params2)
+    caps = make_cap_holes(gerber_dir, params2)
     outer = make_outer(sink, params2)
 
     result2 = Phase2Result(avoid_polys=avoid, solder_polys=solder,
