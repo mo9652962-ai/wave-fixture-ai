@@ -29,6 +29,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from fixture_phase2 import run_phase2
+from fixture_3d import build_fixture_3d, export_stl, export_glb, Fixture3DParams
 
 app = FastAPI(title="波峰焊治具 AI 设计助手", version="1.0")
 app.add_middleware(
@@ -68,6 +69,65 @@ def _extract_upload(files: list[UploadFile]) -> Path:
         # 普通 Gerber/DRL 文件
         (workdir / name).write_bytes(data)
     return workdir
+
+
+@app.post("/api/generate3d")
+async def api_generate3d(files: list[UploadFile] = File(...)):
+    """上传 Gerber → 生成治具 3D（STL + GLB）+ 干涉分析"""
+    if not files:
+        raise HTTPException(400, "未收到文件")
+    try:
+        workdir = _extract_upload(files)
+        # 先用 phase2 得到 2D 几何
+        from fixture_phase1 import parse_gerber, make_sink_region, FixtureParams
+        from fixture_phase2 import run_phase2, Phase2Params
+        from shapely.ops import unary_union as _uu
+
+        board_polys, drills = parse_gerber(str(workdir))
+        if not board_polys:
+            raise HTTPException(422, "未找到外形层")
+        board = _uu(board_polys)
+        sink = make_sink_region(board, FixtureParams())
+        result2 = run_phase2(str(workdir), None)
+        if result2 is None:
+            raise HTTPException(422, "治具 2D 生成失败")
+        outer = result2.outer_poly
+        avoid = result2.avoid_polys
+        solder = result2.solder_polys
+
+        # 构建 3D
+        mesh = build_fixture_3d(sink, avoid, solder, outer, Fixture3DParams())
+        stl_path = OUTPUT_DIR / f"{workdir.name}-3d.stl"
+        glb_path = OUTPUT_DIR / f"{workdir.name}-3d.glb"
+        export_stl(mesh, str(stl_path))
+        try:
+            export_glb(mesh, str(glb_path))
+            glb_ok = True
+        except Exception:
+            glb_ok = False
+
+        # 干涉分析（无元件高度数据时返回空，提示需 KiCad 3D 模型）
+        return JSONResponse({
+            "ok": True,
+            "stl_url": f"/dl/{workdir.name}-3d.stl",
+            "glb_url": f"/dl/{workdir.name}-3d.glb" if glb_ok else None,
+            "stats": {
+                "volume_mm3": round(mesh.volume, 0),
+                "vertices": len(mesh.vertices),
+                "faces": len(mesh.faces),
+                "avoid_holes": len(avoid),
+                "solder_holes": len(solder),
+            },
+            "interference": {
+                "note": "干涉分析需要 PCB 元件 3D 高度数据（KiCad .kicad_pcb 的 3D 模型或 step 文件），当前仅提供 3D 几何预览。"
+            },
+            "message": "3D 治具生成成功",
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"3D 生成失败: {e}\n{traceback.format_exc()}")
+        raise HTTPException(500, f"3D 生成失败: {e}")
 
 
 @app.post("/api/generate")

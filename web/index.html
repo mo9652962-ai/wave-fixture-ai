@@ -121,6 +121,9 @@ header {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+  <!-- three.js 用于 3D 预览 -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
 <div class="container">
@@ -154,7 +157,7 @@ header {
   <div class="result" id="result">
     <div class="result-grid">
       <div class="preview-panel">
-        <h4>治具预览</h4>
+        <h4>治具预览（2D）</h4>
         <img id="previewImg" alt="治具预览">
       </div>
       <div class="stats-panel">
@@ -163,8 +166,18 @@ header {
         <div class="download-bar">
           <a class="btn" id="downloadDxf" href="#" download>⬇️ 下载 DXF</a>
           <a class="btn btn-outline" id="downloadPng" href="#" download>下载 PNG</a>
+          <button class="btn btn-outline" id="gen3dBtn">🧊 生成 3D</button>
           <button class="btn btn-outline" id="resetBtn">↺ 重新上传</button>
         </div>
+      </div>
+    </div>
+    <!-- 3D 预览 -->
+    <div class="preview-panel" id="preview3dPanel" style="margin-top:20px; display:none;">
+      <h4>治具 3D 预览</h4>
+      <div id="threeContainer" style="width:100%;height:400px;border-radius:8px;border:1px solid var(--border);background:#0a0c12;"></div>
+      <div class="download-bar" style="margin-top:12px;">
+        <a class="btn" id="downloadStl" href="#" download>⬇️ 下载 STL</a>
+        <a class="btn btn-outline" id="downloadGlb" href="#" download>下载 GLB</a>
       </div>
     </div>
   </div>
@@ -273,6 +286,91 @@ function showResult(data) {
 document.getElementById('resetBtn').addEventListener('click', () => {
   location.reload();
 });
+
+// 3D 生成 + 预览
+document.getElementById('gen3dBtn').addEventListener('click', async () => {
+  if (!files.length) { showStatus('请先上传 Gerber', 'error'); return; }
+  const btn = document.getElementById('gen3dBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>3D 生成中...';
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f, f.name);
+  try {
+    const resp = await fetch('/api/generate3d', { method: 'POST', body: fd });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || '3D 生成失败');
+    }
+    const data = await resp.json();
+    if (data.ok) {
+      document.getElementById('preview3dPanel').style.display = 'block';
+      document.getElementById('downloadStl').href = data.stl_url;
+      if (data.glb_url) {
+        document.getElementById('downloadGlb').href = data.glb_url;
+        loadGLB(data.glb_url);
+      }
+      showStatus('✅ 3D 治具生成成功！', 'success');
+    }
+  } catch (e) {
+    showStatus('❌ ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🧊 生成 3D';
+  }
+});
+
+let renderer3d = null;
+function loadGLB(url) {
+  const container = document.getElementById('threeContainer');
+  // 清空旧画布
+  container.innerHTML = '';
+  if (!window.THREE || !window.THREE.GLTFLoader) {
+    showStatus('⚠️ three.js 加载失败（需联网）', 'error');
+    return;
+  }
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0c12);
+  const w = container.clientWidth, h = container.clientHeight;
+  const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 1000);
+  camera.position.set(150, 100, 150);
+  camera.lookAt(0, 0, 4);
+
+  if (!renderer3d) {
+    renderer3d = new THREE.WebGLRenderer({ antialias: true });
+    renderer3d.setSize(w, h);
+  }
+  container.appendChild(renderer3d.domElement);
+
+  // 光照
+  const light = new THREE.DirectionalLight(0xffffff, 1);
+  light.position.set(1, 1, 1);
+  scene.add(light);
+  scene.add(new THREE.AmbientLight(0x404040));
+
+  // 网格地面
+  const grid = new THREE.GridHelper(200, 20, 0x4f8cff, 0x2a2e3d);
+  scene.add(grid);
+
+  const loader = new THREE.GLTFLoader();
+  loader.load(url, (gltf) => {
+    const model = gltf.scene;
+    // 居中
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.sub(center);
+    model.position.y += 0;
+    scene.add(model);
+    // 轨道控制（简化：自动旋转）
+    function animate() {
+      requestAnimationFrame(animate);
+      model.rotation.y += 0.005;
+      renderer3d.render(scene, camera);
+    }
+    animate();
+  }, undefined, (err) => {
+    showStatus('⚠️ GLB 加载失败: ' + err.message, 'error');
+  });
+}
 </script>
 </body>
 </html>
