@@ -76,6 +76,58 @@ def _extract_upload(files: list[UploadFile]) -> Path:
 _SESSION_PARAMS: dict = {}
 
 
+@app.post("/api/interference")
+async def api_interference(files: list[UploadFile] = File(...)):
+    """上传 Gerber + KiCad .kicad_pcb → 3D 治具 + 元件干涉分析"""
+    try:
+        workdir = _extract_upload(files)
+        # 找 .kicad_pcb 文件
+        pcb_files = list(Path(workdir).rglob("*.kicad_pcb"))
+        if not pcb_files:
+            return JSONResponse({
+                "ok": False,
+                "message": "未找到 .kicad_pcb 文件——干涉分析需要 KiCad 工程文件（含元件位置）。Gerber 只有焊盘几何，没有元件高度信息。",
+            })
+        pcb_path = pcb_files[0]
+
+        # 生成治具 3D
+        from fixture_phase1 import parse_gerber, make_sink_region, FixtureParams
+        from fixture_phase2 import run_phase2
+        from fixture_3d import build_fixture_3d, export_stl, Fixture3DParams
+        from shapely.ops import unary_union as _uu
+
+        board_polys, drills = parse_gerber(str(workdir))
+        if not board_polys:
+            raise HTTPException(422, "未找到外形层")
+        board = _uu(board_polys)
+        sink = make_sink_region(board, FixtureParams())
+        result2 = run_phase2(str(workdir), None)
+        if result2 is None:
+            raise HTTPException(422, "治具生成失败")
+        mesh = build_fixture_3d(sink, result2.avoid_polys, result2.solder_polys,
+                                result2.outer_poly, Fixture3DParams())
+        stl_path = OUTPUT_DIR / f"{workdir.name}-interf.stl"
+        export_stl(mesh, str(stl_path))
+
+        # 元件解析 + 干涉分析
+        from interference import parse_kicad_pcb, analyze_interference
+        comps = parse_kicad_pcb(str(pcb_path))
+        reports = analyze_interference(str(stl_path), comps)
+
+        return JSONResponse({
+            "ok": True,
+            "component_count": len(comps),
+            "interference_count": len(reports),
+            "interferences": reports,
+            "message": f"分析完成：{len(comps)} 个元件，{len(reports)} 个干涉" if reports else f"分析完成：{len(comps)} 个元件，✅ 无干涉",
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"干涉分析失败: {e}\n{traceback.format_exc()}")
+        raise HTTPException(500, f"干涉分析失败: {e}")
+
+
 @app.post("/api/adjust")
 async def api_adjust(instruction: str = Form(""), files: list[UploadFile] = File(...)):
     """自然语言调整治具参数 → 重新生成 DXF + 调整报告"""

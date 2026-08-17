@@ -44,3 +44,4 @@ python fixture_phase2.py <gerber_dir> -o output/fixture-full.dxf
 - [x] 前端界面（拖 Gerber → 预览 → 下载 DXF）
 - [x] 3D 预览（STL/GLB 导出 + three.js 预览）
 - [x] 自然语言对话调整（「避位区外扩1mm」「治具外形倒角改5mm」）
+- [x] 干涉分析（KiCad .kicad_pcb 元件高度 → 治具 3D 布尔交集）
