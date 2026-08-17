@@ -80,6 +80,7 @@ class Phase2Result:
     rail_lines: list = field(default_factory=list)       # 轨道边虚线
     tin_strip_lines: list = field(default_factory=list)  # 挡锡条
     tin_holes: list = field(default_factory=list)        # 挡锡条孔
+    sink_poly: Polygon | None = None                     # 沉板区（3D 用）
 
 
 # ─────────────────────────────────────────────────────────────
@@ -359,12 +360,22 @@ def export_dxf2(result: Phase2Result, out_path: str, sink_poly=None, handles=Non
 # ─────────────────────────────────────────────────────────────
 # 主流程（Phase 1 + Phase 2 完整）
 # ─────────────────────────────────────────────────────────────
-def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None):
+def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None,
+               params1_override: dict = None, params2_override: dict = None):
     from fixture_phase1 import parse_gerber, make_sink_region, make_handles, \
         make_screws, make_pins, FixtureParams, FixtureResult
 
     params1 = FixtureParams()
     params2 = Phase2Params()
+    # 参数覆盖（自然语言调整）
+    if params1_override:
+        for k, v in params1_override.items():
+            if hasattr(params1, k):
+                setattr(params1, k, v)
+    if params2_override:
+        for k, v in params2_override.items():
+            if hasattr(params2, k):
+                setattr(params2, k, v)
 
     log.info(f"📂 解析 Gerber: {gerber_dir}")
     board_polys, drills = parse_gerber(gerber_dir)
@@ -391,7 +402,8 @@ def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None):
                            cap_holes=caps, outer_poly=outer.outer_poly,
                            rail_lines=outer.rail_lines,
                            tin_strip_lines=outer.tin_strip_lines,
-                           tin_holes=outer.tin_holes)
+                           tin_holes=outer.tin_holes,
+                           sink_poly=sink)
 
     if out_dxf:
         export_dxf2(result2, out_dxf, sink_poly=sink, handles=handles,

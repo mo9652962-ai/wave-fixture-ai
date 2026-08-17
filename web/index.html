@@ -180,6 +180,20 @@ header {
         <a class="btn btn-outline" id="downloadGlb" href="#" download>下载 GLB</a>
       </div>
     </div>
+
+    <!-- 自然语言调整 -->
+    <div class="preview-panel" style="margin-top:20px;">
+      <h4>💬 自然语言调整</h4>
+      <p style="color:var(--dim);font-size:13px;margin-bottom:12px;">
+        示例：<code>避位区外扩1mm</code> · <code>治具外形倒角改5mm</code> · <code>沉板区外扩0.5mm</code> · <code>盖板孔径改3mm</code>
+      </p>
+      <div style="display:flex;gap:10px;">
+        <input type="text" id="adjustInput" placeholder="输入调整指令，如「避位区外扩1mm」"
+               style="flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;">
+        <button class="btn" id="adjustBtn">调整</button>
+      </div>
+      <div id="adjustResult" style="margin-top:12px;font-size:13px;color:var(--dim);"></div>
+    </div>
   </div>
 </div>
 
@@ -316,6 +330,40 @@ document.getElementById('gen3dBtn').addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
     btn.innerHTML = '🧊 生成 3D';
+  }
+});
+
+// 自然语言调整
+document.getElementById('adjustBtn').addEventListener('click', async () => {
+  const instruction = document.getElementById('adjustInput').value.trim();
+  if (!instruction) { showStatus('请输入调整指令', 'error'); return; }
+  if (!files.length) { showStatus('请先上传 Gerber', 'error'); return; }
+  const btn = document.getElementById('adjustBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>调整中...';
+  const fd = new FormData();
+  fd.append('instruction', instruction);
+  for (const f of files) fd.append('files', f, f.name);
+  try {
+    const resp = await fetch('/api/adjust', { method: 'POST', body: fd });
+    const data = await resp.json();
+    const resultEl = document.getElementById('adjustResult');
+    if (data.ok && data.matched) {
+      resultEl.innerHTML = `<span style="color:var(--success)">✅ ${data.message}</span>`;
+      // 更新预览
+      document.getElementById('previewImg').src = data.png_url;
+      document.getElementById('downloadDxf').href = data.dxf_url;
+      document.getElementById('downloadPng').href = data.png_url;
+      showStatus('✅ 调整已应用', 'success');
+    } else {
+      resultEl.innerHTML = `<span style="color:var(--error)">❌ ${data.message || '调整失败'}</span>`;
+      showStatus('❌ 调整失败', 'error');
+    }
+  } catch (e) {
+    showStatus('❌ ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '调整';
   }
 });
 

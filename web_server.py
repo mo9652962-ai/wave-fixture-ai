@@ -23,13 +23,14 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("fixture-web")
 
 # FastAPI 导入（延迟到 main 判断，便于直接跑脚本测试核心函数）
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from fixture_phase2 import run_phase2
 from fixture_3d import build_fixture_3d, export_stl, export_glb, Fixture3DParams
+from nl_adjust import parse_adjust_command, apply_adjustments
 
 app = FastAPI(title="波峰焊治具 AI 设计助手", version="1.0")
 app.add_middleware(
@@ -69,6 +70,89 @@ def _extract_upload(files: list[UploadFile]) -> Path:
         # 普通 Gerber/DRL 文件
         (workdir / name).write_bytes(data)
     return workdir
+
+
+# 会话参数状态（job_id → 参数覆盖 dict）
+_SESSION_PARAMS: dict = {}
+
+
+@app.post("/api/adjust")
+async def api_adjust(instruction: str = Form(""), files: list[UploadFile] = File(...)):
+    """自然语言调整治具参数 → 重新生成 DXF + 调整报告"""
+    if not instruction.strip():
+        raise HTTPException(400, "请输入调整指令")
+    try:
+        workdir = _extract_upload(files)
+        job_id = workdir.name
+
+        # 当前参数（从会话状态继承，或默认）
+        from fixture_phase1 import FixtureParams
+        from fixture_phase2 import Phase2Params
+        p1 = _SESSION_PARAMS.get(job_id, {}).get("p1", {k: v for k, v in FixtureParams().__dict__.items()})
+        p2 = _SESSION_PARAMS.get(job_id, {}).get("p2", {k: v for k, v in Phase2Params().__dict__.items()})
+
+        # 解析调整
+        r = parse_adjust_command(instruction, p1, p2)
+        if not r.matched:
+            return JSONResponse({
+                "ok": False,
+                "message": f"未识别的指令：「{instruction}」。支持如「避位区外扩1mm」「治具外形倒角改5mm」「沉板区外扩0.5mm」等",
+            })
+
+        # 应用调整
+        if r.param in p1:
+            p1[r.param] = r.new_value
+        elif r.param in p2:
+            p2[r.param] = r.new_value
+
+        # 保存会话状态
+        _SESSION_PARAMS[job_id] = {"p1": p1, "p2": p2, "gerber_dir": str(workdir)}
+
+        # 用调整后参数重新生成
+        from fixture_phase2 import run_phase2
+        dxf_path = OUTPUT_DIR / f"{job_id}-adjusted.dxf"
+        png_path = OUTPUT_DIR / f"{job_id}-adjusted.png"
+        # 只传被修改的参数（覆盖默认值）
+        result = run_phase2(str(workdir), str(dxf_path),
+                            params1_override=p1, params2_override=p2)
+        if result is None:
+            raise HTTPException(422, "调整后生成失败")
+
+        # 渲染 PNG
+        try:
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+            import ezdxf
+            from ezdxf.addons.drawing import RenderContext, Frontend
+            from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+            doc = ezdxf.readfile(str(dxf_path))
+            ctx = RenderContext(doc)
+            fig, ax = plt.subplots(figsize=(16, 10))
+            backend = MatplotlibBackend(ax)
+            Frontend(ctx, backend).draw_layout(doc.modelspace(), finalize=True)
+            ax.set_aspect("equal")
+            fig.savefig(str(png_path), dpi=150, bbox_inches="tight")
+            plt.close(fig)
+        except Exception as e:
+            log.warning(f"  PNG 渲染失败: {e}")
+
+        return JSONResponse({
+            "ok": True,
+            "matched": True,
+            "param": r.param,
+            "old_value": r.old_value,
+            "new_value": r.new_value,
+            "action": r.action,
+            "message": r.message,
+            "dxf_url": f"/dl/{job_id}-adjusted.dxf",
+            "png_url": f"/dl/{job_id}-adjusted.png",
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"调整失败: {e}\n{traceback.format_exc()}")
+        raise HTTPException(500, f"调整失败: {e}")
 
 
 @app.post("/api/generate3d")

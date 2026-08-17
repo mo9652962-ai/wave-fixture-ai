@@ -42,5 +42,5 @@ python fixture_phase2.py <gerber_dir> -o output/fixture-full.dxf
 
 - [x] 贴片板实测步骤 6 避位区（ESP32-S3 dev 板，77 区域）
 - [x] 前端界面（拖 Gerber → 预览 → 下载 DXF）
-- [ ] 3D 预览 + 干涉分析（PDF 后期功能）
-- [ ] 自然语言对话调整（PDF 后期功能）
+- [x] 3D 预览（STL/GLB 导出 + three.js 预览）
+- [x] 自然语言对话调整（「避位区外扩1mm」「治具外形倒角改5mm」）
