@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>波峰焊治具 AI 设计助手</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --panel: #1a1d27;
+  --border: #2a2e3d;
+  --accent: #4f8cff;
+  --accent-hover: #6ba0ff;
+  --text: #e4e6eb;
+  --dim: #8b90a0;
+  --success: #3ddc84;
+  --error: #ff5f5f;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 0 24px;
+}
+.logo { font-size: 22px; font-weight: 700; }
+.logo span { color: var(--accent); }
+.subtitle { color: var(--dim); font-size: 13px; margin-top: 4px; }
+.btn {
+  background: var(--accent); color: #fff; border: none;
+  padding: 8px 18px; border-radius: 8px; font-size: 14px;
+  cursor: pointer; transition: 0.2s; text-decoration: none; display: inline-block;
+}
+.btn:hover { background: var(--accent-hover); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-outline {
+  background: transparent; border: 1px solid var(--border); color: var(--text);
+}
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 拖拽区 */
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  transition: 0.2s;
+  cursor: pointer;
+  background: var(--panel);
+}
+.dropzone:hover, .dropzone.dragover {
+  border-color: var(--accent);
+  background: #1e2333;
+}
+.dropzone .icon { font-size: 48px; margin-bottom: 12px; }
+.dropzone h3 { font-size: 18px; margin-bottom: 8px; }
+.dropzone p { color: var(--dim); font-size: 13px; }
+
+/* 文件列表 */
+.file-list { margin-top: 16px; display: none; }
+.file-list.show { display: block; }
+.file-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 6px;
+  font-size: 13px;
+}
+.file-item .fname { color: var(--text); word-break: break-all; }
+.file-item .fstatus { color: var(--dim); font-size: 12px; }
+.file-item .fstatus.ok { color: var(--success); }
+.file-item .fstatus.bad { color: var(--error); }
+
+/* 结果区 */
+.result { display: none; margin-top: 24px; }
+.result.show { display: block; }
+.result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 768px) { .result-grid { grid-template-columns: 1fr; } }
+.preview-panel {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px;
+}
+.preview-panel h4 { font-size: 14px; margin-bottom: 12px; color: var(--dim); }
+.preview-panel img {
+  width: 100%; border-radius: 8px; background: #0a0c12;
+  border: 1px solid var(--border);
+}
+.stats-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.stats-panel h4 { font-size: 14px; margin-bottom: 12px; color: var(--dim); }
+.stat-row {
+  display: flex; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-row .label { color: var(--dim); }
+.stat-row .value { font-weight: 600; }
+.download-bar { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+
+/* 状态栏 */
+.status {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--panel); border: 1px solid var(--border);
+  padding: 10px 20px; border-radius: 20px; font-size: 13px;
+  display: none; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.status.show { display: block; }
+.status.error { border-color: var(--error); color: var(--error); }
+.status.success { border-color: var(--success); color: var(--success); }
+
+.hidden { display: none !important; }
+.spinner {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <div class="logo">⚙️ 波峰焊治具 <span>AI 设计助手</span></div>
+      <div class="subtitle">拖入 Gerber 文件 → 自动生成治具 DXF 工程图（替代 CAM350 手工画图）</div>
+    </div>
+    <a href="https://github.com/mo9652962-ai" target="_blank" class="btn btn-outline">GitHub</a>
+  </header>
+
+  <!-- 拖拽上传 -->
+  <div class="dropzone" id="dropzone">
+    <div class="icon">📁</div>
+    <h3>拖入 Gerber 文件到此处</h3>
+    <p>支持 .gbr / .gbl / .gbs / .gto / .gbo / .gtl / .gts / .drl / .zip<br>
+    或点击选择文件（可多选）</p>
+    <input type="file" id="fileInput" multiple hidden
+           accept=".gbr,.gbl,.gbs,.gto,.gbo,.gtl,.gts,.gtp,.gbp,.drl,.txt,.zip">
+  </div>
+
+  <!-- 文件列表 -->
+  <div class="file-list" id="fileList">
+    <div id="fileItems"></div>
+    <div style="margin-top: 12px; text-align: center;">
+      <button class="btn" id="generateBtn">🚀 生成治具</button>
+    </div>
+  </div>
+
+  <!-- 结果 -->
+  <div class="result" id="result">
+    <div class="result-grid">
+      <div class="preview-panel">
+        <h4>治具预览</h4>
+        <img id="previewImg" alt="治具预览">
+      </div>
+      <div class="stats-panel">
+        <h4>生成统计</h4>
+        <div id="statsBody"></div>
+        <div class="download-bar">
+          <a class="btn" id="downloadDxf" href="#" download>⬇️ 下载 DXF</a>
+          <a class="btn btn-outline" id="downloadPng" href="#" download>下载 PNG</a>
+          <button class="btn btn-outline" id="resetBtn">↺ 重新上传</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 状态提示 -->
+<div class="status" id="status"></div>
+
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const fileItems = document.getElementById('fileItems');
+const generateBtn = document.getElementById('generateBtn');
+const result = document.getElementById('result');
+const statusEl = document.getElementById('status');
+const files = [];  // 收集上传文件（存 File 对象）
+
+function showStatus(msg, type='') {
+  statusEl.textContent = msg;
+  statusEl.className = 'status show' + (type ? ' ' + type : '');
+  clearTimeout(showStatus._t);
+  showStatus._t = setTimeout(() => statusEl.classList.remove('show'), 3000);
+}
+
+function addFile(file) {
+  // 去重（按名字）
+  if (files.some(f => f.name === file.name)) return;
+  files.push(file);
+  const item = document.createElement('div');
+  item.className = 'file-item';
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'fname';
+  nameSpan.textContent = '📄 ' + file.name;
+  const statusSpan = document.createElement('span');
+  statusSpan.className = 'fstatus ok';
+  statusSpan.textContent = '✅';
+  item.appendChild(nameSpan);
+  item.appendChild(statusSpan);
+  fileItems.appendChild(item);
+  fileList.classList.add('show');
+}
+
+// 拖拽
+dropzone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropzone.classList.add('dragover');
+});
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  for (const f of e.dataTransfer.files) addFile(f);
+});
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  for (const f of fileInput.files) addFile(f);
+  fileInput.value = '';
+});
+
+// 生成
+generateBtn.addEventListener('click', async () => {
+  if (!files.length) { showStatus('请先拖入文件', 'error'); return; }
+  generateBtn.disabled = true;
+  generateBtn.innerHTML = '<span class="spinner"></span>生成中...';
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f, f.name);
+  showStatus('生成中，请稍候...');
+  try {
+    const resp = await fetch('/api/generate', { method: 'POST', body: fd });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || '生成失败');
+    }
+    const data = await resp.json();
+    if (data.ok) {
+      showResult(data);
+    }
+  } catch (e) {
+    showStatus('❌ ' + e.message, 'error');
+  } finally {
+    generateBtn.disabled = false;
+    generateBtn.innerHTML = '🚀 生成治具';
+  }
+});
+
+function showResult(data) {
+  document.getElementById('previewImg').src = data.png_url;
+  document.getElementById('downloadDxf').href = data.dxf_url;
+  document.getElementById('downloadPng').href = data.png_url;
+  const stats = data.stats || {};
+  const rows = [
+    ['治具外形', stats.board_size || '-'],
+    ['避位区', stats.avoid_count + ' 个'],
+    ['上锡区', stats.solder_count + ' 个'],
+    ['盖板孔', stats.cap_hole_count + ' 个'],
+    ['状态', '<span style="color:var(--success)">✅ 生成成功</span>'],
+  ];
+  document.getElementById('statsBody').innerHTML = rows
+    .map(([k, v]) => `<div class="stat-row"><span class="label">${k}</span><span class="value">${v}</span></div>`)
+    .join('');
+  result.classList.add('show');
+  showStatus('✅ 治具生成成功！', 'success');
+}
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  location.reload();
+});
+</script>
+</body>
+</html>

@@ -129,7 +129,18 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
     stack = None
     if gerber_files:
         try:
-            stack = LayerStack.from_files(gerber_files)
+            # Edge_Cuts.gm1 → outline（KiCad 命名映射，否则被判 bottom unknown）
+            OVERRIDES = {
+                r".*Edge_Cuts.*": "outline",
+                r".*\.gm1": "outline",
+                r".*B_Cu.*": "bottom copper",
+                r".*F_Cu.*": "top copper",
+                r".*B_Mask.*": "bottom mask",
+                r".*F_Mask.*": "top mask",
+                r".*B_Silkscreen.*": "bottom silk",
+                r".*F_Silkscreen.*": "top silk",
+            }
+            stack = LayerStack.from_files(gerber_files, overrides=OVERRIDES, autoguess=False)
         except Exception as e:
             log.warning(f"  from_files 失败({e})，退 open_dir")
     else:
@@ -158,7 +169,16 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
     except Exception as e:
         log.warning(f"  outline_polygons 失败({e})，退回 stack.outline")
     if not outline_objs:
-        outline_objs = list(stack.outline.objects)
+        # stack.outline 可能为 None（gerbonara 缺铜层时判定不顺型）
+        # 退而从 graphic_layers 找 ('outline','') 层直接读对象
+        try:
+            ol_layer = stack.graphic_layers.get(("outline", ""))
+            if ol_layer is not None:
+                outline_objs = list(ol_layer.objects)
+            else:
+                outline_objs = list(stack.outline.objects)
+        except Exception:
+            outline_objs = []
 
     # Line/Arc → 线段集合 → shapely LineString → 围成 Polygon
     from shapely.geometry import LineString
