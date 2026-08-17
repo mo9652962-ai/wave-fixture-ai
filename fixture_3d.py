@@ -39,9 +39,17 @@ class Fixture3DParams:
 
 
 def polygon_to_extrude(poly: Polygon, z_bottom: float, z_top: float) -> trimesh.Trimesh:
-    """2D 多边形 → 3D 拉伸体（沿 Z 轴）"""
+    """2D 多边形 → 3D 拉伸体（沿 Z 轴）。支持 Polygon / MultiPolygon"""
     if poly is None or poly.is_empty:
         return None
+    from shapely.geometry import MultiPolygon
+    if isinstance(poly, MultiPolygon):
+        # 每个子多边形单独拉伸后合并
+        parts = [polygon_to_extrude(part, z_bottom, z_top) for part in poly.geoms]
+        parts = [p for p in parts if p is not None]
+        if not parts:
+            return None
+        return trimesh.util.concatenate(parts)
     # 简化顶点（减少三角面）
     poly = poly.simplify(0.05, preserve_topology=True)
     exterior = np.array(poly.exterior.coords)[:, :2]

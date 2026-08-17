@@ -82,11 +82,20 @@ def parse_drills_regex(d: Path) -> list[tuple[float, float, float]]:
             log.warning(f"  钻孔 {f.name} gerbonara 失败，正则回退: {e}")
         try:
             raw = f.read_text(encoding="utf-8", errors="replace")
-            # 孔径表: T1C0.8 / T1C0.0300（0.03 是英寸→*25.4）
+            # 单位判断：文件头 METRIC/INCH（KiCad 默认 METRIC）
+            is_metric = "METRIC" in raw.upper() or "M71" in raw.upper()
+            is_inch = ("INCH" in raw.upper() or "M72" in raw.upper()) and not is_metric
+            # 孔径表: T1C0.8 / T1C0.0300（英寸值很小如 0.03 → *25.4）
             ap_sizes = {}
             for m in re.finditer(r"T(\d+)C([0-9.]+)", raw):
                 val = float(m.group(2))
-                ap_sizes[int(m.group(1))] = val * 25.4 if val < 3 else val
+                if is_inch:
+                    ap_sizes[int(m.group(1))] = val * 25.4
+                elif is_metric:
+                    ap_sizes[int(m.group(1))] = val
+                else:
+                    # 无声明：英寸值通常 <3（0.03-0.1"），mm 值通常 >0.2
+                    ap_sizes[int(m.group(1))] = val * 25.4 if val < 0.2 else val
             # G85 多段钻孔: X..Y.. X..Y.. G85X..Y..
             # KiCad 10 的 "T" 行切孔径，坐标行可能一次多个 X/Y
             cur_t = None

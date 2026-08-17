@@ -121,9 +121,15 @@ header {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
-  <!-- three.js 用于 3D 预览 -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
+  <!-- three.js 用于 3D 预览（ES module 方式，GLTFLoader 非模块版 r150+ 已移除）-->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
 <div class="container">
@@ -430,114 +436,116 @@ document.getElementById('interfBtn').addEventListener('click', async () => {
   }
 });
 
-function renderInterference3D(glbUrl, boxes) {
+async function renderInterference3D(glbUrl, boxes) {
   const container = document.getElementById('interfContainer');
   container.innerHTML = '';
-  if (!window.THREE || !window.THREE.GLTFLoader) {
-    showStatus('⚠️ three.js 加载失败（需联网）', 'error');
-    return;
+  try {
+    const THREE = await import('three');
+    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0c12);
+    const w = container.clientWidth, h = container.clientHeight;
+    const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 2000);
+    camera.position.set(150, 120, 150);
+    camera.lookAt(0, 0, 4);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(w, h);
+    container.appendChild(renderer.domElement);
+
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(1, 1, 1);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
+    scene.add(new THREE.GridHelper(250, 25, 0x4f8cff, 0x2a2e3d));
+
+    const loader = new GLTFLoader();
+    loader.load(glbUrl, (gltf) => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.sub(center);
+      scene.add(model);
+
+      // 干涉元件盒（红色半透明）
+      const mat = new THREE.MeshPhongMaterial({ color: 0xff3333, transparent: true, opacity: 0.6 });
+      for (const b of boxes) {
+        const geo = new THREE.BoxGeometry(b.w, b.height, b.h);
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(b.x - center.x, b.y - center.y, 1.6 + b.height / 2);
+        scene.add(mesh);
+        const edges = new THREE.EdgesGeometry(geo);
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xff0000 }));
+        line.position.copy(mesh.position);
+        scene.add(line);
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        model.rotation.y += 0.003;
+        renderer.render(scene, camera);
+      }
+      animate();
+    }, undefined, (err) => {
+      showStatus('⚠️ 3D 加载失败: ' + err.message, 'error');
+    });
+  } catch (e) {
+    showStatus('⚠️ three.js 加载失败（需联网）: ' + e.message, 'error');
   }
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0c12);
-  const w = container.clientWidth, h = container.clientHeight;
-  const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 2000);
-  camera.position.set(150, 120, 150);
-  camera.lookAt(0, 0, 4);
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(w, h);
-  container.appendChild(renderer.domElement);
-
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(1, 1, 1);
-  scene.add(light);
-  scene.add(new THREE.AmbientLight(0x404040));
-  scene.add(new THREE.GridHelper(250, 25, 0x4f8cff, 0x2a2e3d));
-
-  const loader = new THREE.GLTFLoader();
-  loader.load(glbUrl, (gltf) => {
-    const model = gltf.scene;
-    const box = new THREE.Box3().setFromObject(model);
-    const center = box.getCenter(new THREE.Vector3());
-    model.position.sub(center);
-    scene.add(model);
-
-    // 干涉元件盒（红色半透明）
-    const mat = new THREE.MeshPhongMaterial({ color: 0xff3333, transparent: true, opacity: 0.6 });
-    for (const b of boxes) {
-      const geo = new THREE.BoxGeometry(b.w, b.height, b.h);
-      const mesh = new THREE.Mesh(geo, mat);
-      // 注意：KiCad y 轴 vs three.js y 轴（z 是高度）
-      mesh.position.set(b.x - center.x, b.y - center.y, 1.6 + b.height / 2);
-      scene.add(mesh);
-      // 边框
-      const edges = new THREE.EdgesGeometry(geo);
-      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xff0000 }));
-      line.position.copy(mesh.position);
-      scene.add(line);
-    }
-
-    function animate() {
-      requestAnimationFrame(animate);
-      model.rotation.y += 0.003;
-      renderer.render(scene, camera);
-    }
-    animate();
-  }, undefined, (err) => {
-    showStatus('⚠️ 3D 加载失败: ' + err.message, 'error');
-  });
 }
 
 let renderer3d = null;
-function loadGLB(url) {
+async function loadGLB(url) {
   const container = document.getElementById('threeContainer');
   // 清空旧画布
   container.innerHTML = '';
-  if (!window.THREE || !window.THREE.GLTFLoader) {
-    showStatus('⚠️ three.js 加载失败（需联网）', 'error');
-    return;
-  }
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0c12);
-  const w = container.clientWidth, h = container.clientHeight;
-  const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 1000);
-  camera.position.set(150, 100, 150);
-  camera.lookAt(0, 0, 4);
+  try {
+    // ES module 动态加载（importmap 生效）
+    const THREE = await import('three');
+    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0c12);
+    const w = container.clientWidth, h = container.clientHeight;
+    const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 1000);
+    camera.position.set(150, 100, 150);
+    camera.lookAt(0, 0, 4);
 
-  if (!renderer3d) {
-    renderer3d = new THREE.WebGLRenderer({ antialias: true });
-    renderer3d.setSize(w, h);
-  }
-  container.appendChild(renderer3d.domElement);
-
-  // 光照
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(1, 1, 1);
-  scene.add(light);
-  scene.add(new THREE.AmbientLight(0x404040));
-
-  // 网格地面
-  const grid = new THREE.GridHelper(200, 20, 0x4f8cff, 0x2a2e3d);
-  scene.add(grid);
-
-  const loader = new THREE.GLTFLoader();
-  loader.load(url, (gltf) => {
-    const model = gltf.scene;
-    // 居中
-    const box = new THREE.Box3().setFromObject(model);
-    const center = box.getCenter(new THREE.Vector3());
-    model.position.sub(center);
-    model.position.y += 0;
-    scene.add(model);
-    // 轨道控制（简化：自动旋转）
-    function animate() {
-      requestAnimationFrame(animate);
-      model.rotation.y += 0.005;
-      renderer3d.render(scene, camera);
+    if (!renderer3d) {
+      renderer3d = new THREE.WebGLRenderer({ antialias: true });
+      renderer3d.setSize(w, h);
     }
-    animate();
-  }, undefined, (err) => {
-    showStatus('⚠️ GLB 加载失败: ' + err.message, 'error');
-  });
+    container.appendChild(renderer3d.domElement);
+
+    // 光照
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(1, 1, 1);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
+
+    // 网格地面
+    const grid = new THREE.GridHelper(200, 20, 0x4f8cff, 0x2a2e3d);
+    scene.add(grid);
+
+    const loader = new GLTFLoader();
+    loader.load(url, (gltf) => {
+      const model = gltf.scene;
+      // 居中
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.sub(center);
+      scene.add(model);
+      // 自动旋转
+      function animate() {
+        requestAnimationFrame(animate);
+        model.rotation.y += 0.005;
+        renderer3d.render(scene, camera);
+      }
+      animate();
+    }, undefined, (err) => {
+      showStatus('⚠️ GLB 加载失败: ' + err.message, 'error');
+    });
+  } catch (e) {
+    showStatus('⚠️ three.js 加载失败（需联网）: ' + e.message, 'error');
+  }
 }
 </script>
 </body>

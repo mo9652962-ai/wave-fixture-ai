@@ -109,10 +109,20 @@ async def api_interference(files: list[UploadFile] = File(...)):
         stl_path = OUTPUT_DIR / f"{workdir.name}-interf.stl"
         export_stl(mesh, str(stl_path))
 
-        # 元件解析 + 干涉分析
-        from interference import parse_kicad_pcb, analyze_interference
+        # 元件解析 + 干涉分析（带坐标变换：KiCad → Gerber）
+        from interference import parse_kicad_pcb, analyze_interference, transform_pcb_to_gerber, get_pcb_board_bounds
         comps = parse_kicad_pcb(str(pcb_path))
-        reports = analyze_interference(str(stl_path), comps)
+        # pcb 板范围（优先用板框 gr_rect，否则用元件范围）
+        pcb_bounds = get_pcb_board_bounds(str(pcb_path))
+        if pcb_bounds is None and comps:
+            pcb_bounds = (
+                min(c["x"] for c in comps) - 5, min(c["y"] for c in comps) - 5,
+                max(c["x"] for c in comps) + 5, max(c["y"] for c in comps) + 5,
+            )
+        # gerber 板范围（沉板区 = PCB 区域）
+        gerber_bounds = sink.bounds if sink is not None else None
+        reports = analyze_interference(str(stl_path), comps, pcb_bounds=pcb_bounds, gerber_bounds=gerber_bounds,
+                                       avoid_polys=result2.avoid_polys)
 
         # 导出 GLB 供前端 3D 可视化
         glb_path = OUTPUT_DIR / f"{workdir.name}-interf.glb"

@@ -60,11 +60,11 @@ def _extract_number(text: str) -> float | None:
 
 
 def _extract_action(text: str) -> str:
-    """判断动作类型"""
-    if any(k in text for k in ["加大", "扩大", "外扩", "增加", "增大", "放大", "加宽"]):
-        return "increase"
-    if any(k in text for k in ["缩小", "减小", "减少", "缩小", "变窄", "调小"]):
+    """判断动作类型（缩小优先于外扩——「缩小X」含「小」应优先）"""
+    if any(k in text for k in ["缩小", "减小", "减少", "调小", "变小", "改小", "变窄"]):
         return "decrease"
+    if any(k in text for k in ["加大", "扩大", "外扩", "增加", "增大", "放大", "加宽", "变大", "改大"]):
+        return "increase"
     if any(k in text for k in ["改为", "改成", "设为", "设置为", "调整为", "调成"]):
         return "set"
     # 默认：有数字就设为

@@ -53,8 +53,8 @@ log = logging.getLogger("fixture2")
 class Phase2Params:
     # 步骤6: 避位区（BOT 贴片）
     avoid_fillet_r: float = 1.5        # 包围线框倒角 R1.5
-    avoid_group_gap: float = 0.5       # 焊盘分组距离阈值（mm）
-    avoid_pad_extra: float = 0.3       # 焊盘外扩包围
+    avoid_group_gap: float = 3.0       # 焊盘分组距离阈值（mm）——覆盖模块焊盘间距(≤2.54mm)把同元件合并
+    avoid_pad_extra: float = 2.0       # 焊盘外扩包围——覆盖元件体(焊盘→封装外沿)防压margin
     # 步骤7: 上锡区（TOP 插件）
     solder_fillet_r: float = 2.0       # 倒角 R2
     solder_min_gap: float = 3.0        # 焊脚距线框边 ≥3mm（PDF）
@@ -181,7 +181,22 @@ def make_avoid_regions(stack_or_dir, drills: list, p: Phase2Params) -> list[Poly
         poly = convex_hull_buffer(g, p.avoid_pad_extra, p.avoid_fillet_r)
         if poly.area > 0:
             polys.append(poly)
-    log.info(f"  步骤6 避位区: {len(polys)} 个区域")
+    # 合并相邻避位区（同一元件多组焊盘 → 一个完整避位区）
+    # 先各自外扩 union_gap，让相邻组重叠，再 unary_union 融合，最后收回
+    if len(polys) > 1:
+        from shapely.ops import unary_union as _union
+        union_gap = 1.0  # 外扩量（mm）：相邻组间距<2mm 时重叠→合并
+        try:
+            expanded = [poly.buffer(union_gap, join_style="round") for poly in polys]
+            merged = _union(expanded)
+            merged = merged.buffer(-union_gap, join_style="round")
+            if merged.geom_type == "MultiPolygon":
+                polys = [m for m in merged.geoms if m.area > 0]
+            else:
+                polys = [merged] if merged.area > 0 else []
+        except Exception:
+            pass
+    log.info(f"  步骤6 避位区: {len(polys)} 个区域（合并后）")
     return polys
 
 

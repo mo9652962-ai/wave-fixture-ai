@@ -198,9 +198,45 @@ def _fp_key(footprint_name: str) -> str:
     return None
 
 
+def transform_pcb_to_gerber(x: float, y: float, pcb_bounds=None, gerber_bounds=None) -> tuple[float, float]:
+    """
+    KiCad .kicad_pcb 坐标 → Gerber 坐标变换。
+
+    KiCad 导出 Gerber 时 Y 轴翻转（KiCad 的板坐标系 Y 向下，
+    Gerber 标准 Y 向上）。用板中心对齐消除平移差异。
+
+    pcb_bounds: (xmin, ymin, xmax, ymax) pcb 板范围
+    gerber_bounds: (xmin, ymin, xmax, ymax) gerber 板范围
+    若提供 bounds 用中心对齐；否则仅翻转 y。
+    """
+    # y 翻转
+    y_t = -y
+    if pcb_bounds and gerber_bounds:
+        # 中心对齐
+        pcb_cx = (pcb_bounds[0] + pcb_bounds[2]) / 2
+        pcb_cy = (pcb_bounds[1] + pcb_bounds[3]) / 2
+        ger_cx = (gerber_bounds[0] + gerber_bounds[2]) / 2
+        ger_cy = (gerber_bounds[1] + gerber_bounds[3]) / 2
+        return x + (ger_cx - pcb_cx), y_t + (ger_cy - (-pcb_cy))
+    return x, y_t
+
+
+def get_pcb_board_bounds(pcb_path: str) -> tuple | None:
+    """从 .kicad_pcb 提取板框（Edge.Cuts gr_rect）范围 → (xmin, ymin, xmax, ymax)"""
+    try:
+        txt = Path(pcb_path).read_text(encoding="utf-8", errors="replace")
+        for m in re.finditer(r"\(gr_rect[\s\S]*?\(start ([-\d.]+) ([-\d.]+)\)[\s\S]*?\(end ([-\d.]+) ([-\d.]+)\)", txt):
+            x1, y1, x2, y2 = map(float, m.groups())
+            return (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
+    except Exception as e:
+        log.warning(f"  提取板框失败: {e}")
+    return None
+
+
 def parse_kicad_pcb(pcb_path: str) -> list[dict]:
     """
     解析 KiCad .kicad_pcb → 元件列表 [{name, x, y, w, h, height, ref}]
+    坐标保持原始 pcb 坐标（分析时用 transform_pcb_to_gerber 转换）。
     """
     txt = Path(pcb_path).read_text(encoding="utf-8", errors="replace")
     components = []
@@ -279,33 +315,80 @@ def build_component_meshes(components: list[dict], pcb_thickness: float = 1.6) -
     return trimesh.util.concatenate(meshes) if meshes else None
 
 
+def _is_through_hole(footprint_name: str) -> bool:
+    """判断是否为插件封装（贯穿治具，不参与避位区干涉检查）"""
+    name = footprint_name.lower()
+    th_marks = ["pinheader", "connector", "mountinghole", "terminalblock",
+                "screw", "jack", "socket", "dip-", "dip_", "rj45", "usb",
+                "hdmi", "type-c", "audio"]
+    return any(m in name for m in th_marks)
+
+
 def analyze_interference(
     fixture_stl: str,
     components: list[dict],
     pcb_thickness: float = 1.6,
+    pcb_bounds=None,
+    gerber_bounds=None,
+    skip_through_hole: bool = True,
+    avoid_polys: list = None,
+    cover_threshold: float = 0.85,
 ) -> list[dict]:
     """
     干涉分析：每个元件包围盒 vs 治具实体。
 
-    治具在 z=0..thickness，PCB 表面在 z=pcb_thickness（沉板区下沉）。
-    元件在 PCB 上方 → 若元件超出避位区通孔高度 → 与治具实体干涉。
-    返回: [{ref, name, x, y, w, h, height, overlap_mm3}]
+    双层判定：
+    1. 2D 覆盖：元件盒在避位区内的覆盖比例 < cover_threshold → 干涉
+       （治具实体压到元件——避位区必须覆盖元件整体）
+    2. 3D 布尔：与治具实体交集 > 阈值 → 干涉（附重叠体积）
+
+    skip_through_hole: True 时跳过插件封装（PinHeader/Connector 等贯穿治具，
+    它们由上锡区开孔处理，不应报避位区干涉）
+
+    avoid_polys: 避位区多边形列表（用于 2D 覆盖判定）
+    pcb_bounds / gerber_bounds: 提供则先做坐标变换（KiCad→Gerber）
+    返回: [{ref, name, x, y, w, h, height, overlap_mm3, cover_ratio}]
     """
+    from shapely.geometry import box as sbox
+    from shapely.ops import unary_union
     fixture = trimesh.load(fixture_stl)
+    # 避位区合并（2D 覆盖判定用）
+    avoid_union = unary_union(avoid_polys) if avoid_polys else None
     reports = []
     for c in components:
+        # 跳过插件（贯穿治具的正常设计）
+        if skip_through_hole and _is_through_hole(c["name"]):
+            continue
+        # 坐标变换（KiCad → Gerber）
+        tx, ty = c["x"], c["y"]
+        if pcb_bounds and gerber_bounds:
+            tx, ty = transform_pcb_to_gerber(c["x"], c["y"], pcb_bounds, gerber_bounds)
+
+        # 2D 覆盖判定
+        cover_ratio = 1.0
+        if avoid_union is not None:
+            comp_box = sbox(tx - c["w"]/2, ty - c["h"]/2, tx + c["w"]/2, ty + c["h"]/2)
+            inter_area = comp_box.intersection(avoid_union).area
+            cover_ratio = inter_area / comp_box.area if comp_box.area > 0 else 0
+
+        # 3D 布尔判定
         comp = trimesh.creation.box(extents=[c["w"], c["h"], c["height"]])
-        comp.apply_translation([c["x"], c["y"], pcb_thickness + c["height"] / 2])
+        comp.apply_translation([tx, ty, pcb_thickness + c["height"] / 2])
+        vol = 0.0
         try:
             inter = fixture.intersection(comp, engine="manifold")
             vol = inter.volume if inter is not None else 0.0
-            if vol > 0.05:  # 容差：>0.05 mm³ 视为干涉
-                reports.append({
-                    **c,
-                    "overlap_mm3": round(vol, 2),
-                })
         except Exception as e:
             log.warning(f"  干涉检测 {c['ref']} 失败: {e}")
+
+        # 任一判定触发即报干涉
+        if vol > 5.0 or cover_ratio < cover_threshold:
+            reports.append({
+                **c,
+                "x": tx, "y": ty,  # 返回转换后坐标（前端 3D 用）
+                "overlap_mm3": round(vol, 2),
+                "cover_ratio": round(cover_ratio, 2),
+            })
     return reports
 
 
