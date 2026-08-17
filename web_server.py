@@ -114,11 +114,33 @@ async def api_interference(files: list[UploadFile] = File(...)):
         comps = parse_kicad_pcb(str(pcb_path))
         reports = analyze_interference(str(stl_path), comps)
 
+        # 导出 GLB 供前端 3D 可视化
+        glb_path = OUTPUT_DIR / f"{workdir.name}-interf.glb"
+        try:
+            from fixture_3d import export_glb
+            export_glb(mesh, str(glb_path))
+            glb_url = f"/dl/{workdir.name}-interf.glb"
+        except Exception:
+            glb_url = None
+
+        # 干涉元件盒数据（前端 three.js 叠加高亮）
+        interference_boxes = [
+            {
+                "ref": r["ref"], "name": r["name"],
+                "x": r["x"], "y": r["y"],
+                "w": r["w"], "h": r["h"], "height": r["height"],
+                "overlap_mm3": r["overlap_mm3"],
+            }
+            for r in reports
+        ]
+
         return JSONResponse({
             "ok": True,
             "component_count": len(comps),
             "interference_count": len(reports),
             "interferences": reports,
+            "interference_boxes": interference_boxes,
+            "glb_url": glb_url,
             "message": f"分析完成：{len(comps)} 个元件，{len(reports)} 个干涉" if reports else f"分析完成：{len(comps)} 个元件，✅ 无干涉",
         })
     except HTTPException:
