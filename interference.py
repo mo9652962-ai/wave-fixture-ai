@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 interference — 干涉分析：PCB 元件 vs 治具 3D
 
@@ -21,10 +20,8 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field
 from pathlib import Path
 
-import numpy as np
 import trimesh
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -331,7 +328,7 @@ def analyze_interference(
     pcb_bounds=None,
     gerber_bounds=None,
     skip_through_hole: bool = True,
-    avoid_polys: list = None,
+    avoid_polys: list | None = None,
     cover_threshold: float = 0.85,
 ) -> list[dict]:
     """
@@ -393,7 +390,6 @@ def analyze_interference(
 
 
 if __name__ == "__main__":
-    import sys
     # 自测：ESP32 dev 板
     pcb = r"D:\kicad-test-board\basic-esp32s3-dev-board\dev-board.kicad_pcb"
     comps = parse_kicad_pcb(pcb)

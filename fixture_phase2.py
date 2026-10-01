@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 波峰焊治具 AI 设计助手 — Phase 2
 PDF 步骤 6-9：避位区 / 上锡区 / 盖板弹力柱孔 / 治具外形+挡锡条
@@ -14,10 +13,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import ezdxf
-from shapely.geometry import Polygon, box, Point, LineString
+from shapely.geometry import Point, Polygon, box
 from shapely.ops import unary_union
-
-from gerbonara import LayerStack, GerberFile
 
 
 def layer_pts_from_files(gerber_dir: str, key: str) -> list[tuple[float, float, float]]:
@@ -102,8 +99,8 @@ def objects_to_points(layer) -> list[tuple[float, float, float]]:
         elif cls == "Arc":
             try:
                 pts.append((float(o.center_x), float(o.center_y), 0.1))
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Arc 中心点提取失败: %s", e)
     return pts
 
 
@@ -160,8 +157,8 @@ def make_avoid_regions(stack_or_dir, drills: list, p: Phase2Params) -> list[Poly
         pad_pts = objects_to_points(stack_or_dir["bottom mask"])
         try:
             pad_pts += objects_to_points(stack_or_dir["top mask"])
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("top mask 层缺失: %s", e)
 
     # 判定插件：焊盘中心附近有钻孔 = 插件脚（排除出避位区）
     drill_pts = [(x, y) for x, y, r in drills]
@@ -194,8 +191,8 @@ def make_avoid_regions(stack_or_dir, drills: list, p: Phase2Params) -> list[Poly
                 polys = [m for m in merged.geoms if m.area > 0]
             else:
                 polys = [merged] if merged.area > 0 else []
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("避位区合并失败，使用独立区域: %s", e)
     log.info(f"  步骤6 避位区: {len(polys)} 个区域（合并后）")
     return polys
 
@@ -376,9 +373,15 @@ def export_dxf2(result: Phase2Result, out_path: str, sink_poly=None, handles=Non
 # 主流程（Phase 1 + Phase 2 完整）
 # ─────────────────────────────────────────────────────────────
 def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None,
-               params1_override: dict = None, params2_override: dict = None):
-    from fixture_phase1 import parse_gerber, make_sink_region, make_handles, \
-        make_screws, make_pins, FixtureParams, FixtureResult
+               params1_override: dict | None = None, params2_override: dict | None = None):
+    from fixture_phase1 import (
+        FixtureParams,
+        make_handles,
+        make_pins,
+        make_screws,
+        make_sink_region,
+        parse_gerber,
+    )
 
     params1 = FixtureParams()
     params2 = Phase2Params()

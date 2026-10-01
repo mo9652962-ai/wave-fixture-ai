@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 波峰焊治具 AI 设计助手 — Web 服务
 拖 Gerber → 生成治具 DXF → 预览 PNG → 下载
@@ -8,8 +7,6 @@
 from __future__ import annotations
 
 import logging
-import os
-import shutil
 import sys
 import tempfile
 import time
@@ -23,14 +20,14 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("fixture-web")
 
 # FastAPI 导入（延迟到 main 判断，便于直接跑脚本测试核心函数）
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from fixture_3d import Fixture3DParams, build_fixture_3d, export_glb, export_stl
 from fixture_phase2 import run_phase2
-from fixture_3d import build_fixture_3d, export_stl, export_glb, Fixture3DParams
-from nl_adjust import parse_adjust_command, apply_adjustments
+from nl_adjust import parse_adjust_command
 
 app = FastAPI(title="波峰焊治具 AI 设计助手", version="1.0")
 app.add_middleware(
@@ -91,12 +88,13 @@ async def api_interference(files: list[UploadFile] = File(...)):
         pcb_path = pcb_files[0]
 
         # 生成治具 3D
-        from fixture_phase1 import parse_gerber, make_sink_region, FixtureParams
-        from fixture_phase2 import run_phase2
-        from fixture_3d import build_fixture_3d, export_stl, Fixture3DParams
         from shapely.ops import unary_union as _uu
 
-        board_polys, drills = parse_gerber(str(workdir))
+        from fixture_3d import Fixture3DParams, build_fixture_3d, export_stl
+        from fixture_phase1 import FixtureParams, make_sink_region, parse_gerber
+        from fixture_phase2 import run_phase2
+
+        board_polys, _drills = parse_gerber(str(workdir))
         if not board_polys:
             raise HTTPException(422, "未找到外形层")
         board = _uu(board_polys)
@@ -110,7 +108,11 @@ async def api_interference(files: list[UploadFile] = File(...)):
         export_stl(mesh, str(stl_path))
 
         # 元件解析 + 干涉分析（带坐标变换：KiCad → Gerber）
-        from interference import parse_kicad_pcb, analyze_interference, transform_pcb_to_gerber, get_pcb_board_bounds
+        from interference import (
+            analyze_interference,
+            get_pcb_board_bounds,
+            parse_kicad_pcb,
+        )
         comps = parse_kicad_pcb(str(pcb_path))
         # pcb 板范围（优先用板框 gr_rect，否则用元件范围）
         pcb_bounds = get_pcb_board_bounds(str(pcb_path))
@@ -206,9 +208,9 @@ async def api_adjust(instruction: str = Form(""), files: list[UploadFile] = File
         try:
             import matplotlib
             matplotlib.use("Agg")
-            import matplotlib.pyplot as plt
             import ezdxf
-            from ezdxf.addons.drawing import RenderContext, Frontend
+            import matplotlib.pyplot as plt
+            from ezdxf.addons.drawing import Frontend, RenderContext
             from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
             doc = ezdxf.readfile(str(dxf_path))
             ctx = RenderContext(doc)
@@ -247,11 +249,12 @@ async def api_generate3d(files: list[UploadFile] = File(...)):
     try:
         workdir = _extract_upload(files)
         # 先用 phase2 得到 2D 几何
-        from fixture_phase1 import parse_gerber, make_sink_region, FixtureParams
-        from fixture_phase2 import run_phase2, Phase2Params
         from shapely.ops import unary_union as _uu
 
-        board_polys, drills = parse_gerber(str(workdir))
+        from fixture_phase1 import FixtureParams, make_sink_region, parse_gerber
+        from fixture_phase2 import run_phase2
+
+        board_polys, _drills = parse_gerber(str(workdir))
         if not board_polys:
             raise HTTPException(422, "未找到外形层")
         board = _uu(board_polys)
@@ -317,9 +320,9 @@ async def api_generate(files: list[UploadFile] = File(...)):
         try:
             import matplotlib
             matplotlib.use("Agg")
-            import matplotlib.pyplot as plt
             import ezdxf
-            from ezdxf.addons.drawing import RenderContext, Frontend
+            import matplotlib.pyplot as plt
+            from ezdxf.addons.drawing import Frontend, RenderContext
             from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
             doc = ezdxf.readfile(str(dxf_path))
             ctx = RenderContext(doc)
@@ -388,11 +391,17 @@ async def api_health():
 app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
 
 
-if __name__ == "__main__":
+def main() -> None:
     import argparse
+
     ap = argparse.ArgumentParser(description="波峰焊治具 AI Web 服务")
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
     import uvicorn
+
     print(f"🚀 波峰焊治具 AI 已启动: http://localhost:{args.port}")
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+
+
+if __name__ == "__main__":
+    main()

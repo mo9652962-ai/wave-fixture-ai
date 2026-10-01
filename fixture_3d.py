@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 fixture_3d — 波峰焊治具 3D 预览 + 干涉分析
 
@@ -16,13 +15,12 @@ fixture_3d — 波峰焊治具 3D 预览 + 干涉分析
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import trimesh
-from shapely.geometry import Polygon, box
-from shapely.ops import unary_union
+from shapely.geometry import Polygon
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("fixture3d")
@@ -166,7 +164,7 @@ if __name__ == "__main__":
         solder = result.solder_polys
 
         # 需要 sink_poly，从 phase1 补
-        from fixture_phase1 import parse_gerber, make_sink_region, FixtureParams
+        from fixture_phase1 import FixtureParams, make_sink_region, parse_gerber
         polys, drills = parse_gerber(gerber_dir)
         from shapely.ops import unary_union as _uu
         board = _uu(polys)

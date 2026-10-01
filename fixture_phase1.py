@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 波峰焊治具 AI 设计助手 — Phase 1
 PDF 10 步规则前 4 步：沉板区 / 取手位 / 压扣孔 / 定位销 → DXF 输出
@@ -18,12 +17,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import ezdxf
-import shapely
+from gerbonara import ExcellonFile, LayerStack
 from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
-
-from gerbonara import LayerStack, ExcellonFile
-from gerbonara.utils import MM
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("fixture")
@@ -202,20 +198,20 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
                 approx = obj.approximate(max_error=0.01)
                 pts = [(a.x1, a.y1) for a in approx] + [(approx[-1].x2, approx[-1].y2)]
                 lines.append(LineString(pts))
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Arc 近似失败 %s: %s", getattr(obj, "ref", "?"), e)
         elif cls == "Region":
             try:
                 pts = [(v.x, v.y) for v in obj.vertices]
                 if len(pts) >= 3:
                     board_polys.append(Polygon(pts))
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Region 顶点解析失败 %s: %s", getattr(obj, "ref", "?"), e)
 
     if lines and not board_polys:
         # 线段围成多边形：尝试 LinearRing
         try:
-            from shapely.ops import polygonize, unary_union as _uu
+            from shapely.ops import polygonize
             merged = unary_union(lines)
             if merged.geom_type == "LineString":
                 ring = Polygon(merged.coords)
@@ -252,7 +248,7 @@ def make_sink_region(board_poly: Polygon, p: FixtureParams) -> Polygon:
 # ─────────────────────────────────────────────────────────────
 def make_handles(sink_poly: Polygon, p: FixtureParams) -> list[Polygon]:
     """沉板区左右各一取手位，紧贴边线，重叠 1mm"""
-    minx, miny, maxx, maxy = sink_poly.bounds
+    minx, miny, maxx, _maxy = sink_poly.bounds
     handles = []
 
     for side in ("left", "right"):

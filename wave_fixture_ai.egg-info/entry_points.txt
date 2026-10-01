@@ -1,0 +1,2 @@
+[console_scripts]
+wave-fixture-ai = web_server:main

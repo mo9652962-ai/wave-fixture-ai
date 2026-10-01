@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 nl_adjust — 自然语言对话调整治具参数
 
@@ -10,7 +9,7 @@ nl_adjust — 自然语言对话调整治具参数
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # 参数 → 中文别名 映射
 PARAM_ALIASES = {

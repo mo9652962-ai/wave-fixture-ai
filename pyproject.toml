@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wave-fixture-ai"
+version = "0.2.0"
+description = "波峰焊治具 AI 设计助手：Gerber → 治具 DXF/STL，13 项自动化（沉板/取手/避位/上锡/干涉分析/自然语言调整）"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "mo9652962-ai" }]
+dependencies = [
+    "shapely>=2.0",
+    "ezdxf>=1.1",
+    "trimesh>=4.0",
+    "numpy>=1.24",
+    "manifold3d>=0.7",
+    "gerbonara>=1.4",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.8"]
+
+[project.scripts]
+wave-fixture-ai = "web_server:main"
+
+[tool.setuptools]
+py-modules = [
+    "fixture_phase1",
+    "fixture_phase2",
+    "fixture_3d",
+    "interference",
+    "nl_adjust",
+    "web_server",
+]
+
+[tool.setuptools.data-files]
+"share/wave-fixture-ai" = ["web/index.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# E501: 行长由格式化负责；BLE001: 解析器对恶意/畸形输入必须容错不崩（except 已逐处审计）
+ignore = ["E501", "BLE001"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI 的 File()/Form() 依赖注入模式必然在默认参数中调用工厂
+"web_server.py" = ["B008"]
+"tests/*" = ["S101"]

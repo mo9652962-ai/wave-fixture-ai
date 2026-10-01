@@ -1,9 +1,54 @@
-# 波峰焊治具 AI 设计助手 (Wave Fixture AI)
+<div align="center">
 
-输入 PCB Gerber 文件 → 自动生成波峰焊治具工程图（DXF/STL），替代传统重复性 CAD 手工画图。
-支持 2D 出图、3D 预览、元件干涉分析、自然语言参数调整。
+  <img src="docs/images/brand-mark.png" alt="Wave Fixture AI" width="110">
 
-## 功能一览
+  # WAVE FIXTURE AI
+
+  **Gerber 进 · 治具工程图出 · 13 项自动化 · 会听人话的 CAD 助手**
+
+  **wave-fixture-ai 把波峰焊治具设计从手工描图变成一条命令：拖入 PCB Gerber 文件，自动生成沉板区、取手位、避位区、上锡区、压扣孔、定位销与治具外形，输出 DXF/STL/GLB；支持 3D 预览、元件干涉分析与自然语言参数调整（「避位区外扩1mm」等 23 参数确定性解析）。**
+
+  <p>
+    <a href="README.en.md">English</a>
+    ·
+    <a href="#-命令行方式">⌨️ 命令行</a>
+    ·
+    <a href="#-api-端点">🔌 API</a>
+    ·
+    <a href="LICENSE">MIT</a>
+  </p>
+
+  <p>
+    <a href="https://github.com/mo9652962-ai/wave-fixture-ai/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/mo9652962-ai/wave-fixture-ai/ci.yml?style=flat-square&label=CI" alt="CI"></a>
+    <img src="https://img.shields.io/badge/features-13-2563EB?style=flat-square" alt="features">
+    <img src="https://img.shields.io/badge/KiCad-10%20兼容-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
+    <img src="https://img.shields.io/badge/tests-22%20passed-success?style=flat-square" alt="tests">
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
+  </p>
+</div>
+
+<div align="center">
+  <img src="docs/images/banner-1200x630.png" alt="WAVE FIXTURE AI · 波峰焊治具 AI 设计助手" width="100%">
+</div>
+
+<div align="center">
+  <img src="docs/images/demo.gif" alt="wave-fixture-ai 能力清单：Gerber 识别 / 沉板区 / 避位区 / 3D 预览 / 干涉分析 / 自然语言调整" width="92%">
+  <p><sub>▲ 13 项自动化 · DXF / STL / GLB 交付 · Web 界面或命令行</sub></p>
+</div>
+
+<div align="center">
+
+### ⭐ 如果 wave-fixture-ai 对你有帮助，点个 Star 就是最大的支持
+
+[![GitHub stars](https://img.shields.io/github/stars/mo9652962-ai/wave-fixture-ai?style=social)](https://github.com/mo9652962-ai/wave-fixture-ai/stargazers)
+[![GitHub License](https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/mo9652962-ai/wave-fixture-ai/ci.yml?style=flat-square)](https://github.com/mo9652962-ai/wave-fixture-ai/actions)
+
+[![Star History Chart](https://api.star-history.com/svg?repos=mo9652962-ai/wave-fixture-ai&type=Date)](https://star-history.com/#mo9652962-ai/wave-fixture-ai&Date)
+
+</div>
+
+## ✨ 13 项自动化
 
 | 步骤 | 功能 | 状态 |
 |:---|:---|:---|
@@ -21,11 +66,13 @@
 | 12 | **干涉分析**（元件 vs 治具：2D 覆盖 + 3D 布尔双层判定）| ✅ |
 | 13 | **自然语言调整**（「避位区外扩1mm」等 23 参数）| ✅ |
 
-## 快速开始（Web 界面，推荐）
+## 🚀 快速开始（Web 界面，推荐）
 
 ```bash
-cd D:\wave-fixture-ai
-python web_server.py --port 8000
+# 安装（或 pip install -e . 后用 wave-fixture-ai 命令）
+pip install -e .
+
+wave-fixture-ai --port 8000
 ```
 
 浏览器打开 **http://localhost:8000**，使用流程：
@@ -35,30 +82,11 @@ python web_server.py --port 8000
    建议包含：B_Mask + F_Mask + Edge_Cuts + B_Cu + F_Cu + .drl
 2. 点「🚀 生成治具」→ 预览 2D + 下载 DXF/PNG
 3. 点「🧊 生成 3D」→ 3D 旋转预览 + 下载 STL/GLB
-4. （可选）干涉分析：
-   再拖入 KiCad 工程文件 .kicad_pcb → 点「🔍 运行干涉分析」
-   → 报告避位不足的元件 + 3D 红色高亮
-5. （可选）自然语言调整：
-   输入如「避位区外扩1mm」→ 重新生成调整后的治具
+4. （可选）干涉分析：再拖入 KiCad 工程文件 .kicad_pcb → 报告避位不足的元件
+5. （可选）自然语言调整：输入如「避位区外扩1mm」→ 重新生成
 ```
 
-### 干涉分析说明
-
-- 需要 **.kicad_pcb** 文件（Gerber 只有焊盘几何，无元件高度信息）
-- 判定规则：元件盒在避位区覆盖 <85% 或 与治具 3D 重叠 >5mm³ → 报干涉
-- 插件（PinHeader/Connector/USB 等）自动跳过（贯穿治具由「上锡区」处理）
-
-### 自然语言调整示例
-
-```
-避位区外扩1mm           → avoid_pad_extra: 0.3 → 1.3
-治具外形倒角改5mm        → outer_fillet_r: 5.0 → 5.0
-沉板区外扩0.5mm          → sink_expand_mm: 0.2 → 0.7
-盖板孔径改3mm            → cap_hole_r: 2.45 → 3.0
-左右外扩加大20mm         → ext_left_right: 20.0 → 40.0
-```
-
-## 命令行方式
+## ⌨️ 命令行方式
 
 ```bash
 # Phase 1（沉板区/取手位/压扣孔/定位销）
@@ -66,9 +94,6 @@ python fixture_phase1.py <gerber_dir> -o output/fixture.dxf
 
 # Phase 2 完整（+避位区/上锡区/盖板/治具外形）
 python fixture_phase2.py <gerber_dir> -o output/fixture-full.dxf
-
-# 3D 治具（STL）
-python fixture_3d.py
 
 # 干涉分析（需 .kicad_pcb）
 python -c "
@@ -78,7 +103,7 @@ reports = analyze_interference('output/fixture.stl', comps)
 "
 ```
 
-## API 端点
+## 🔌 API 端点
 
 | 端点 | 功能 |
 |:---|:---|
@@ -88,37 +113,32 @@ reports = analyze_interference('output/fixture.stl', comps)
 | `POST /api/interference` | 干涉分析（需含 .kicad_pcb）|
 | `GET /dl/{file}` | 下载生成的文件 |
 
-## 技术栈
+## 🔬 干涉分析说明
+
+- 需要 **.kicad_pcb** 文件（Gerber 只有焊盘几何，无元件高度信息）
+- 判定规则：元件盒在避位区覆盖 <85% 或 与治具 3D 重叠 >5mm³ → 报干涉
+- 插件（PinHeader/Connector/USB 等）自动跳过（贯穿治具由「上锡区」处理）
+
+## 💬 自然语言调整示例
+
+```
+避位区外扩1mm           → avoid_pad_extra: 0.3 → 1.3
+沉板区外扩0.5mm          → sink_expand_mm: 0.2 → 0.7
+盖板孔径改3mm            → cap_hole_r: 2.45 → 3.0
+左右外扩加大20mm         → ext_left_right: 20.0 → 40.0
+```
+
+> 规则解析（确定性，不用 LLM）——工程参数调整要精确可复现。
+
+## 🧰 技术栈
 
 - **gerbonara** — Gerber/Excellon 解析（层自动识别 + KiCad10 G85 正则回退）
 - **shapely** — 几何运算（外扩/倒角/凸包包围/坐标变换）
 - **ezdxf** — DXF 输出
-- **trimesh** — 3D 拉伸/布尔（manifold 引擎）
+- **trimesh + manifold** — 3D 拉伸/布尔
 - **fastapi + uvicorn** — Web 服务
 - **three.js** — 前端 3D 渲染（ES module）
 
-## 项目结构
+## License
 
-```
-wave-fixture-ai/
-├── fixture_phase1.py    # 步骤 2-5（沉板区/取手位/压扣孔/定位销）
-├── fixture_phase2.py    # 步骤 6-9（避位区/上锡区/盖板/外形）+ 主流程
-├── fixture_3d.py        # 2D→3D 拉伸 + STL/GLB 导出
-├── interference.py      # 干涉分析（KiCad 坐标变换 + 双层判定 + 137 封装高度表）
-├── nl_adjust.py         # 自然语言指令解析（23 参数映射）
-├── web_server.py        # FastAPI 服务
-├── web/index.html       # 前端（拖拽/预览/3D/对话调整/干涉可视化）
-└── output/              # 生成的 DXF/PNG/STL/GLB
-```
-
-## 已知限制
-
-- 干涉分析需要 .kicad_pcb（元件高度数据）；纯 Gerber 只能做 3D 几何预览
-- 避位区按焊盘凸包生成，对「中间无焊盘」的模块（如 ESP32）覆盖不全——干涉分析会如实报告，需人工确认加避让
-- 3D 预览需联网加载 three.js（CDN）；离线可下载 STL 用其他查看器
-
-## 验证
-
-- 实测板：空调板 demo（80×80mm，68 钻孔，47 避位区）+ ESP32-S3 dev 板（21 元件，77 避位区）
-- 干涉分析验证：ESP32 板准确报出 4 个避位不足元件（U2 模块 34% / U3 稳压 27% / SW 开关 73%）
-- 自动化验证：`hermes-verify` 脚本（22 项：语法/坐标变换/DRL 单位/插件过滤/干涉报告）
+MIT
