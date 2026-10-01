@@ -30,6 +30,6 @@ def test_convex_hull_buffer_three_points():
 def test_convex_hull_buffer_two_points_makes_round_caps():
 
     poly = convex_hull_buffer([(0, 0, 1.0), (20, 0, 1.0)], extra=0.5, fillet_r=0.3)
-    minx, miny, maxx, maxy = poly.bounds
+    minx, _miny, maxx, _maxy = poly.bounds
     # 几何不变量：bounds 至少外扩 extra−0.01（同上，离散化容差）
     assert minx <= -0.49 and maxx >= 20.49
