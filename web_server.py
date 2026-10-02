@@ -37,7 +37,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-WEB_DIR = Path(__file__).parent / "web"
+def _resolve_web_dir() -> Path:
+    """定位前端静态目录，兼容源码运行与 pip 安装两种布局。
+
+    - 源码：<repo>/web/index.html（与 web_server.py 同级）
+    - 安装（data-files）：<sys.prefix>/share/wave-fixture-ai/index.html
+    找不到时返回源码路径（让 StaticFiles 在启动时报出清晰的缺目录错误）。
+    """
+    here = Path(__file__).resolve().parent
+    candidates = [
+        here / "web",                                        # 源码布局
+        Path(sys.prefix) / "share" / "wave-fixture-ai",      # venv 安装（实测位置）
+        Path(sys.base_prefix) / "share" / "wave-fixture-ai", # 系统级安装
+        here.parent.parent / "share" / "wave-fixture-ai",    # site-packages 上两级（兼容布局）
+    ]
+    # 最可靠：按发行版元数据定位（pip 安装时 data-files 的相对位置由安装器决定）
+    try:
+        from importlib.metadata import distribution
+
+        dist = distribution("wave-fixture-ai")
+        for f in dist.files or []:
+            if str(f).replace("\\", "/").endswith("share/wave-fixture-ai/index.html"):
+                candidates.insert(0, Path(str(dist.locate_file(f))).parent)
+                break
+    except Exception as e:  # noqa: BLE001 —— 元数据不可用（源码运行）时跳过
+        log.debug("importlib.metadata 定位跳过: %s", e)
+    for c in candidates:
+        if (c / "index.html").is_file():
+            return c
+    log.warning(f"  未找到前端静态目录，候选: {[str(c) for c in candidates]}")
+    return candidates[0]
+
+
+WEB_DIR = _resolve_web_dir()
 OUTPUT_DIR = Path(__file__).parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 REVIEW_DIR = Path(__file__).parent / "reviews-data"

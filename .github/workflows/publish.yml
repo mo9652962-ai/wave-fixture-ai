@@ -1,0 +1,65 @@
+name: Publish to PyPI
+
+# 打 v* tag（如 v0.2.0）或手动触发 → uv build → OIDC 免 token 发布。
+# 前提（一次性）: PyPI 项目 Settings → Publishing 配 Trusted Publisher:
+#   Owner=mo9652962-ai  Repository=wave-fixture-ai  Workflow name=publish.yml  Environment=pypi
+# 同时记得 bump pyproject 的 version——PyPI 不允许同版本重传。
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# least-privilege：GITHUB_TOKEN 全局只读；publish job 单独声明 id-token（OIDC）
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --extra dev
+
+      - name: Run tests before publish
+        run: uv run pytest -q
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write # PyPI Trusted Publishing (OIDC)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+
+      - name: Build sdist & wheel
+        run: uv build
+
+      - name: Generate SBOM (CycloneDX)
+        run: uv run --with cyclonedx-py cyclonedx-py environment --output-format json --output-file sbom.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3（SHA 固定）
+        with:
+          name: sbom-cyclonedx
+          path: sbom.json
+
+      # 前端资源随 wheel 分发（data-files → share/wave-fixture-ai），安装后由
+      # _resolve_web_dir() 定位；发布前验证 wheel 内确实含 index.html
+      - name: Verify wheel contains web assets
+        run: python -c "import glob,zipfile,sys; n=zipfile.ZipFile(glob.glob('dist/*.whl')[0]).namelist(); sys.exit('wheel 缺少前端资源（pip 安装后将无界面）') if not any(x.endswith('index.html') for x in n) else print('wheel 含前端资源 OK', [x for x in n if x.endswith('index.html')])"
+
+      # pypi-publish 在 OIDC 模式下默认生成 PEP 740 attestations（provenance）
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
