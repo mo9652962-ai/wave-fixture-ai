@@ -16,7 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from web_server import _resolve_web_dir  # noqa: E402
+from web_server import _resolve_web_dir
 
 
 def test_source_layout_resolves():

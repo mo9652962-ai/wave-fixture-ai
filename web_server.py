@@ -60,7 +60,7 @@ def _resolve_web_dir() -> Path:
             if str(f).replace("\\", "/").endswith("share/wave-fixture-ai/index.html"):
                 candidates.insert(0, Path(str(dist.locate_file(f))).parent)
                 break
-    except Exception as e:  # noqa: BLE001 —— 元数据不可用（源码运行）时跳过
+    except Exception as e:
         log.debug("importlib.metadata 定位跳过: %s", e)
     for c in candidates:
         if (c / "index.html").is_file():
