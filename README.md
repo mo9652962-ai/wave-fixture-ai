@@ -173,8 +173,19 @@ reports = analyze_interference('output/fixture.stl', comps)
 | `case_003_stm32_4layer` | **circuit-agent 生成的 4 层板**（跨仓/跨工具素材） | 37×37mm · 12 钻孔 · 含 3.2mm 安装孔 | **跨 AI-EDA 工具兼容性**、合格销径走打分正常路径、DRC 全绿正例 |
 
 ```bash
-uv run pytest tests/test_golden_case001.py tests/test_golden_case002_kicad.py -v   # 18 项黄金断言
+uv run pytest -q --cov --cov-fail-under=80    # 130 测试 · 覆盖率 84%（CI 棘轮 80）
+uv run pytest tests/test_golden_case*.py -v    # 25 项真实板黄金断言
 ```
+
+| 测试层 | 文件 | 覆盖内容 |
+|:---|:---|:---|
+| **真实板黄金**（25） | `test_golden_case00*.py` | 三来源板的几何精确性/设计规则/跨工具兼容 |
+| **API 契约**（13） | `test_web_api.py` | 全部 7 个端点的字段契约、错误路径、产物可下载 |
+| **解析健壮性**（8） | `test_drill_parsing.py` | METRIC/INCH 单位推断、英寸换算、G85 多孔、去重 |
+| **3D 构建**（8） | `test_fixture_3d.py` | 布尔差集体积校验、失败告警、STL/GLB 导出 |
+| **导出与编排**（5） | `test_phase1_export.py` | DXF 图层契约、孔为圆实体、无外形不产出 |
+| **安全**（5） | `test_web_download_security.py` | 路径穿越拒绝、同名前缀目录、cwd 变化 |
+| **模块单元**（66） | 其余 | DRC 规则/Golden/Review/销选点/几何/NL 调整 |
 
 | 断言类别 | 内容 |
 |:---|:---|
