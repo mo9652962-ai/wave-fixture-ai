@@ -11,6 +11,12 @@
   <p>
     <a href="README.md">🇨🇳 中文</a>
     ·
+    <a href="#-use-in-ci-github-action">🤖 GitHub Action</a>
+    ·
+    <a href="llms.txt">📄 llms.txt (AI Direct)</a>
+    ·
+    <a href="VALIDATION.md">🧪 Real-world Validation (16 defects)</a>
+    ·
     <a href="#-api-endpoints">🔌 API</a>
     ·
     <a href="LICENSE">MIT</a>
@@ -18,8 +24,12 @@
 
   <p>
     <a href="https://github.com/mo9652962-ai/wave-fixture-ai/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/mo9652962-ai/wave-fixture-ai/ci.yml?style=flat-square&label=CI" alt="CI"></a>
-    <img src="https://img.shields.io/badge/features-13-2563EB?style=flat-square" alt="features">
+    <img src="https://img.shields.io/badge/features-17%20automations-2563EB?style=flat-square" alt="features">
     <img src="https://img.shields.io/badge/KiCad-10%20compatible-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
+    <img src="https://img.shields.io/badge/tests-160%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
+    <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
   </p>
 </div>
 
@@ -44,16 +54,42 @@
 | 11 | **3D preview** (STL/GLB export + in-browser viewer) | ✅ |
 | 12 | **Interference analysis** (2D coverage + 3D boolean dual test) | ✅ |
 | 13 | **Natural-language adjustment** (23 parameters) | ✅ |
+| 14 | **DRC manufacturing safety gate** (16 rules · 4 severities · cited) | ✅ |
+| 15 | **Golden sample regression** (IoU≥0.9 · Hausdorff≤0.5mm · circle best-match) | ✅ |
+| 16 | **Human review loop** (missing-data gating → operator audit log) | ✅ |
+| 17 | **Locating pin scoring** (diameter window / NPTH / edge distance) | ✅ |
 
 ## 🚀 Quick start
 
 ```bash
-pip install -e .
+pip install wave-fixture-ai
 wave-fixture-ai --port 8000
 # open http://localhost:8000 and drop your Gerber files
 ```
 
-Command-line equivalents:
+## 🤖 Use in CI (GitHub Action)
+
+Automatically generate solder fixtures and enforce DRC manufacturing gates on PRs:
+
+```yaml
+name: drc
+on: [pull_request, push]
+jobs:
+  fixture-drc:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mo9652962-ai/wave-fixture-ai@main
+        with:
+          gerber-dir: gerber/
+          severity-threshold: error
+```
+
+Outputs `fixture.dxf` (production ready, or watermarked with `PREVIEW` if gates fail) + `drc-report.json`.
+
+## Command-line equivalents
 
 ```bash
 python fixture_phase1.py <gerber_dir> -o output/fixture.dxf    # sink/handles/screws/pins

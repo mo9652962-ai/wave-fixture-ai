@@ -11,7 +11,11 @@
   <p>
     <a href="README.en.md">English</a>
     ·
-    <a href="#-命令行方式">⌨️ 命令行</a>
+    <a href="#-在-ci-里用github-action">🤖 GitHub Action</a>
+    ·
+    <a href="llms.txt">📄 llms.txt (AI 直读)</a>
+    ·
+    <a href="VALIDATION.md">🧪 真实世界验证 (16 缺陷)</a>
     ·
     <a href="#-api-端点">🔌 API</a>
     ·
@@ -20,9 +24,11 @@
 
   <p>
     <a href="https://github.com/mo9652962-ai/wave-fixture-ai/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/mo9652962-ai/wave-fixture-ai/ci.yml?style=flat-square&label=CI" alt="CI"></a>
-    <img src="https://img.shields.io/badge/features-13-2563EB?style=flat-square" alt="features">
+    <img src="https://img.shields.io/badge/features-17%20automations-2563EB?style=flat-square" alt="features">
     <img src="https://img.shields.io/badge/KiCad-10%20兼容-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
-    <img src="https://img.shields.io/badge/tests-22%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/tests-160%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
+    <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
   </p>
 </div>
@@ -108,6 +114,31 @@ wave-fixture-ai --port 8000
 4. （可选）干涉分析：再拖入 KiCad 工程文件 .kicad_pcb → 报告避位不足的元件
 5. （可选）自然语言调整：输入如「避位区外扩1mm」→ 重新生成
 ```
+
+## 🤖 在 CI 里用（GitHub Action）
+
+在 PR 时自动为 PCB 生成波峰焊治具并跑 DRC 生产门禁——**可制造性问题在 PR 阶段暴露**，
+防止把不可焊的板送去打样：
+
+```yaml
+name: drc
+on: [pull_request, push]
+jobs:
+  fixture-drc:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mo9652962-ai/wave-fixture-ai@main
+        with:
+          gerber-dir: gerber/           # 你的 Gerber 产物目录
+          severity-threshold: error     # error/blocking 问题让 CI 失败
+```
+
+产出：`fixture.dxf`（通过则为生产版，未过自动带 `PREVIEW` 水印）+ `drc-report.json`
+自动上传为 `fixture-artifacts`。详见 [action.yml](action.yml)。本仓库 CI 每次 push 都在
+用它审计自己的真实板用例（dogfood）。
 
 ## ⌨️ 命令行方式
 

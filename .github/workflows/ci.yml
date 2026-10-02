@@ -23,8 +23,8 @@ jobs:
           enable-cache: true
       - name: Sync dependencies
         run: uv sync --extra dev
-      - name: Run tests（覆盖率棘轮：实测 84%，门槛 80%，只升不降）
-        run: uv run pytest -q --cov=fixture_phase1 --cov=fixture_phase2 --cov=fixture_3d --cov=interference --cov=nl_adjust --cov=drc --cov=golden --cov=review --cov=pin_select --cov=web_server --cov-report=term-missing --cov-fail-under=80
+      - name: Run tests（覆盖率棘轮：实测 85%，门槛 80%，只升不降）
+        run: uv run pytest -q --cov=fixture_phase1 --cov=fixture_phase2 --cov=fixture_3d --cov=interference --cov=nl_adjust --cov=drc --cov=golden --cov=review --cov=pin_select --cov=web_server --cov=ci_drc_gate --cov-report=term-missing --cov-fail-under=80
 
   lint:
     runs-on: ubuntu-latest
@@ -37,3 +37,19 @@ jobs:
         run: uv sync --extra dev
       - name: Ruff
         run: uv run ruff check .
+
+  # 自吃狗粮：用本仓的 action.yml 跑真实板门禁（case_003 4 层板），自验 Action 完整链路
+  action-dogfood:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: Install current repo into isolated venv for action
+        run: |
+          uv venv .gfx-venv --quiet
+          uv pip install --python .gfx-venv -e . --quiet
+      - name: Run local action against case_003
+        run: |
+          .gfx-venv/bin/python -m ci_drc_gate cases/case_003_stm32_4layer --out fixture-out --severity-threshold error
+          test -f fixture-out/fixture.dxf
+          test -f fixture-out/drc-report.json
