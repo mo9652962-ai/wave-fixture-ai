@@ -424,12 +424,21 @@ def _safe(poly) -> str:
 
 @app.get("/dl/{fname}")
 async def api_download(fname: str):
-    """下载生成的文件（DXF/PNG）"""
-    # 安全：只允许 output 目录内的文件
-    p = (OUTPUT_DIR / fname).resolve()
-    if not str(p).startswith(str(OUTPUT_DIR.resolve())):
+    """下载生成的文件（DXF/PNG/STL/GLB）。
+
+    路径安全：用 Path.relative_to() 做**结构化**包含判断，而非字符串前缀比较——
+    后者在 cwd 变化/同名前缀目录（如 output-old）时会误判或漏判。
+    """
+    base = OUTPUT_DIR.resolve()
+    try:
+        p = (base / fname).resolve()
+    except (OSError, ValueError):
         raise HTTPException(400, "非法文件名")
-    if not p.exists():
+    try:
+        p.relative_to(base)          # 不在 output 目录下会抛 ValueError
+    except ValueError:
+        raise HTTPException(400, "非法文件名")
+    if not p.is_file():
         raise HTTPException(404, "文件不存在")
     return FileResponse(str(p), filename=fname)
 
