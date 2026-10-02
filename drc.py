@@ -88,8 +88,12 @@ def _poly_ok(poly) -> bool:
         return False
 
 
-def run_drc(r1, r2) -> list[dict]:
-    """对 phase1/phase2 结果跑全部 DRC 规则，返回发现列表（含 severity 与出处）。"""
+def run_drc(r1, r2, material_key: str | None = None) -> list[dict]:
+    """对 phase1/phase2 结果跑全部 DRC 规则，返回发现列表（含 severity 与出处）。
+
+    material_key: 可选治具材料 key（materials.MATERIALS）——提供时启用
+    材料-工艺交叉校验（G5 MATERIAL_TEMP_WINDOW，如 FR-4 vs 无铅波峰）。
+    """
     issues: list[dict] = []
     SRC_STRUCT = "竞品逆向框架（wave-soldering-fixture-designer）"
     SRC_SIZE = "PCBSync / MB Manufacturing（传送带 20×30in）"
@@ -487,6 +491,31 @@ def run_drc(r1, r2) -> list[dict]:
                     unit="mm",
                 )
             )
+    # G5. 材料-工艺交叉校验：治具底面直接接触波峰焊料，
+    #     材料长期使用温度必须 ≥ 无铅波峰下限 255°C（process.py 工艺窗口库）
+    mkey = material_key or getattr(r2, "material_key", None)
+    if mkey:
+        try:
+            from materials import get_material as _get_material
+            from process import material_process_compat as _compat
+
+            _m = _get_material(mkey)
+            ok, note = _compat(_m.max_service_temp_c)
+            if not ok:
+                issues.append(
+                    _issue(
+                        "MATERIAL_TEMP_WINDOW",
+                        "材料耐温低于无铅波峰温度",
+                        note,
+                        "warning",
+                        SRC_DFM,
+                        current=float(_m.max_service_temp_c),
+                        required=255.0,
+                        unit="°C",
+                    )
+                )
+        except Exception as e:  # 材料库异常不阻塞 DRC 主流程
+            log.debug("材料-工艺校验跳过: %s", e)
 
     return issues
 

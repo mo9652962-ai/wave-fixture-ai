@@ -226,6 +226,22 @@ DXF 之外直接交付机床可执行程序（RS-274，G21 mm / G90 绝对 / G54
 进给/转速/层深/行距按材料预设给出安全默认值（合成石低进给高转速 + 强制吸尘提示），
 程序头注释材料/板厚/刀具表，尾部附加工估时（本页示例真实板 39.2 min）。
 
+### 批量作业（YAML 作业规格，KiBot 惯例）
+```yaml
+batch: "2026-W40 空调主板批"
+defaults: { material: durostone, pallet_thickness: 10 }
+jobs:
+  - { name: aircon-main, gerber_dir: cases/case_002_aircon_kicad }
+  - { name: stm32-carrier, gerber_dir: cases/case_003_stm32_4layer, panel_cols: 2 }
+```
+`python batch_run.py job.yaml` 一条命令产出整批 DXF/G 代码/工单 + 批次汇总，
+单作业失败不中断批次（退出码可直接当 CI 门禁）。
+
+### 波峰焊工艺窗口（作业指导书）
+工单内置工艺参考窗口并做**材料-工艺交叉校验**：有铅 Sn63Pb37 锡炉 260±5°C/接触 2-5s、
+无铅 SAC305 255-265°C/接触 4-8s（出处 Yint/Kester/Highqualitypcb，见 `process.py`）；
+治具底面直接过波峰——材料耐温 <255°C（如高 Tg FR-4 180°C）触发 DRC `MATERIAL_TEMP_WINDOW` 警告。
+
 ### 生产工单报告（Markdown）
 一次生成可归档/可传阅的 `*-report.md`：治具规格（含拼版）→ 材料与成本 → CNC 程序摘要 →
 DRC 结论 → 干涉汇总 → 交付物清单，每项带数据出处。

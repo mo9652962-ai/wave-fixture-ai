@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wave-fixture-ai"
-version = "0.2.1"
+version = "0.2.2"
 description = "波峰焊治具 AI 设计助手：Gerber → 治具 DXF/STL，13 项自动化（沉板/取手/避位/上锡/干涉分析/自然语言调整）"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -34,6 +34,7 @@ dependencies = [
     "uvicorn>=0.29",
     "python-multipart>=0.0.9",
     "matplotlib>=3.8",  # DXF → PNG 预览渲染（cz 缺省未装会导致预览裂图）
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -61,6 +62,8 @@ py-modules = [
     "panelize",
     "cnc_gcode",
     "report",
+    "process",
+    "batch_run",
 ]
 
 [tool.setuptools.data-files]

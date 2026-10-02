@@ -521,7 +521,7 @@ async def api_generate(
         # ── DRC 生产安全门禁（blocking/error → 只出带水印预览版）──
         from drc import apply_watermark, gate, run_drc
 
-        issues = run_drc(r1, result)
+        issues = run_drc(r1, result, material_key=material)
         verdict = gate(issues)
         dxf_url = f"/dl/{workdir.name}.dxf"
         if not verdict["allowed"]:
@@ -622,6 +622,7 @@ async def api_generate(
                     "PNG 预览": f"/dl/{workdir.name}.png",
                     "CNC G 代码": f"/dl/{workdir.name}.nc",
                 },
+                process_key="lead_free",
             )
             write_report(report_path, report_md, parent_hint=OUTPUT_DIR)
             gcode_url = f"/dl/{workdir.name}.nc"

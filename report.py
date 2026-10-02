@@ -51,6 +51,8 @@ def build_report(
     gcode_stats: dict | None = None,
     interference_summary: dict | None = None,
     output_urls: dict | None = None,
+    process_key: str = "lead_free",
+    include_process: bool = True,
 ) -> str:
     """构造 Markdown 生产工单。所有输入均为已算好的 dict/对象（无 IO）。"""
     from materials import get_material
@@ -59,6 +61,13 @@ def build_report(
     stats = getattr(r2, "panel_grid", None)
     drc_counts = drc_verdict.get("counts", {})
     drc_ok = drc_verdict.get("allowed", False)
+
+    # 动态章节编号（CNC 节与工艺节按可用性增减）
+    sec = {"spec": 1, "mat": 2, "cnc": 3, "drc": 4, "interf": 5, "proc": 6, "dl": 7}
+    if not gcode_stats:
+        sec = {k: (v - 1 if v >= 3 else v) for k, v in sec.items()}
+    if not include_process:
+        sec = {k: (v - 1 if v >= 6 else v) for k, v in sec.items()}
 
     L: list[str] = []
     ap = L.append
@@ -69,7 +78,7 @@ def build_report(
     ap(f"> 材料方案：**{mat.name_cn}**（{mat.name_en}），厚度 {material.get('thickness', '-')}mm")
     ap("")
 
-    ap("## 1. 治具规格")
+    ap(f"## {sec['spec']}. 治具规格")
     ap("")
     ap("| 项目 | 数值 |")
     ap("|---|---|")
@@ -92,7 +101,7 @@ def build_report(
     )
     ap("")
 
-    ap("## 2. 材料与成本")
+    ap(f"## {sec['mat']}. 材料与成本")
     ap("")
     ap("| 项目 | 数值 |")
     ap("|---|---|")
@@ -111,7 +120,7 @@ def build_report(
     ap("")
 
     if gcode_stats:
-        ap("## 3. CNC 加工程序")
+        ap(f"## {sec['cnc']}. CNC 加工程序")
         ap("")
         ap("| 项目 | 数值 |")
         ap("|---|---|")
@@ -125,7 +134,7 @@ def build_report(
         ap(f"| 程序行数 | {gcode_stats.get('line_count', '-')} |")
         ap("")
 
-    ap("## 4. DRC 生产门禁结论")
+    ap(f"## {sec['drc']}. DRC 生产门禁结论")
     ap("")
     ap(
         f"- blocking: **{drc_counts.get('blocking', 0)}** · error: **{drc_counts.get('error', 0)}** "
@@ -137,7 +146,7 @@ def build_report(
     ap("")
 
     if interference_summary:
-        ap("## 5. 元件干涉分析")
+        ap(f"## {sec['interf']}. 元件干涉分析")
         ap("")
         ap(f"- 分析元件：{interference_summary.get('component_count', '-')} 个")
         ap(f"- 实体干涉：{interference_summary.get('interference_count', 0)} 处")
@@ -153,7 +162,20 @@ def build_report(
                 )
         ap("")
 
-    ap("## 6. 交付物清单")
+    # 波峰焊工艺窗口（作业指导书章节）
+    if include_process:
+        from process import material_process_compat, process_section_markdown
+
+        proc_name = "有铅" if process_key == "leaded" else "无铅"
+        ap(f"## {sec['proc']}. 波峰焊工艺窗口（{proc_name}参考）")
+        ap("")
+        ap(process_section_markdown(process_key))
+        ok, note = material_process_compat(mat.max_service_temp_c)
+        ap(f"- **材料-工艺兼容性**：{'✅ ' if ok else '⚠️ '}{note}")
+        ap("")
+
+    urls = output_urls or {}
+    ap(f"## {sec['dl']}. 交付物清单")
     ap("")
     urls = output_urls or {}
     if urls:

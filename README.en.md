@@ -4,7 +4,7 @@
 
   # WAVE FIXTURE AI
 
-  **Gerber in · fixture drawings out · 13 automations · a CAD assistant that listens**
+  **Gerber in · fixture drawings out · 21 automations · a CAD assistant that listens**
 
   **wave-fixture-ai turns wave-soldering fixture design from manual CAD drafting into one command: drop in PCB Gerber files and it auto-generates sink regions, handles, avoid zones, solder areas, screw holes, locating pins and the fixture outline — exporting DXF/STL/GLB with 3D preview, component interference analysis, and natural-language parameter adjustment.**
 
@@ -24,9 +24,9 @@
 
   <p>
     <a href="https://github.com/mo9652962-ai/wave-fixture-ai/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/mo9652962-ai/wave-fixture-ai/ci.yml?style=flat-square&label=CI" alt="CI"></a>
-    <img src="https://img.shields.io/badge/features-17%20automations-2563EB?style=flat-square" alt="features">
+    <img src="https://img.shields.io/badge/features-21%20automations-2563EB?style=flat-square" alt="features">
     <img src="https://img.shields.io/badge/KiCad-10%20compatible-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
-    <img src="https://img.shields.io/badge/tests-160%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/tests-212%20passed-success?style=flat-square" alt="tests">
     <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
     <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
@@ -37,7 +37,7 @@
   <img src="docs/images/banner-1200x630.png" alt="WAVE FIXTURE AI" width="100%">
 </div>
 
-## The 13 automations
+## The 21 automations
 
 | Step | Feature | Status |
 |:---|:---|:---|
@@ -54,10 +54,26 @@
 | 11 | **3D preview** (STL/GLB export + in-browser viewer) | ✅ |
 | 12 | **Interference analysis** (2D coverage + 3D boolean dual test) | ✅ |
 | 13 | **Natural-language adjustment** (23 parameters) | ✅ |
-| 14 | **DRC manufacturing safety gate** (16 rules · 4 severities · cited) | ✅ |
+| 14 | **DRC manufacturing safety gate** (20 rules · 4 severities · cited) | ✅ |
 | 15 | **Golden sample regression** (IoU≥0.9 · Hausdorff≤0.5mm · circle best-match) | ✅ |
 | 16 | **Human review loop** (missing-data gating → operator audit log) | ✅ |
 | 17 | **Locating pin scoring** (diameter window / NPTH / edge distance) | ✅ |
+| 18 | **Dogbone corner relief** (bisector toolpath · dogbone/T-bone/corner-hole · dedicated DXF layer) | ✅ |
+| 19 | **Panelization** (N×M array per pallet · barrier-gap DRC · full geometry replication) | ✅ |
+| 20 | **Material presets & cost estimation** (Durostone/Ricocel/FR-4/aluminum · weight & cost) | ✅ |
+| 21 | **CNC G-code output + production job report** (drill/pocket/profile ops · .nc delivery) | ✅ |
+
+## 🏭 Enterprise delivery (benchmarked against Macaos Solder Pallet Designer)
+
+- **Panelization** — N×M copies per pallet with barrier-gap DRC (`panel_cols/rows/gap`)
+- **Material presets** — Durostone (1.90 g/cm³, 280°C, ESD) / Ricocel / high-Tg FR-4 / aluminum,
+  with blank-size snapping, weight and cost estimation (sources cited in `materials.py`)
+- **CNC G-code (.nc)** — RS-274 (G21/G90/G54, tool changes, M30): grouped pin drilling,
+  raster roughing + wall finishing pockets, helical bores, profile cuts; feeds/speeds per material
+- **Production job report** — spec, materials & cost, CNC summary, DRC verdict,
+  wave-soldering process window (lead-free 255–265°C pot, 4–8 s dwell), deliverables list
+- **Batch jobs** — declarative YAML job spec (`batch_run.py`, KiBot-style): one command
+  produces DXF + G-code + report for a whole batch, with a batch summary and per-job failure isolation
 
 ## 🚀 Quick start
 
