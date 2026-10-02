@@ -1,0 +1,13 @@
+{
+  "boardWidthMm": 25.654,
+  "boardHeightMm": 48.26,
+  "holeCount": 31,
+  "keepoutRegionCount": 0,
+  "solderRegionCount": 6,
+  "fixtureWidthMm": 75.0,
+  "fixtureHeightMm": 120.0,
+  "engineeringNotes": [
+    "标准双排插针评估板",
+    "采用 3.0mm TOP 上锡安全开窗与 R1.85 铣刀凸角清角 (实际沉板区外扩 0.2mm + 凸角 R1.85 圆孔，治具四周预留 X:20mm, Y:30mm 边距、R5mm 圆角及 5mm 取整)"
+  ]
+}

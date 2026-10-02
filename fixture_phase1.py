@@ -128,22 +128,46 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
     # ⚠️ 排除 .drl/.txt DRL 文件——KiCad 10 的 G85 新语法会让 gerbonara 崩，
     #    钻孔单独用 _parse_drills_regex 处理
     gerber_files = [f for f in d.rglob("*")
-                    if f.suffix.lower() in (".gbr", ".gba", ".gbl", ".gbs", ".gbo",
+                    if f.suffix.lower() in (".gbr", ".ger", ".gba", ".gbl", ".gbs", ".gbo",
                                              ".gtl", ".gts", ".gto", ".gtp", ".gbp",
                                              ".gm1", ".g2", ".g3", ".gko")]
     stack = None
     if gerber_files:
+        # 同一逻辑层的重复文件（真实板常见：01_board_outline.GBR + 02_board_outline.GER
+        # + Gerber_BoardOutline.GKO 三份等价外形）会让 gerbonara 抛 Ambiguous layer names。
+        # 去重策略：同语义前缀只保留一份（优先 .gko > .gm1 > .gbr > .ger）。
+        def _layer_key(p: Path):
+            stem = p.stem.lower()
+            if "outline" in stem or "edge" in stem:
+                return ("outline",)
+            return (stem,)
+
+        def _pref(p: Path) -> int:
+            order = {".gko": 0, ".gm1": 1, ".gbr": 2, ".ger": 3}
+            return order.get(p.suffix.lower(), 9)
+
+        dedup: dict[tuple, Path] = {}
+        for f in gerber_files:
+            k = _layer_key(f)
+            if k not in dedup or _pref(f) < _pref(dedup[k]):
+                dedup[k] = f
+        gerber_files = sorted(dedup.values())
+        log.info(f"  层文件去重: {len(gerber_files)} 份 → {[f.name for f in gerber_files]}")
         try:
-            # Edge_Cuts.gm1 → outline（KiCad 命名映射，否则被判 bottom unknown）
+            # gerbonara 的 overrides 语义：{正则(全名匹配): 层名字符串}。
+            # 覆盖三类来源的命名（KiCad / EasyEDA / 通用后缀）。
             OVERRIDES = {
-                r".*Edge_Cuts.*": "outline",
-                r".*\.gm1": "outline",
-                r".*B_Cu.*": "bottom copper",
-                r".*F_Cu.*": "top copper",
-                r".*B_Mask.*": "bottom mask",
-                r".*F_Mask.*": "top mask",
-                r".*B_Silkscreen.*": "bottom silk",
-                r".*F_Silkscreen.*": "top silk",
+                r"(?i).*Edge_Cuts.*": "top silk",  # KiCad Edge_Cuts 惯例挂顶层，本体由 polygons 提取
+                r"(?i).*\.gm1": "outline",
+                r"(?i).*\.gko": "outline",
+                r"(?i).*outline.*\.ger": "outline",
+                r"(?i).*outline.*\.gbr": "outline",
+                r"(?i).*B_Cu.*": "bottom copper",
+                r"(?i).*F_Cu.*": "top copper",
+                r"(?i).*B_Mask.*": "bottom mask",
+                r"(?i).*F_Mask.*": "top mask",
+                r"(?i).*B_Silkscreen.*": "bottom silk",
+                r"(?i).*F_Silkscreen.*": "top silk",
             }
             stack = LayerStack.from_files(gerber_files, overrides=OVERRIDES, autoguess=False)
         except Exception as e:
@@ -163,25 +187,28 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
     if stack is None:
         log.warning("  ⚠️ stack 解析失败（可能目录无 Gerber 文件或格式不支持），跳过外形")
         return board_polys, parse_drills_regex(d)
+    # 优先直接读 ('outline','') 图形层的对象——overrides 指定后 st.outline 属性仍为 None，
+    # 只有 graphic_layers 里才有真实对象（gerbonara 的 outline 属性仅自动识别时填充）
     try:
-        op = stack.outline_polygons() if callable(stack.outline_polygons) else stack.outline_polygons
-        if op is not None:
-            for chunk in op:
-                if isinstance(chunk, list):
-                    outline_objs.extend(chunk)
-                else:
-                    outline_objs.append(chunk)
+        ol_layer = stack.graphic_layers.get(("outline", ""))
+        if ol_layer is not None and list(ol_layer.objects):
+            outline_objs = list(ol_layer.objects)
     except Exception as e:
-        log.warning(f"  outline_polygons 失败({e})，退回 stack.outline")
+        log.debug("graphic_layers 读取失败: %s", e)
     if not outline_objs:
-        # stack.outline 可能为 None（gerbonara 缺铜层时判定不顺型）
-        # 退而从 graphic_layers 找 ('outline','') 层直接读对象
         try:
-            ol_layer = stack.graphic_layers.get(("outline", ""))
-            if ol_layer is not None:
-                outline_objs = list(ol_layer.objects)
-            else:
-                outline_objs = list(stack.outline.objects)
+            op = stack.outline_polygons() if callable(stack.outline_polygons) else stack.outline_polygons
+            if op is not None:
+                for chunk in op:
+                    if isinstance(chunk, list):
+                        outline_objs.extend(chunk)
+                    else:
+                        outline_objs.append(chunk)
+        except Exception as e:
+            log.warning(f"  outline_polygons 失败({e})，退回 stack.outline")
+    if not outline_objs:
+        try:
+            outline_objs = list(stack.outline.objects) if stack.outline is not None else []
         except Exception:
             outline_objs = []
 
@@ -209,19 +236,68 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
                 log.debug("Region 顶点解析失败 %s: %s", getattr(obj, "ref", "?"), e)
 
     if lines and not board_polys:
-        # 线段围成多边形：尝试 LinearRing
+        # 真实板的外形线段常有微缺口（本例 0.127mm：圆角端点 vs 直角端点）。
+        # 工业级做法：端点链式追踪（endpoint chaining）——按「上一段终点≈下一段起点」
+        # 串成有序闭合环，比 buffer/snap 更精确且能容忍小缺口。
         try:
             from shapely.ops import polygonize
-            merged = unary_union(lines)
-            if merged.geom_type == "LineString":
-                ring = Polygon(merged.coords)
-                if ring.is_valid and ring.area > 0:
-                    board_polys.append(ring)
+
+            segs = [(tuple(l.coords[0]), tuple(l.coords[-1])) for l in lines]
+            used = [False] * len(segs)
+            chains: list[list[tuple]] = []
+            tolerance = 0.5  # mm，覆盖实测 0.127mm 缺口与常见导出误差
+
+            for start_i in range(len(segs)):
+                if used[start_i]:
+                    continue
+                chain = [segs[start_i][0], segs[start_i][1]]
+                used[start_i] = True
+                extended = True
+                while extended and len(chain) < len(segs) + 2:
+                    extended = False
+                    tail = chain[-1]
+                    for j, (s0, s1) in enumerate(segs):
+                        if used[j]:
+                            continue
+                        d0 = ((tail[0] - s0[0]) ** 2 + (tail[1] - s0[1]) ** 2) ** 0.5
+                        d1 = ((tail[0] - s1[0]) ** 2 + (tail[1] - s1[1]) ** 2) ** 0.5
+                        if d0 <= tolerance:
+                            chain.append(s1)
+                            used[j] = True
+                            extended = True
+                            break
+                        if d1 <= tolerance:
+                            chain.append(s0)
+                            used[j] = True
+                            extended = True
+                            break
+                if len(chain) >= 4:
+                    gap = ((chain[-1][0] - chain[0][0]) ** 2 + (chain[-1][1] - chain[0][1]) ** 2) ** 0.5
+                    if gap <= tolerance:
+                        if gap > 0:  # 显式首尾闭合，消除微缺口
+                            chain.append(chain[0])
+                        try:
+                            poly = Polygon(chain)
+                            if poly.is_valid and poly.area > 0.01:
+                                chains.append(chain)
+                                board_polys.append(poly)
+                        except Exception as e:
+                            log.debug("构环失败: %s", e)
+
+            if board_polys:
+                best = max(board_polys, key=lambda p: p.area)
+                board_polys = [best]
+                log.info(f"  外形端点链式闭合成功 → 面积 {best.area:.1f} mm²")
             else:
-                for poly in polygonize([merged]):
-                    if poly.is_valid and poly.area > 0:
-                        board_polys.append(poly)
-        except Exception as e:
+                # 兜底：polygonize + 最大面
+                merged = unary_union(lines)
+                found = [p for p in polygonize([merged]) if p.is_valid and p.area > 0.01]
+                if found:
+                    board_polys = [max(found, key=lambda p: p.area)]
+                    log.info(f"  外形 polygonize 兜底 → 面积 {board_polys[0].area:.1f} mm²")
+                else:
+                    log.warning("  外形围合失败：未能形成有效闭合环")
+        except Exception as e:  # noqa: BLE001 —— 线段围合失败不阻断（钻孔仍可用）
             log.warning(f"  线段围合失败: {e}")
 
     # 钻孔：找 .drl/.txt/.xln 文件
@@ -270,15 +346,18 @@ def make_handles(sink_poly: Polygon, p: FixtureParams) -> list[Polygon]:
 # 步骤 4: 压扣螺丝孔（四角 Φ3.4，圆心距边 10mm）
 # ─────────────────────────────────────────────────────────────
 def make_screws(sink_poly: Polygon, p: FixtureParams) -> list[tuple[float, float]]:
-    """沉板区四个边角（bounding box 四角）放压扣螺丝孔"""
+    """沉板区四角**外侧**放压扣螺丝孔（压扣用于压住 PCB 边缘，孔必须在板区之外）。
+
+    几何语义（对标竞品 generator._clamp_holes）：沿 x/y 各向外偏移 offset，
+    即 (min ± offset, min ± offset) 四种组合——孔落在沉板区对角外侧的治具体上。
+    """
     minx, miny, maxx, maxy = sink_poly.bounds
-    # 向内偏移 10mm 的四角
     cx = p.screw_offset
     corners = [
-        (minx + cx, miny + cx),
-        (maxx - cx, miny + cx),
-        (minx + cx, maxy - cx),
-        (maxx - cx, maxy - cx),
+        (minx - cx, miny - cx),
+        (maxx + cx, miny - cx),
+        (minx - cx, maxy + cx),
+        (maxx + cx, maxy + cx),
     ]
     return corners
 

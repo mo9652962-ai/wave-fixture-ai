@@ -42,15 +42,19 @@ def test_handles_two_per_side_geometry():
     assert left.bounds[3] - left.bounds[1] <= P.handle_h + 0.01
 
 
-def test_screws_four_corners_inset():
-    screws = make_screws(make_sink_region(_board(), P), P)
+def test_screws_four_corners_outside_sink():
+    """压扣孔必须在沉板区**外侧**（压扣压住 PCB 边缘，孔落在治具体上）。"""
+    sink = make_sink_region(_board(), P)
+    screws = make_screws(sink, P)
     assert len(screws) == 4
-    sb = make_sink_region(_board(), P).bounds
-    # 每个孔的 x 与 y 各自恰好距沉板区某一边 10mm（四角内缩）
+    sb = sink.bounds
     for x, y in screws:
-        assert 10.0 in (x - sb[0], sb[2] - x)
-        assert 10.0 in (y - sb[1], sb[3] - y)
-    # 且四角互不重合
+        # 每个孔的 x 与 y 都落在沉板区边界之外
+        assert x < sb[0] or x > sb[2], f"孔 x={x} 不在沉板区外"
+        assert y < sb[1] or y > sb[3], f"孔 y={y} 不在沉板区外"
+        # 且偏移量恰好是 screw_offset
+        assert min(abs(x - sb[0]), abs(x - sb[2])) == P.screw_offset
+        assert min(abs(y - sb[1]), abs(y - sb[3])) == P.screw_offset
     assert len(set(screws)) == 4
 
 
