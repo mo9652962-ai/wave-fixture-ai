@@ -27,6 +27,10 @@ import trimesh
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("interference")
 
+# 3D 实体重叠体积阈值（mm³）：超过才判为干涉。
+# 5mm³ ≈ 2×2×1.25mm 的小块——低于此值多为元件与治具开孔边缘的数值毛刺。
+INTERFERENCE_VOLUME_THRESHOLD_MM3 = 5.0
+
 # 封装名 → (宽, 高, 厚) 典型尺寸 mm（不含引脚）
 # 参考：IPC/JEDEC 标准封装尺寸 + 主流厂商 datasheet 典型值
 FOOTPRINT_DIMS = {
@@ -219,12 +223,31 @@ def transform_pcb_to_gerber(x: float, y: float, pcb_bounds=None, gerber_bounds=N
 
 
 def get_pcb_board_bounds(pcb_path: str) -> tuple | None:
-    """从 .kicad_pcb 提取板框（Edge.Cuts gr_rect）范围 → (xmin, ymin, xmax, ymax)"""
+    """从 .kicad_pcb 提取板框范围 → (xmin, ymin, xmax, ymax)。
+
+    支持两种 KiCad 板框写法（真实板实测两种都存在）：
+    - `(gr_rect (start x y) (end x y))` —— 矩形对象
+    - `(gr_line (start x y) (end x y) ... (layer "Edge.Cuts"))` —— 四条边线围成（更常见）
+    """
     try:
         txt = Path(pcb_path).read_text(encoding="utf-8", errors="replace")
+        # ① 优先 gr_rect
         for m in re.finditer(r"\(gr_rect[\s\S]*?\(start ([-\d.]+) ([-\d.]+)\)[\s\S]*?\(end ([-\d.]+) ([-\d.]+)\)", txt):
             x1, y1, x2, y2 = map(float, m.groups())
             return (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
+        # ② 回退：Edge.Cuts 层上所有线段/圆弧的端点集合取包围盒
+        pts: list[tuple[float, float]] = []
+        for m in re.finditer(
+            r"\(gr_(?:line|arc)[\s\S]{0,400}?\(start ([-\d.]+) ([-\d.]+)\)[\s\S]{0,200}?\(end ([-\d.]+) ([-\d.]+)\)"
+            r"[\s\S]{0,200}?\(layer \"Edge\.Cuts\"\)",
+            txt,
+        ):
+            x1, y1, x2, y2 = map(float, m.groups())
+            pts += [(x1, y1), (x2, y2)]
+        if len(pts) >= 4:
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            return (min(xs), min(ys), max(xs), max(ys))
     except Exception as e:
         log.warning(f"  提取板框失败: {e}")
     return None
@@ -334,22 +357,23 @@ def analyze_interference(
     """
     干涉分析：每个元件包围盒 vs 治具实体。
 
-    双层判定：
-    1. 2D 覆盖：元件盒在避位区内的覆盖比例 < cover_threshold → 干涉
-       （治具实体压到元件——避位区必须覆盖元件整体）
-    2. 3D 布尔：与治具实体交集 > 阈值 → 干涉（附重叠体积）
+    **判定语义（2026-10-02 真实板修正）**：
+    只有「治具实体真的压到元件」才算干涉 = 3D 布尔重叠 > 阈值。
+    原先「3D 重叠>5mm³ **或** 2D 覆盖<0.85」是 OR 逻辑，会把大量与 3D 完全不相交
+    的元件（重叠 0.00mm³）也报成干涉（真实板 36 元件全报）——那是误报大户。
+    2D 覆盖现在只作为**归因信息**（说明该元件是否被避位区覆盖），不触发独立判定。
 
     skip_through_hole: True 时跳过插件封装（PinHeader/Connector 等贯穿治具，
     它们由上锡区开孔处理，不应报避位区干涉）
 
-    avoid_polys: 避位区多边形列表（用于 2D 覆盖判定）
+    avoid_polys: 避位区多边形列表（用于 2D 覆盖归因）
     pcb_bounds / gerber_bounds: 提供则先做坐标变换（KiCad→Gerber）
     返回: [{ref, name, x, y, w, h, height, overlap_mm3, cover_ratio}]
     """
     from shapely.geometry import box as sbox
     from shapely.ops import unary_union
     fixture = trimesh.load(fixture_stl)
-    # 避位区合并（2D 覆盖判定用）
+    # 避位区合并（2D 覆盖归因用）
     avoid_union = unary_union(avoid_polys) if avoid_polys else None
     reports = []
     for c in components:
@@ -361,14 +385,14 @@ def analyze_interference(
         if pcb_bounds and gerber_bounds:
             tx, ty = transform_pcb_to_gerber(c["x"], c["y"], pcb_bounds, gerber_bounds)
 
-        # 2D 覆盖判定
+        # 2D 覆盖归因（不触发判定，只报告该元件是否被避位区覆盖）
         cover_ratio = 1.0
         if avoid_union is not None:
             comp_box = sbox(tx - c["w"]/2, ty - c["h"]/2, tx + c["w"]/2, ty + c["h"]/2)
             inter_area = comp_box.intersection(avoid_union).area
             cover_ratio = inter_area / comp_box.area if comp_box.area > 0 else 0
 
-        # 3D 布尔判定
+        # 3D 布尔判定：唯一触发条件（实体真的压到元件）
         comp = trimesh.creation.box(extents=[c["w"], c["h"], c["height"]])
         comp.apply_translation([tx, ty, pcb_thickness + c["height"] / 2])
         vol = 0.0
@@ -378,13 +402,15 @@ def analyze_interference(
         except Exception as e:
             log.warning(f"  干涉检测 {c['ref']} 失败: {e}")
 
-        # 任一判定触发即报干涉
-        if vol > 5.0 or cover_ratio < cover_threshold:
+        # 判定：3D 实体重叠超阈值才算干涉（2D 覆盖仅作归因）——
+        # 原 OR 逻辑会把与治具完全不相交的元件也报出来（真实板实测 36/36 误报）
+        if vol > INTERFERENCE_VOLUME_THRESHOLD_MM3:
             reports.append({
                 **c,
                 "x": tx, "y": ty,  # 返回转换后坐标（前端 3D 用）
                 "overlap_mm3": round(vol, 2),
                 "cover_ratio": round(cover_ratio, 2),
+                "avoid_covered": cover_ratio >= cover_threshold,
             })
     return reports
 
