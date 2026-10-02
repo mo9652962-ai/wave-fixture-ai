@@ -12,6 +12,7 @@
 数值为安全默认值，供 Φ3.7 平底铣刀试切基准（Bee-Plastic Durostone CNC 加工服务页：
 ±0.03mm 精度），实际机台按刀具/机床刚性微调。
 """
+
 from __future__ import annotations
 
 import logging
@@ -27,19 +28,19 @@ class MaterialPreset:
     key: str
     name_cn: str
     name_en: str
-    density_g_cm3: float          # 密度 g/cm³
-    max_service_temp_c: float     # 长期使用温度上限 °C
-    thickness_options_mm: tuple   # 常规板材厚度档位
-    price_per_kg: float           # 参考材料价（元/kg，可按采购价覆盖）
-    esd_safe: bool                # 是否静电耗散
-    color: str                    # 常见颜色
-    source: str                   # 数据出处
+    density_g_cm3: float  # 密度 g/cm³
+    max_service_temp_c: float  # 长期使用温度上限 °C
+    thickness_options_mm: tuple  # 常规板材厚度档位
+    price_per_kg: float  # 参考材料价（元/kg，可按采购价覆盖）
+    esd_safe: bool  # 是否静电耗散
+    color: str  # 常见颜色
+    source: str  # 数据出处
     # 推荐切削参数（Φ3.7 平底铣刀基准）
-    feed_xy_mm_min: float = 600.0     # XY 进给
-    feed_plunge_mm_min: float = 150.0 # Z 向下刀
-    spindle_rpm: float = 18000.0      # 主轴转速
-    stepdown_mm: float = 1.5          # 每层切深
-    stepover_pct: float = 45.0        # 行距占刀具直径百分比
+    feed_xy_mm_min: float = 600.0  # XY 进给
+    feed_plunge_mm_min: float = 150.0  # Z 向下刀
+    spindle_rpm: float = 18000.0  # 主轴转速
+    stepdown_mm: float = 1.5  # 每层切深
+    stepover_pct: float = 45.0  # 行距占刀具直径百分比
     note: str = ""
 
     def to_dict(self) -> dict:
@@ -146,16 +147,21 @@ def nearest_sheet_thickness(thickness_mm: float, material: MaterialPreset) -> fl
     return float(opts[-1])
 
 
-def estimate_weight(area_mm2: float, thickness_mm: float, material: MaterialPreset,
-                    openings_area_mm2: float = 0.0) -> float:
+def estimate_weight(
+    area_mm2: float, thickness_mm: float, material: MaterialPreset, openings_area_mm2: float = 0.0
+) -> float:
     """估算治具毛坯净重 kg：体积 = (面积 - 开孔面积) × 厚度。"""
     net_area = max(area_mm2 - openings_area_mm2, 0.0)
     vol_cm3 = net_area * thickness_mm / 1000.0
     return round(vol_cm3 * material.density_g_cm3 / 1000.0, 3)
 
 
-def estimate_cost(weight_kg: float, material: MaterialPreset,
-                  machining_minutes: float = 0.0, labor_per_hour: float = 120.0) -> dict:
+def estimate_cost(
+    weight_kg: float,
+    material: MaterialPreset,
+    machining_minutes: float = 0.0,
+    labor_per_hour: float = 120.0,
+) -> dict:
     """估算治具成本（材料 + 机加工时），返回分项 dict（报价参考，非定价）。"""
     material_cost = weight_kg * material.price_per_kg
     machining_cost = machining_minutes / 60.0 * labor_per_hour
@@ -175,7 +181,9 @@ def blank_area(bounds_wh: tuple[float, float], margin_mm: float = 10.0) -> float
 
 if __name__ == "__main__":
     for k, m in MATERIALS.items():
-        print(f"{k:12s} {m.name_cn:14s} ρ={m.density_g_cm3} T={m.max_service_temp_c}°C "
-              f"板厚{m.thickness_options_mm}")
+        print(
+            f"{k:12s} {m.name_cn:14s} ρ={m.density_g_cm3} T={m.max_service_temp_c}°C "
+            f"板厚{m.thickness_options_mm}"
+        )
     demo_w = estimate_weight(blank_area((120.0, 85.0)), 10.0, MATERIALS["durostone"])
     print(f"120×85 治具 10mm Durostone 毛坯重 ≈ {demo_w} kg")

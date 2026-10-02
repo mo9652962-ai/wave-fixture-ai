@@ -6,6 +6,7 @@ nl_adjust — 自然语言对话调整治具参数
 
 规则解析（确定性，不用 LLM——工程参数调整要精确可复现）
 """
+
 from __future__ import annotations
 
 import re
@@ -16,7 +17,10 @@ PARAM_ALIASES = {
     # 参数名 → (所属类, 别名列表)
     "sink_expand_mm": ("phase1", ["沉板区外扩", "沉板外扩", "外形外扩", "沉板区扩大"]),
     "sink_fillet_r": ("phase1", ["沉板区倒角", "清角", "沉板倒角"]),
-    "dogbone_r": ("phase1", ["狗骨头半径", "狗骨头倒角", "清角刀具", "清角铣刀", "清角半径", "狗骨头大小", "狗骨头R"]),
+    "dogbone_r": (
+        "phase1",
+        ["狗骨头半径", "狗骨头倒角", "清角刀具", "清角铣刀", "清角半径", "狗骨头大小", "狗骨头R"],
+    ),
     "dogbone_clearance": ("phase1", ["狗骨头余量", "清角避空", "清角余量"]),
     "handle_w": ("phase1", ["取手长", "取手位长", "取手宽"]),
     "handle_h": ("phase1", ["取手高", "取手位高", "取手宽度"]),
@@ -48,11 +52,12 @@ PARAM_ALIASES = {
 @dataclass
 class AdjustResult:
     """一次调整的结果"""
+
     matched: bool = False
     param: str = ""
     old_value: float = 0.0
     new_value: float = 0.0
-    action: str = ""          # 设为/加大/缩小/外扩
+    action: str = ""  # 设为/加大/缩小/外扩
     message: str = ""
     unmatched_text: str = ""
 
@@ -67,7 +72,9 @@ def _extract_action(text: str) -> str:
     """判断动作类型（缩小优先于外扩——「缩小X」含「小」应优先）"""
     if any(k in text for k in ["缩小", "减小", "减少", "调小", "变小", "改小", "变窄"]):
         return "decrease"
-    if any(k in text for k in ["加大", "扩大", "外扩", "增加", "增大", "放大", "加宽", "变大", "改大"]):
+    if any(
+        k in text for k in ["加大", "扩大", "外扩", "增加", "增大", "放大", "加宽", "变大", "改大"]
+    ):
         return "increase"
     if any(k in text for k in ["改为", "改成", "设为", "设置为", "调整为", "调成"]):
         return "set"
@@ -123,7 +130,9 @@ def parse_adjust_command(text: str, params1: dict, params2: dict) -> AdjustResul
     return result
 
 
-def apply_adjustments(text: str, params1: dict, params2: dict) -> tuple[dict, dict, list[AdjustResult]]:
+def apply_adjustments(
+    text: str, params1: dict, params2: dict
+) -> tuple[dict, dict, list[AdjustResult]]:
     """
     解析可能含多条指令的文本（分号/换行/逗号分隔），逐条应用。
     返回 (新 params1, 新 params2, 调整报告列表)
@@ -150,6 +159,7 @@ if __name__ == "__main__":
     # 自测
     from fixture_phase1 import FixtureParams
     from fixture_phase2 import Phase2Params
+
     p1 = {k: v for k, v in FixtureParams().__dict__.items()}
     p2 = {k: v for k, v in Phase2Params().__dict__.items()}
 

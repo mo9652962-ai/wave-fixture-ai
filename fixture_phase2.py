@@ -4,6 +4,7 @@ PDF 步骤 6-9：避位区 / 上锡区 / 盖板弹力柱孔 / 治具外形+挡�
 
 技术栈：gerbonara(解析) + shapely(几何) + ezdxf(DXF)
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,19 +26,23 @@ def layer_pts_from_files(gerber_dir: str, key: str) -> list[tuple[float, float, 
     """
     d = Path(gerber_dir)
     side_ext = {
-        "bottom mask": ".gbs", "top mask": ".gts",
-        "bottom silk": ".gbo", "top silk": ".gto",
+        "bottom mask": ".gbs",
+        "top mask": ".gts",
+        "bottom silk": ".gbo",
+        "top silk": ".gto",
     }
     ext = side_ext.get(key, ".gbs")
     # 找该扩展名文件（KiCad10 命名如 dev-board-B_Mask.gbs）
     for f in sorted(d.rglob(f"*{ext}")):
         try:
             from gerbonara.rs274x import GerberFile
+
             gf = GerberFile.open(str(f))
             return objects_to_points(gf)
         except Exception as e:
             log.warning(f"  层文件 {f.name} 解析失败: {e}")
     return []
+
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("fixture2")
@@ -49,41 +54,41 @@ log = logging.getLogger("fixture2")
 @dataclass
 class Phase2Params:
     # 步骤6: 避位区（BOT 贴片）
-    avoid_fillet_r: float = 1.5        # 包围线框倒角 R1.5
-    avoid_group_gap: float = 3.0       # 焊盘分组距离阈值（mm）——覆盖模块焊盘间距(≤2.54mm)把同元件合并
-    avoid_pad_extra: float = 2.0       # 焊盘外扩包围——覆盖元件体(焊盘→封装外沿)防压margin
+    avoid_fillet_r: float = 1.5  # 包围线框倒角 R1.5
+    avoid_group_gap: float = 3.0  # 焊盘分组距离阈值（mm）——覆盖模块焊盘间距(≤2.54mm)把同元件合并
+    avoid_pad_extra: float = 2.0  # 焊盘外扩包围——覆盖元件体(焊盘→封装外沿)防压margin
     # 步骤7: 上锡区（TOP 插件）
-    solder_fillet_r: float = 2.0       # 倒角 R2
-    solder_min_gap: float = 3.0        # 焊脚距线框边 ≥3mm（PDF）
-    solder_tight_gap: float = 0.7      # 与避位区最小间距 0.7mm（PDF）
-    solder_group_gap: float = 4.0      # 插件焊脚分组距离
+    solder_fillet_r: float = 2.0  # 倒角 R2
+    solder_min_gap: float = 3.0  # 焊脚距线框边 ≥3mm（PDF）
+    solder_tight_gap: float = 0.7  # 与避位区最小间距 0.7mm（PDF）
+    solder_group_gap: float = 4.0  # 插件焊脚分组距离
     # 步骤8: 盖板弹力柱孔
-    cap_hole_r: float = 2.45           # 半径 2.45mm（PDF）
+    cap_hole_r: float = 2.45  # 半径 2.45mm（PDF）
     # 步骤9: 治具外形
-    ext_left_right: float = 20.0       # 左右外扩 20mm
-    ext_top_bottom: float = 30.0       # 上下外扩 30mm
-    outer_fillet_r: float = 5.0        # 外形倒角 R5
-    rail_width: float = 5.0            # 轨道边宽 5mm（虚线）
-    tin_strip_w: float = 10.0          # 挡锡条宽 10mm
-    tin_hole_r: float = 1.6            # 挡锡条圆孔 R1.6
+    ext_left_right: float = 20.0  # 左右外扩 20mm
+    ext_top_bottom: float = 30.0  # 上下外扩 30mm
+    outer_fillet_r: float = 5.0  # 外形倒角 R5
+    rail_width: float = 5.0  # 轨道边宽 5mm（虚线）
+    tin_strip_w: float = 10.0  # 挡锡条宽 10mm
+    tin_hole_r: float = 1.6  # 挡锡条圆孔 R1.6
     # 步骤10: 拼版阵列（企业级：小板一治具多片，Macaos Panelizer 同款能力）
-    panel_cols: int = 1                # X 向片数
-    panel_rows: int = 1                # Y 向片数
-    panel_gap: float = 5.0             # 片间距 mm（挡锡墙，行业下限 3mm）
+    panel_cols: int = 1  # X 向片数
+    panel_rows: int = 1  # Y 向片数
+    panel_gap: float = 5.0  # 片间距 mm（挡锡墙，行业下限 3mm）
 
 
 @dataclass
 class Phase2Result:
-    avoid_polys: list = field(default_factory=list)      # 避位区
-    solder_polys: list = field(default_factory=list)     # 上锡区
-    cap_holes: list = field(default_factory=list)        # 盖板孔 (x,y,r)
-    outer_poly: Polygon | None = None                    # 治具外形
-    rail_lines: list = field(default_factory=list)       # 轨道边虚线
+    avoid_polys: list = field(default_factory=list)  # 避位区
+    solder_polys: list = field(default_factory=list)  # 上锡区
+    cap_holes: list = field(default_factory=list)  # 盖板孔 (x,y,r)
+    outer_poly: Polygon | None = None  # 治具外形
+    rail_lines: list = field(default_factory=list)  # 轨道边虚线
     tin_strip_lines: list = field(default_factory=list)  # 挡锡条
-    tin_holes: list = field(default_factory=list)        # 挡锡条孔
-    sink_poly: Polygon | None = None                     # 沉板区（3D 用）
+    tin_holes: list = field(default_factory=list)  # 挡锡条孔
+    sink_poly: Polygon | None = None  # 沉板区（3D 用）
     dogbone_corners: list = field(default_factory=list)  # 狗骨头减隙刀路 (DogboneCorner)
-    panel_grid: dict | None = None                       # 拼版网格信息（panelize.PanelGrid.to_dict()）
+    panel_grid: dict | None = None  # 拼版网格信息（panelize.PanelGrid.to_dict()）
 
 
 # ─────────────────────────────────────────────────────────────
@@ -134,6 +139,7 @@ def group_points(points: list[tuple], gap: float) -> list[list[tuple]]:
 def convex_hull_buffer(points: list[tuple], extra: float, fillet_r: float) -> Polygon:
     """点集凸包 + 外扩 + 圆角"""
     from shapely.geometry import MultiPoint
+
     if len(points) < 3:
         # 单点/两点：用缓冲圆/缓冲线
         pts = [Point(x, y).buffer(extra, quad_segs=8) for x, y, _ in points]
@@ -142,8 +148,9 @@ def convex_hull_buffer(points: list[tuple], extra: float, fillet_r: float) -> Po
         mp = MultiPoint([(x, y) for x, y, _ in points])
         base = mp.convex_hull.buffer(extra, join_style="round", quad_segs=8)
     # 圆角
-    return base.buffer(fillet_r, join_style="round", quad_segs=12) \
-               .buffer(-fillet_r, join_style="round", quad_segs=12)
+    return base.buffer(fillet_r, join_style="round", quad_segs=12).buffer(
+        -fillet_r, join_style="round", quad_segs=12
+    )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -174,7 +181,7 @@ def make_avoid_regions(stack_or_dir, drills: list, p: Phase2Params) -> list[Poly
         if not is_pth:
             smd_pts.append((x, y, d))
 
-    log.info(f"  步骤6 贴片焊盘: {len(smd_pts)} 个（排除插件 {len(pad_pts)-len(smd_pts)}）")
+    log.info(f"  步骤6 贴片焊盘: {len(smd_pts)} 个（排除插件 {len(pad_pts) - len(smd_pts)}）")
 
     groups = group_points(smd_pts, p.avoid_group_gap)
     polys = []
@@ -188,6 +195,7 @@ def make_avoid_regions(stack_or_dir, drills: list, p: Phase2Params) -> list[Poly
     # 先各自外扩 union_gap，让相邻组重叠，再 unary_union 融合，最后收回
     if len(polys) > 1:
         from shapely.ops import unary_union as _union
+
         union_gap = 1.0  # 外扩量（mm）：相邻组间距<2mm 时重叠→合并
         try:
             expanded = [poly.buffer(union_gap, join_style="round") for poly in polys]
@@ -206,7 +214,9 @@ def make_avoid_regions(stack_or_dir, drills: list, p: Phase2Params) -> list[Poly
 # ─────────────────────────────────────────────────────────────
 # 步骤 7: 上锡区（TOP 插件焊脚包围）
 # ─────────────────────────────────────────────────────────────
-def make_solder_regions(stack_or_dir, drills: list, avoid_polys: list, p: Phase2Params) -> list[Polygon]:
+def make_solder_regions(
+    stack_or_dir, drills: list, avoid_polys: list, p: Phase2Params
+) -> list[Polygon]:
     """插件焊脚 → 上锡区（与避位区保持 ≥0.7mm）"""
     if isinstance(stack_or_dir, str):
         pad_pts = layer_pts_from_files(stack_or_dir, "bottom mask")
@@ -282,8 +292,9 @@ def make_outer(sink_poly: Polygon, p: Phase2Params) -> Phase2Result:
 
     outer = box(ox, oy, right, top)
     # R5 倒角
-    outer_r = outer.buffer(p.outer_fillet_r, join_style="round", quad_segs=12) \
-                    .buffer(-p.outer_fillet_r, join_style="round", quad_segs=12)
+    outer_r = outer.buffer(p.outer_fillet_r, join_style="round", quad_segs=12).buffer(
+        -p.outer_fillet_r, join_style="round", quad_segs=12
+    )
 
     result = Phase2Result(outer_poly=outer_r)
 
@@ -291,15 +302,15 @@ def make_outer(sink_poly: Polygon, p: Phase2Params) -> Phase2Result:
     top_y = oy + oh_int
     bot_y = oy
     result.rail_lines = [
-        (ox, top_y - p.rail_width, ox + ow_int, top_y),      # 上轨道边
-        (ox, bot_y, ox + ow_int, bot_y + p.rail_width),      # 下轨道边
+        (ox, top_y - p.rail_width, ox + ow_int, top_y),  # 上轨道边
+        (ox, bot_y, ox + ow_int, bot_y + p.rail_width),  # 下轨道边
     ]
 
     # 挡锡条：左右齐边 + 上下四边框内 10mm 宽（简化为四条边线）
     result.tin_strip_lines = [
         (ox, oy + oh_int - p.tin_strip_w, ox + ow_int, oy + oh_int - p.tin_strip_w),  # 上
-        (ox, oy + p.tin_strip_w, ox + ow_int, oy + p.tin_strip_w),                    # 下
-        (ox + p.tin_strip_w, oy, ox + p.tin_strip_w, oy + oh_int),                    # 左
+        (ox, oy + p.tin_strip_w, ox + ow_int, oy + p.tin_strip_w),  # 下
+        (ox + p.tin_strip_w, oy, ox + p.tin_strip_w, oy + oh_int),  # 左
         (ox + ow_int - p.tin_strip_w, oy, ox + ow_int - p.tin_strip_w, oy + oh_int),  # 右
     ]
 
@@ -318,15 +329,15 @@ def make_outer(sink_poly: Polygon, p: Phase2Params) -> Phase2Result:
 # DXF 输出（Phase 2 图层）
 # ─────────────────────────────────────────────────────────────
 LAYER_COLORS2 = {
-    "沉板区": 1,      # 红
-    "取手位": 3,      # 绿
-    "配件层": 4,      # 青
-    "定位销": 5,      # 蓝
-    "避位区": 6,      # 紫
-    "上锡区": 2,      # 黄
-    "盖板": 7,        # 白
-    "治具外形": 8,    # 灰
-    "清角刀路": 30,    # 橙色 (狗骨头清角刀路)
+    "沉板区": 1,  # 红
+    "取手位": 3,  # 绿
+    "配件层": 4,  # 青
+    "定位销": 5,  # 蓝
+    "避位区": 6,  # 紫
+    "上锡区": 2,  # 黄
+    "盖板": 7,  # 白
+    "治具外形": 8,  # 灰
+    "清角刀路": 30,  # 橙色 (狗骨头清角刀路)
 }
 
 
@@ -341,8 +352,15 @@ def poly_to_dxf_polyline(msp, poly, layer: str):
     msp.add_lwpolyline(coords, dxfattribs={"layer": layer, "flags": 1})
 
 
-def export_dxf2(result: Phase2Result, out_path: str, sink_poly=None, handles=None,
-                screws=None, pins=None, dogbone_corners=None):
+def export_dxf2(
+    result: Phase2Result,
+    out_path: str,
+    sink_poly=None,
+    handles=None,
+    screws=None,
+    pins=None,
+    dogbone_corners=None,
+):
     out_path = str(Path(out_path))
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     doc = ezdxf.new("R2010")
@@ -356,8 +374,9 @@ def export_dxf2(result: Phase2Result, out_path: str, sink_poly=None, handles=Non
     # 拼版信息注记（企业级：N×M 阵列 + 间距，供 CAM/生产核对）
     grid = getattr(result, "panel_grid", None)
     if grid:
-        minx, _miny, _maxx, maxy = (result.outer_poly.bounds if result.outer_poly
-                                  else (0, 0, 100, 100))
+        minx, _miny, _maxx, maxy = (
+            result.outer_poly.bounds if result.outer_poly else (0, 0, 100, 100)
+        )
         msp.add_text(
             f"PANEL {grid.get('cols', 1)}x{grid.get('rows', 1)} "
             f"gap {grid.get('gap', 0)}mm copies {grid.get('copies', 1)} "
@@ -368,17 +387,18 @@ def export_dxf2(result: Phase2Result, out_path: str, sink_poly=None, handles=Non
     # Phase 1 元素
     if sink_poly:
         poly_to_dxf_polyline(msp, sink_poly, "沉板区")
-    for h in (handles or []):
+    for h in handles or []:
         poly_to_dxf_polyline(msp, h, "取手位")
-    for x, y in (screws or []):
+    for x, y in screws or []:
         msp.add_circle((x, y), radius=1.7, dxfattribs={"layer": "配件层"})
-    for x, y, r in (pins or []):
+    for x, y, r in pins or []:
         msp.add_circle((x, y), radius=r, dxfattribs={"layer": "定位销"})
 
     # 狗骨头清角专用刀路图层
     corners = dogbone_corners or getattr(result, "dogbone_corners", None)
     if corners:
         from dogbone import add_dogbone_to_dxf
+
         add_dogbone_to_dxf(msp, corners, layer="清角刀路")
 
     # Phase 2 元素
@@ -404,8 +424,13 @@ def export_dxf2(result: Phase2Result, out_path: str, sink_poly=None, handles=Non
 # ─────────────────────────────────────────────────────────────
 # 主流程（Phase 1 + Phase 2 完整）
 # ─────────────────────────────────────────────────────────────
-def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None,
-               params1_override: dict | None = None, params2_override: dict | None = None):
+def run_phase2(
+    gerber_dir: str,
+    out_dxf: str,
+    phase1_result=None,
+    params1_override: dict | None = None,
+    params2_override: dict | None = None,
+):
     from fixture_phase1 import (
         FixtureParams,
         make_handles,
@@ -434,6 +459,7 @@ def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None,
         return
 
     from shapely.ops import unary_union as _uu
+
     board = _uu(board_polys)
 
     # Phase 1 重算 (含狗骨头清角)
@@ -456,31 +482,53 @@ def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None,
 
         board_bounds = board.bounds
         grid, sink, avoid, solder, caps, pins, handles, screws, dogbone_corners = panelize_geometry(
-            board_bounds, sink, avoid, solder, caps, pins, handles, screws, dogbone_corners,
-            cols, rows, params2.panel_gap,
+            board_bounds,
+            sink,
+            avoid,
+            solder,
+            caps,
+            pins,
+            handles,
+            screws,
+            dogbone_corners,
+            cols,
+            rows,
+            params2.panel_gap,
         )
         panel_grid = grid.to_dict()
 
     outer = make_outer(sink, params2)
 
-    result2 = Phase2Result(avoid_polys=avoid, solder_polys=solder,
-                           cap_holes=caps, outer_poly=outer.outer_poly,
-                           rail_lines=outer.rail_lines,
-                           tin_strip_lines=outer.tin_strip_lines,
-                           tin_holes=outer.tin_holes,
-                           sink_poly=sink,
-                           dogbone_corners=dogbone_corners,
-                           panel_grid=panel_grid)
+    result2 = Phase2Result(
+        avoid_polys=avoid,
+        solder_polys=solder,
+        cap_holes=caps,
+        outer_poly=outer.outer_poly,
+        rail_lines=outer.rail_lines,
+        tin_strip_lines=outer.tin_strip_lines,
+        tin_holes=outer.tin_holes,
+        sink_poly=sink,
+        dogbone_corners=dogbone_corners,
+        panel_grid=panel_grid,
+    )
 
     if out_dxf:
-        export_dxf2(result2, out_dxf, sink_poly=sink, handles=handles,
-                    screws=screws, pins=pins, dogbone_corners=dogbone_corners)
+        export_dxf2(
+            result2,
+            out_dxf,
+            sink_poly=sink,
+            handles=handles,
+            screws=screws,
+            pins=pins,
+            dogbone_corners=dogbone_corners,
+        )
 
     return result2
 
 
 if __name__ == "__main__":
     import argparse
+
     ap = argparse.ArgumentParser(description="波峰焊治具 AI 设计助手 Phase 2")
     ap.add_argument("gerber_dir", help="Gerber 文件目录")
     ap.add_argument("-o", "--out", default="fixture2.dxf")

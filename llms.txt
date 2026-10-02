@@ -35,16 +35,16 @@ python fixture_phase2.py <gerber_dir> -o fixture-full.dxf  # 完整治具（+避
 
 | 端点 | 作用 |
 |:---|:---|
-| `POST /api/generate` | 上传 Gerber → DXF + PNG 预览（返回 `drc` 门禁结论） |
+| `POST /api/generate` | 上传 Gerber → DXF + PNG + CNC G 代码(.nc) + 生产报告 Markdown（可选材料/拼版/板厚表单字段；返回 `drc` 门禁结论） |
 | `POST /api/generate3d` | 上传 Gerber → 3D 治具（STL + GLB） |
 | `POST /api/adjust` | 自然语言调整参数 → 重新生成 |
-| `POST /api/interference` | 干涉分析（需 `.kicad_pcb`）→ 报告 + 高亮盒 + GLB |
+| `POST /api/interference` | 干涉分析（需 `.kicad_pcb`；支持 `height_overrides` 高度覆盖与 `panel_cols/rows` 拼版）→ 报告 + 可疑元件列表 + 高亮盒 + GLB |
 | `POST /api/review/confirm` | 确认人工 Review 项（缺数据/低置信度） |
 | `GET /dl/{fname}` | 下载产物 |
 
 ## 核心概念
 
-- **DRC 生产安全门禁**：16 条规则，四级严重度（blocking/error/warning/info），每条带出处
+- **DRC 生产安全门禁**：20 条规则（含轨道限宽/最小开口 3.8mm/薄壁 1.5mm/拼版间距），四级严重度（blocking/error/warning/info），每条带出处
   （对标 Macaos / AGICORP / APTPCB / PCBSync 的 DFM 指南）。存在 blocking/error 时
   导出的 DXF **自动打水印 PREVIEW**，禁止直接送 CNC。
 - **定位销打分算法**：从钻孔中按「孔径窗口 / NPTH / 靠边距离」打分，选**对角跨距最大**的一对；
@@ -63,6 +63,10 @@ python fixture_phase2.py <gerber_dir> -o fixture-full.dxf  # 完整治具（+避
 | 定位销 | 钻孔内缩 0.1mm，销径 ≥1.5mm | 对角选点 |
 | 治具外形 | 外扩 X20/Y30mm，向上取整 5mm | CNC 加工友好 |
 | 传送带极限 | 508×762mm | 超出报 error |
+| 波峰焊轨距 | 默认 330mm | 治具短边超限报 error（`rail_max_mm` 可按设备配置）|
+| 拼版阵列 | 1×1，间距 5mm | `panel_cols/panel_rows/panel_gap`；间距 <3mm 报 warning |
+| 材料 | Durostone 1.90g/cm³ / 280°C | `material`: durostone(默认)/ricocel/fr4_high_tg/aluminum |
+| 沉板槽深 | 板厚 + 0.3mm | G 代码按此分层铣削；避位/上锡/取手为贯穿切 |
 
 ## 常见坑（真实板实测）
 
@@ -83,7 +87,12 @@ fixture_phase1.py    步骤 1-5：Gerber 解析 / 沉板区 / 取手位 / 压扣
 fixture_phase2.py    步骤 6-10：避位区 / 上锡区 / 盖板孔 / 治具外形 / DXF 输出
 fixture_3d.py        3D 拉伸与布尔（STL/GLB）
 interference.py      元件干涉分析（2D 覆盖归因 + 3D 布尔判定）
-drc.py               DRC 生产安全门禁（16 规则带出处）
+drc.py               DRC 生产安全门禁（20 规则带出处）
+dogbone.py           内凹拐角狗骨头清角（刀路 + DXF 图层）
+panelize.py          拼版阵列 N×M（几何复制 + 元件复制）
+materials.py         材料预设库（Durostone/Ricocel/FR-4/铝）+ 成本估算
+cnc_gcode.py         CNC G 代码直出（钻孔/挖腔/外形落料）
+report.py            生产工单报告（Markdown）
 golden.py            Golden Sample 回归框架
 review.py            人工 Review 闭环（含审计日志）
 pin_select.py        定位销打分选点

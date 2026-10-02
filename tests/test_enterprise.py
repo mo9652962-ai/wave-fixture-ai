@@ -8,6 +8,7 @@
 5. report：生产工单 Markdown 生成与路径安全
 6. web 集成：/api/generate 返回 gcode_url / report_url / material
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -63,8 +64,8 @@ def test_panel_grid_math():
     demo = Polygon([(0, 0), (60, 0), (60, 40), (0, 40)])
     g = build_grid(demo.bounds, 2, 3, 5.0)
     assert len(g.offsets) == 6
-    assert g.offsets[1] == (65.0, 0.0)     # 第二列 +60+5
-    assert g.offsets[2] == (0.0, 45.0)     # 第二行 +40+5（行优先排列）
+    assert g.offsets[1] == (65.0, 0.0)  # 第二列 +60+5
+    assert g.offsets[2] == (0.0, 45.0)  # 第二行 +40+5（行优先排列）
     assert g.offsets[3] == (65.0, 45.0)
     assert g.total_w == pytest.approx(125.0)
     assert g.total_h == pytest.approx(130.0)
@@ -80,12 +81,22 @@ def test_panelize_geometry_replicates_all():
     screws = [(-5.0, 5.0)]
     corners = []
     from dogbone import DogboneCorner
-    corners.append(DogboneCorner(index=0, vertex=(60.0, 40.0), center=(61.31, 41.31),
-                                 cutter_r=1.85, bisector=(0.707, 0.707),
-                                 angle_deg=90.0, style="dogbone",
-                                 lead_in_line=((63.0, 41.31), (61.31, 41.31))))
+
+    corners.append(
+        DogboneCorner(
+            index=0,
+            vertex=(60.0, 40.0),
+            center=(61.31, 41.31),
+            cutter_r=1.85,
+            bisector=(0.707, 0.707),
+            angle_deg=90.0,
+            style="dogbone",
+            lead_in_line=((63.0, 41.31), (61.31, 41.31)),
+        )
+    )
     grid, sink, avoids, _solders, caps2, pins2, handles2, screws2, corners2 = panelize_geometry(
-        unit.bounds, unit, avoid, [], caps, pins, handles, screws, corners, 2, 2, 5.0)
+        unit.bounds, unit, avoid, [], caps, pins, handles, screws, corners, 2, 2, 5.0
+    )
     assert len(grid.offsets) == 4
     # 2×2 = 4 片，所有列表 ×4
     assert len(avoids) == 4
@@ -103,7 +114,9 @@ def test_panelize_geometry_replicates_all():
 
 def test_replicate_components_refs():
     """元件复制：位号加 [ij] 后缀、坐标按片平移。"""
-    comps = [{"ref": "R1", "name": "R0603", "x": 10.0, "y": 10.0, "w": 1.6, "h": 0.8, "height": 0.5}]
+    comps = [
+        {"ref": "R1", "name": "R0603", "x": 10.0, "y": 10.0, "w": 1.6, "h": 0.8, "height": 0.5}
+    ]
     g = build_grid((0, 0, 60, 40), 2, 1, 5.0)
     out = replicate_components(comps, g)
     assert len(out) == 2
@@ -130,10 +143,20 @@ def test_gcode_structure_and_safety(tmp_path):
 
     sink, avoid, solder, caps, pins, handles, outer = _make_simple_geometry()
     out = tmp_path / "fixture.nc"
-    stats = generate_gcode(sink, avoid, solder, caps, pins, handles, outer,
-                           str(out), material_key="durostone",
-                           pallet_thickness=10.0, board_thickness=1.6,
-                           parent_hint=tmp_path)
+    stats = generate_gcode(
+        sink,
+        avoid,
+        solder,
+        caps,
+        pins,
+        handles,
+        outer,
+        str(out),
+        material_key="durostone",
+        pallet_thickness=10.0,
+        board_thickness=1.6,
+        parent_hint=tmp_path,
+    )
     text = out.read_text(encoding="ascii")
     assert "G21" in text and "G90" in text and "G54" in text
     assert "M30" in text and "M5" in text
@@ -153,8 +176,17 @@ def test_gcode_rejects_bad_path(tmp_path):
 
     sink, avoid, solder, caps, pins, handles, outer = _make_simple_geometry()
     with pytest.raises(ValueError):
-        generate_gcode(sink, avoid, solder, caps, pins, handles, outer,
-                       str(tmp_path / "evil.exe"), parent_hint=tmp_path)
+        generate_gcode(
+            sink,
+            avoid,
+            solder,
+            caps,
+            pins,
+            handles,
+            outer,
+            str(tmp_path / "evil.exe"),
+            parent_hint=tmp_path,
+        )
     with pytest.raises(ValueError):
         resolve_safe_out_path(str(tmp_path.parent / "outside.nc"), parent_hint=tmp_path)
 
@@ -164,20 +196,39 @@ def test_gcode_material_changes_parameters(tmp_path):
     from cnc_gcode import generate_gcode
 
     sink, avoid, solder, caps, pins, handles, outer = _make_simple_geometry()
-    s1 = generate_gcode(sink, avoid, solder, caps, pins, handles, outer,
-                        str(tmp_path / "a.nc"), material_key="durostone",
-                        pallet_thickness=10.0, parent_hint=tmp_path)
-    s2 = generate_gcode(sink, avoid, solder, caps, pins, handles, outer,
-                        str(tmp_path / "b.nc"), material_key="aluminum",
-                        pallet_thickness=10.0, parent_hint=tmp_path)
+    s1 = generate_gcode(
+        sink,
+        avoid,
+        solder,
+        caps,
+        pins,
+        handles,
+        outer,
+        str(tmp_path / "a.nc"),
+        material_key="durostone",
+        pallet_thickness=10.0,
+        parent_hint=tmp_path,
+    )
+    s2 = generate_gcode(
+        sink,
+        avoid,
+        solder,
+        caps,
+        pins,
+        handles,
+        outer,
+        str(tmp_path / "b.nc"),
+        material_key="aluminum",
+        pallet_thickness=10.0,
+        parent_hint=tmp_path,
+    )
     assert s1["material"] == "durostone"
     assert s2["material"] == "aluminum"
     assert s1["machining_minutes"] > s2["machining_minutes"]  # 合成石更保守更慢
 
 
 # ── 4. DRC G 组工业合规 ──────────────────────────────────────────
-def _mk_r1r2(outer_w=120.0, outer_h=80.0, avoid_w=10.0, panel_grid=None,
-             rail_max=None):
+def _mk_r1r2(outer_w=120.0, outer_h=80.0, avoid_w=10.0, panel_grid=None, rail_max=None):
     """构造最小 r1/r2 测试对象。"""
     from types import SimpleNamespace
 
@@ -185,13 +236,26 @@ def _mk_r1r2(outer_w=120.0, outer_h=80.0, avoid_w=10.0, panel_grid=None,
     sink = board.buffer(0.2)
     outer = box(0, 0, outer_w, outer_h)
     avoid = [box(30, 30, 30 + avoid_w, 30 + 10)] if avoid_w else []
-    r1 = SimpleNamespace(board_poly=board, sink_poly=sink, handles=[], screws=[],
-                         pins=[(15.0, 15.0, 1.5), (60.0, 60.0, 1.5)],
-                         dogbone_corners=[])
-    r2 = SimpleNamespace(avoid_polys=avoid, solder_polys=[], cap_holes=[],
-                         outer_poly=outer, rail_lines=[], tin_strip_lines=[],
-                         tin_holes=[], sink_poly=sink, dogbone_corners=[],
-                         panel_grid=panel_grid)
+    r1 = SimpleNamespace(
+        board_poly=board,
+        sink_poly=sink,
+        handles=[],
+        screws=[],
+        pins=[(15.0, 15.0, 1.5), (60.0, 60.0, 1.5)],
+        dogbone_corners=[],
+    )
+    r2 = SimpleNamespace(
+        avoid_polys=avoid,
+        solder_polys=[],
+        cap_holes=[],
+        outer_poly=outer,
+        rail_lines=[],
+        tin_strip_lines=[],
+        tin_holes=[],
+        sink_poly=sink,
+        dogbone_corners=[],
+        panel_grid=panel_grid,
+    )
     if rail_max is not None:
         r2.rail_max_mm = rail_max
     return r1, r2
@@ -221,11 +285,26 @@ def test_drc_thin_wall():
     avoid = [box(60.25, 20, 75, 40)]
     from types import SimpleNamespace
 
-    r1 = SimpleNamespace(board_poly=board, sink_poly=sink, handles=[], screws=[],
-                         pins=[(15.0, 15.0, 1.5), (40.0, 40.0, 1.5)], dogbone_corners=[])
-    r2 = SimpleNamespace(avoid_polys=avoid, solder_polys=[], cap_holes=[],
-                         outer_poly=box(0, 0, 120, 80), rail_lines=[], tin_strip_lines=[],
-                         tin_holes=[], sink_poly=sink, dogbone_corners=[], panel_grid=None)
+    r1 = SimpleNamespace(
+        board_poly=board,
+        sink_poly=sink,
+        handles=[],
+        screws=[],
+        pins=[(15.0, 15.0, 1.5), (40.0, 40.0, 1.5)],
+        dogbone_corners=[],
+    )
+    r2 = SimpleNamespace(
+        avoid_polys=avoid,
+        solder_polys=[],
+        cap_holes=[],
+        outer_poly=box(0, 0, 120, 80),
+        rail_lines=[],
+        tin_strip_lines=[],
+        tin_holes=[],
+        sink_poly=sink,
+        dogbone_corners=[],
+        panel_grid=None,
+    )
     issues = drc.run_drc(r1, r2)
     codes = [i["code"] for i in issues]
     assert "THIN_WALL" in codes
@@ -233,8 +312,9 @@ def test_drc_thin_wall():
 
 def test_drc_panel_gap():
     """拼版间距 < 3mm → warning。"""
-    r1, r2 = _mk_r1r2(panel_grid={"cols": 2, "rows": 2, "gap": 2.0, "copies": 4,
-                                  "total": [125.0, 85.0]})
+    r1, r2 = _mk_r1r2(
+        panel_grid={"cols": 2, "rows": 2, "gap": 2.0, "copies": 4, "total": [125.0, 85.0]}
+    )
     issues = drc.run_drc(r1, r2)
     codes = [i["code"] for i in issues]
     assert "PANEL_GAP_TOO_SMALL" in codes
@@ -244,21 +324,45 @@ def test_drc_panel_gap():
 def test_report_generation(tmp_path):
     """生产工单：包含材料/成本/DRC/G 代码关键节。"""
 
-    r1, r2 = _mk_r1r2(panel_grid={"cols": 2, "rows": 2, "gap": 5.0, "copies": 4,
-                                  "total": [125.0, 85.0]})
-    verdict = {"allowed": True, "counts": {"blocking": 0, "error": 0, "warning": 1, "info": 0},
-               "worst": "warning", "total": 1}
+    r1, r2 = _mk_r1r2(
+        panel_grid={"cols": 2, "rows": 2, "gap": 5.0, "copies": 4, "total": [125.0, 85.0]}
+    )
+    verdict = {
+        "allowed": True,
+        "counts": {"blocking": 0, "error": 0, "warning": 1, "info": 0},
+        "worst": "warning",
+        "total": 1,
+    }
     md = report_mod.build_report(
-        "test-job", r1, r2, verdict,
+        "test-job",
+        r1,
+        r2,
+        verdict,
         material={"key": "durostone", "thickness": 10.0, "board_pocket_depth": 1.9},
-        weight_kg=0.42, cost={"material_cost": 176.4, "machining_cost": 60.0,
-                              "total": 236.4, "currency": "CNY", "note": "估算"},
-        gcode_stats={"machining_minutes": 30.0, "pocket_ops": 12, "profile_passes": 7,
-                     "tools": [{"number": 1, "kind": "drill", "dia_mm": 3.0, "rpm": 18000},
-                               {"number": 2, "kind": "endmill", "dia_mm": 3.7, "rpm": 18000}],
-                     "cut_len_mm": 12000.0, "line_count": 900},
-        interference_summary={"component_count": 17, "interference_count": 2,
-                              "suspicious": [{"ref": "FB1", "height": 1.5, "suspicious_reason": "未知封装"}]},
+        weight_kg=0.42,
+        cost={
+            "material_cost": 176.4,
+            "machining_cost": 60.0,
+            "total": 236.4,
+            "currency": "CNY",
+            "note": "估算",
+        },
+        gcode_stats={
+            "machining_minutes": 30.0,
+            "pocket_ops": 12,
+            "profile_passes": 7,
+            "tools": [
+                {"number": 1, "kind": "drill", "dia_mm": 3.0, "rpm": 18000},
+                {"number": 2, "kind": "endmill", "dia_mm": 3.7, "rpm": 18000},
+            ],
+            "cut_len_mm": 12000.0,
+            "line_count": 900,
+        },
+        interference_summary={
+            "component_count": 17,
+            "interference_count": 2,
+            "suspicious": [{"ref": "FB1", "height": 1.5, "suspicious_reason": "未知封装"}],
+        },
     )
     assert "# 波峰焊治具生产工单" in md
     assert "Durostone" in md

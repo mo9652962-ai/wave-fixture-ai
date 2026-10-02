@@ -16,6 +16,7 @@ RS-274 G 代码（mm/G21 绝对坐标），覆盖治具全部加工特征：
 
 安全：输出路径统一经 resolve + 白名单后缀校验，禁止越出指定父目录。
 """
+
 from __future__ import annotations
 
 import logging
@@ -30,11 +31,11 @@ from materials import MaterialPreset, get_material
 
 log = logging.getLogger("fixture-gcode")
 
-SAFE_Z = 5.0            # 安全高度 mm
-RAPID_MM_MIN = 3000.0   # G0 估算速度（时间估算用）
-TOOL_CHANGE_S = 6.0     # 换刀耗时（时间估算用）
-BOARD_DEPTH_CLEARANCE = 0.3   # 沉板槽底部余隙
-BREAK_THROUGH = 1.0     # 贯穿切破底量
+SAFE_Z = 5.0  # 安全高度 mm
+RAPID_MM_MIN = 3000.0  # G0 估算速度（时间估算用）
+TOOL_CHANGE_S = 6.0  # 换刀耗时（时间估算用）
+BOARD_DEPTH_CLEARANCE = 0.3  # 沉板槽底部余隙
+BREAK_THROUGH = 1.0  # 贯穿切破底量
 
 ALLOWED_SUFFIXES = {".nc", ".gcode", ".tap", ".txt", ".cnc"}
 
@@ -54,7 +55,7 @@ def resolve_safe_out_path(out_path: str | Path, parent_hint: str | Path | None =
 @dataclass
 class ToolInfo:
     number: int
-    kind: str          # "drill" | "endmill"
+    kind: str  # "drill" | "endmill"
     dia_mm: float
     feed_xy: float
     feed_z: float
@@ -66,7 +67,7 @@ class GCodeBuilder:
 
     def __init__(self) -> None:
         self.lines: list[str] = []
-        self.path_len: float = 0.0   # G1 切削路径累计 mm
+        self.path_len: float = 0.0  # G1 切削路径累计 mm
         self.rapid_len: float = 0.0  # G0 快移累计 mm
         self.feed_time_min: float = 0.0  # 切削耗时累计 min
         self._pos: tuple[float, float, float] | None = None
@@ -74,6 +75,7 @@ class GCodeBuilder:
 
     def comment(self, text: str) -> None:
         import unicodedata
+
         ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
         safe = ascii_text.replace("(", "[").replace(")", "]")
         self.lines.append(f"({safe})")
@@ -92,7 +94,9 @@ class GCodeBuilder:
             self.rapid_len += math.sqrt(dx * dx + dy * dy + dz * dz)
         self._pos = (x, y, z if z is not None else (self._pos[2] if self._pos else z))
 
-    def feed_to(self, x: float, y: float, z: float | None = None, feed: float | None = None) -> None:
+    def feed_to(
+        self, x: float, y: float, z: float | None = None, feed: float | None = None
+    ) -> None:
         f = feed if feed is not None else self._feed
         cmd = f"G1 X{_fmt(x)} Y{_fmt(y)}"
         if z is not None:
@@ -154,8 +158,14 @@ def contour_ring(poly: Polygon, tool_r: float) -> list[tuple[float, float]]:
     return [(round(cx, 3), round(cy, 3)) for cx, cy in inner.exterior.coords]
 
 
-def _emit_pocket(b: GCodeBuilder, poly: Polygon, depth: float, tool: ToolInfo,
-                 mat: MaterialPreset, stepover: float) -> int:
+def _emit_pocket(
+    b: GCodeBuilder,
+    poly: Polygon,
+    depth: float,
+    tool: ToolInfo,
+    mat: MaterialPreset,
+    stepover: float,
+) -> int:
     """单个挖腔：分层（粗铣 raster + 每层轮廓）→ 返回执行环数。"""
     raster = raster_passes(poly, tool.dia_mm / 2.0, stepover)
     ring = contour_ring(poly, tool.dia_mm / 2.0)
@@ -170,8 +180,8 @@ def _emit_pocket(b: GCodeBuilder, poly: Polygon, depth: float, tool: ToolInfo,
             x0, y0 = pts[0]
             b.rapid(x0, y0, SAFE_Z)
             b.rapid(x0, y0, z + 0.5)
-            b.feed_to(x0, y0, z, feed=tool.feed_z)   # 下刀
-            for (px, py) in pts[1:]:
+            b.feed_to(x0, y0, z, feed=tool.feed_z)  # 下刀
+            for px, py in pts[1:]:
                 b.feed_to(px, py, z, feed=tool.feed_xy)
             b.rapid(x0, y0, SAFE_Z)
             passes += 1
@@ -181,15 +191,22 @@ def _emit_pocket(b: GCodeBuilder, poly: Polygon, depth: float, tool: ToolInfo,
             b.rapid(cx, cy, SAFE_Z)
             b.rapid(cx, cy, z + 0.5)
             b.feed_to(cx, cy, z, feed=tool.feed_z)
-            for (px, py) in ring[1:]:
+            for px, py in ring[1:]:
                 b.feed_to(px, py, z, feed=tool.feed_xy)
             b.rapid(cx, cy, SAFE_Z)
             passes += 1
     return passes
 
 
-def _emit_helical_bore(b: GCodeBuilder, cx: float, cy: float, hole_r: float,
-                       depth: float, tool: ToolInfo, mat: MaterialPreset) -> int:
+def _emit_helical_bore(
+    b: GCodeBuilder,
+    cx: float,
+    cy: float,
+    hole_r: float,
+    depth: float,
+    tool: ToolInfo,
+    mat: MaterialPreset,
+) -> int:
     """圆形孔螺旋铣孔（孔径 > 刀径）：刀心绕孔心做螺旋下降。"""
     path_r = hole_r - tool.dia_mm / 2.0
     if path_r <= 0.2:
@@ -213,8 +230,9 @@ def _emit_helical_bore(b: GCodeBuilder, cx: float, cy: float, hole_r: float,
         for s in range(1, steps + 1):
             ang = 2 * math.pi * s / steps
             zt = z + (z_target - z) * s / steps
-            b.feed_to(cx + path_r * math.cos(ang), cy + path_r * math.sin(ang), zt,
-                      feed=tool.feed_xy)
+            b.feed_to(
+                cx + path_r * math.cos(ang), cy + path_r * math.sin(ang), zt, feed=tool.feed_xy
+            )
             revolutions += 1
         z = z_target
     b.rapid(cx + path_r, cy, SAFE_Z)
@@ -251,8 +269,12 @@ def generate_gcode(
     # ── 程序头 ────────────────────────────────────────────────
     b.comment(f"Wave Fixture AI CNC program: {job_name}")
     b.comment(f"Generated: {_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    b.comment(f"Material: {mat.name_en} (key={mat.key}) rho={mat.density_g_cm3}g/cm3 Tmax={mat.max_service_temp_c}C")
-    b.comment(f"Pallet thickness: {pallet_thickness}mm  Board pocket depth: {board_thickness + BOARD_DEPTH_CLEARANCE}mm")
+    b.comment(
+        f"Material: {mat.name_en} (key={mat.key}) rho={mat.density_g_cm3}g/cm3 Tmax={mat.max_service_temp_c}C"
+    )
+    b.comment(
+        f"Pallet thickness: {pallet_thickness}mm  Board pocket depth: {round(board_thickness + BOARD_DEPTH_CLEARANCE, 2)}mm"
+    )
     b.comment("Units: mm (G21)  Abs (G90)  WCS G54  Z0 = pallet top face")
     b.comment("NOTE: plunge is straight-down; swap to helical ramp if material chipping observed")
     b.comment("NOTE: dust extraction required for synthetic stone machining")
@@ -261,20 +283,30 @@ def generate_gcode(
     # ── T1..Tn 钻孔组（定位销，按孔径分组）──────────────────────
     tool_no = 1
     pin_groups: dict[float, list[tuple[float, float]]] = {}
-    for (x, y, r) in pins:
+    for x, y, r in pins:
         pin_groups.setdefault(round(2 * r, 2), []).append((x, y))
 
     drill_tools: list[ToolInfo] = []
     for dia in sorted(pin_groups):
-        t = ToolInfo(number=tool_no, kind="drill", dia_mm=dia,
-                     feed_xy=mat.feed_plunge_mm_min, feed_z=mat.feed_plunge_mm_min,
-                     rpm=mat.spindle_rpm)
+        t = ToolInfo(
+            number=tool_no,
+            kind="drill",
+            dia_mm=dia,
+            feed_xy=mat.feed_plunge_mm_min,
+            feed_z=mat.feed_plunge_mm_min,
+            rpm=mat.spindle_rpm,
+        )
         drill_tools.append(t)
         tool_no += 1
 
-    endmill = ToolInfo(number=tool_no, kind="endmill", dia_mm=endmill_dia,
-                       feed_xy=mat.feed_xy_mm_min, feed_z=mat.feed_plunge_mm_min,
-                       rpm=mat.spindle_rpm)
+    endmill = ToolInfo(
+        number=tool_no,
+        kind="endmill",
+        dia_mm=endmill_dia,
+        feed_xy=mat.feed_xy_mm_min,
+        feed_z=mat.feed_plunge_mm_min,
+        rpm=mat.spindle_rpm,
+    )
 
     b.raw("")
     b.comment("=== TOOL CHANGE: drills for locating pins ===")
@@ -285,7 +317,7 @@ def generate_gcode(
         b.raw("G54")
         b.raw("G21 G90 G17")
         b.comment(f"T{t.number}: drill D{t.dia_mm}mm F{t.feed_z} Z-depth {drill_depth}")
-        for (x, y) in pin_groups[round(t.dia_mm, 2)]:
+        for x, y in pin_groups[round(t.dia_mm, 2)]:
             b.rapid(x, y, SAFE_Z)
             b.feed_to(x, y, drill_depth / 2.0, feed=t.feed_z)  # 分两段模拟啄钻
             b.feed_to(x, y, drill_depth, feed=t.feed_z)
@@ -298,7 +330,9 @@ def generate_gcode(
     b.raw(f"T{endmill.number} M6")
     b.raw(f"S{_fmt(endmill.rpm)} M3")
     b.raw("G54 G21 G90 G17")
-    b.comment(f"T{endmill.number}: endmill D{endmill_dia}mm  Fxy={endmill.feed_xy} Fz={endmill.feed_z}")
+    b.comment(
+        f"T{endmill.number}: endmill D{endmill_dia}mm  Fxy={endmill.feed_xy} Fz={endmill.feed_z}"
+    )
 
     through_depth = pallet_thickness + BREAK_THROUGH
     ops = 0
@@ -357,7 +391,7 @@ def generate_gcode(
                     b.rapid(x0, y0, SAFE_Z)
                     b.rapid(x0, y0, z + 0.5)
                     b.feed_to(x0, y0, z, feed=endmill.feed_z)
-                    for (px, py) in pts[1:]:
+                    for px, py in pts[1:]:
                         b.feed_to(px, py, z, feed=endmill.feed_xy)
                     b.feed_to(x0, y0, z, feed=endmill.feed_xy)  # 闭环
                     b.rapid(x0, y0, SAFE_Z)
@@ -389,6 +423,8 @@ def generate_gcode(
         "line_count": len(b.lines),
         **stats,
     }
-    log.info(f"  G-code 已生成: {safe_out}（{len(b.lines)} 行，"
-             f"挖腔 {ops} 环，估时 {stats['machining_minutes']} min）")
+    log.info(
+        f"  G-code 已生成: {safe_out}（{len(b.lines)} 行，"
+        f"挖腔 {ops} 环，估时 {stats['machining_minutes']} min）"
+    )
     return result

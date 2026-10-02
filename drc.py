@@ -11,6 +11,7 @@
 门禁语义：存在 blocking 或 error 级发现时，`production_allowed` 返回 False——
 导出的 DXF 自动打水印（PREVIEW），禁止直接送 CNC 生产。
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,11 +26,11 @@ CONVEYOR_MAX_W_MM = 508.0
 CONVEYOR_MAX_L_MM = 762.0
 
 # 工业合规常量（G 组规则）：
-RAIL_MAX_MM = 330.0        # 波峰焊轨距默认上限（常见 350mm 轨道 - 两侧余量，设备可配）
-MIN_OPENING_MM = 3.8       # 最小开口宽度（Macaos Selective Wave Soldering Guidelines）
-MIN_WALL_MM = 1.5          # 最小壁厚（APTPCB：肋墙 ≥0.8mm，推荐 1.5mm）
-DEFAULT_PANEL_GAP = 5.0    # 拼版默认片间距
-MIN_PANEL_GAP = 3.0        # 拼版最小片间距（挡锡墙下限）
+RAIL_MAX_MM = 330.0  # 波峰焊轨距默认上限（常见 350mm 轨道 - 两侧余量，设备可配）
+MIN_OPENING_MM = 3.8  # 最小开口宽度（Macaos Selective Wave Soldering Guidelines）
+MIN_WALL_MM = 1.5  # 最小壁厚（APTPCB：肋墙 ≥0.8mm，推荐 1.5mm）
+DEFAULT_PANEL_GAP = 5.0  # 拼版默认片间距
+MIN_PANEL_GAP = 3.0  # 拼版最小片间距（挡锡墙下限）
 
 
 @dataclass
@@ -48,8 +49,7 @@ class DRCIssue:
         return asdict(self)
 
 
-def _issue(code: str, title: str, detail: str, severity: str,
-           source: str, **kw) -> dict:
+def _issue(code: str, title: str, detail: str, severity: str, source: str, **kw) -> dict:
     d = DRCIssue(code=code, title=title, detail=detail, severity=severity, source=source, **kw)
     return d.to_dict()
 
@@ -63,13 +63,18 @@ def _covers(outer, inner) -> bool:
 
 def _contains_point(geom, x: float, y: float) -> bool:
     try:
-        return geom is not None and geom.contains(type(geom)([(x, y)])) if False else _pt_in(geom, x, y)
+        return (
+            geom is not None and geom.contains(type(geom)([(x, y)]))
+            if False
+            else _pt_in(geom, x, y)
+        )
     except Exception:
         return False
 
 
 def _pt_in(geom, x: float, y: float) -> bool:
     from shapely.geometry import Point
+
     try:
         return geom is not None and geom.contains(Point(x, y))
     except Exception:
@@ -104,94 +109,203 @@ def run_drc(r1, r2) -> list[dict]:
 
     # ── A. 结构边界 ──────────────────────────────────────────────
     if not _poly_ok(board):
-        issues.append(_issue("BOARD_OUTLINE_INVALID", "PCB 外形无效",
-                             "外形层缺失、为空或存在自交拓扑。", "blocking", SRC_STRUCT))
+        issues.append(
+            _issue(
+                "BOARD_OUTLINE_INVALID",
+                "PCB 外形无效",
+                "外形层缺失、为空或存在自交拓扑。",
+                "blocking",
+                SRC_STRUCT,
+            )
+        )
     if not _poly_ok(sink):
-        issues.append(_issue("SINK_REGION_INVALID", "沉板区无效",
-                             "外形外扩后未形成有效沉板区域。", "blocking", SRC_STRUCT))
+        issues.append(
+            _issue(
+                "SINK_REGION_INVALID",
+                "沉板区无效",
+                "外形外扩后未形成有效沉板区域。",
+                "blocking",
+                SRC_STRUCT,
+            )
+        )
     if not _poly_ok(outer):
-        issues.append(_issue("FIXTURE_BODY_INVALID", "治具外形无效",
-                             "治具外框缺失或无效。", "blocking", SRC_STRUCT))
+        issues.append(
+            _issue(
+                "FIXTURE_BODY_INVALID",
+                "治具外形无效",
+                "治具外框缺失或无效。",
+                "blocking",
+                SRC_STRUCT,
+            )
+        )
     else:
         if _poly_ok(sink) and not outer.covers(sink):
-            issues.append(_issue("FIXTURE_BODY_OVERFLOW", "沉板区超出治具",
-                                 "沉板区超出治具主体外框边界。", "blocking", SRC_STRUCT))
+            issues.append(
+                _issue(
+                    "FIXTURE_BODY_OVERFLOW",
+                    "沉板区超出治具",
+                    "沉板区超出治具主体外框边界。",
+                    "blocking",
+                    SRC_STRUCT,
+                )
+            )
         for i, av in enumerate(avoids):
             if _poly_ok(av) and not outer.covers(av):
-                issues.append(_issue("AVOID_OUTSIDE_OUTER", "避位区超出治具",
-                                     f"避位区 #{i+1} 超出治具外框。", "blocking",
-                                     SRC_STRUCT, object_id=f"avoid-{i+1}"))
+                issues.append(
+                    _issue(
+                        "AVOID_OUTSIDE_OUTER",
+                        "避位区超出治具",
+                        f"避位区 #{i + 1} 超出治具外框。",
+                        "blocking",
+                        SRC_STRUCT,
+                        object_id=f"avoid-{i + 1}",
+                    )
+                )
         for i, so in enumerate(solders):
             if _poly_ok(so) and not outer.covers(so):
-                issues.append(_issue("SOLDER_OUTSIDE_OUTER", "上锡区超出治具",
-                                     f"上锡区 #{i+1} 超出治具外框。", "blocking",
-                                     SRC_STRUCT, object_id=f"solder-{i+1}"))
+                issues.append(
+                    _issue(
+                        "SOLDER_OUTSIDE_OUTER",
+                        "上锡区超出治具",
+                        f"上锡区 #{i + 1} 超出治具外框。",
+                        "blocking",
+                        SRC_STRUCT,
+                        object_id=f"solder-{i + 1}",
+                    )
+                )
         # 传送带极限（治具可平放的最长边不得超过传送带宽度）
         minx, miny, maxx, maxy = outer.bounds
         w, h = maxx - minx, maxy - miny
         short, long_ = min(w, h), max(w, h)
         if short > CONVEYOR_MAX_W_MM or long_ > CONVEYOR_MAX_L_MM:
-            issues.append(_issue("FIXTURE_SIZE_EXCEEDS_CONVEYOR", "治具超出传送带极限",
-                                 f"治具 {w:.0f}×{h:.0f}mm 超出常见传送带上限 "
-                                 f"{CONVEYOR_MAX_W_MM:.0f}×{CONVEYOR_MAX_L_MM:.0f}mm，"
-                                 "需确认波峰焊设备轨距或改用分板。", "error", SRC_SIZE,
-                                 current=float(max(w, h)), required=CONVEYOR_MAX_L_MM, unit="mm"))
+            issues.append(
+                _issue(
+                    "FIXTURE_SIZE_EXCEEDS_CONVEYOR",
+                    "治具超出传送带极限",
+                    f"治具 {w:.0f}×{h:.0f}mm 超出常见传送带上限 "
+                    f"{CONVEYOR_MAX_W_MM:.0f}×{CONVEYOR_MAX_L_MM:.0f}mm，"
+                    "需确认波峰焊设备轨距或改用分板。",
+                    "error",
+                    SRC_SIZE,
+                    current=float(max(w, h)),
+                    required=CONVEYOR_MAX_L_MM,
+                    unit="mm",
+                )
+            )
 
     # ── B. 定位销 ────────────────────────────────────────────────
     if len(pins) < 2:
-        issues.append(_issue("LOCATING_PINS_INSUFFICIENT", "定位销数量不足",
-                             f"当前 {len(pins)} 个定位销，推荐至少 2 个以保证 PCB 约束定位。",
-                             "warning", SRC_STRUCT,
-                             current=float(len(pins)), required=2.0, unit="个"))
+        issues.append(
+            _issue(
+                "LOCATING_PINS_INSUFFICIENT",
+                "定位销数量不足",
+                f"当前 {len(pins)} 个定位销，推荐至少 2 个以保证 PCB 约束定位。",
+                "warning",
+                SRC_STRUCT,
+                current=float(len(pins)),
+                required=2.0,
+                unit="个",
+            )
+        )
     # 销径过小：<1.5mm 的销在波峰焊高温下强度不足（真实板常见：全板只有细信号过孔）
     for pi, (_x, _y, pr) in enumerate(pins):
         if pr * 2 < 1.5:
-            issues.append(_issue("PIN_DIAMETER_TOO_SMALL", "定位销直径过小",
-                                 f"定位销 #{pi+1} 直径 {pr * 2:.2f}mm < 1.5mm，"
-                                 "高温下强度不足且定位精度差；建议选 2.5-4.5mm 安装孔。",
-                                 "warning", SRC_DFM,
-                                 current=round(pr * 2, 3), required=1.5, unit="mm"))
+            issues.append(
+                _issue(
+                    "PIN_DIAMETER_TOO_SMALL",
+                    "定位销直径过小",
+                    f"定位销 #{pi + 1} 直径 {pr * 2:.2f}mm < 1.5mm，"
+                    "高温下强度不足且定位精度差；建议选 2.5-4.5mm 安装孔。",
+                    "warning",
+                    SRC_DFM,
+                    current=round(pr * 2, 3),
+                    required=1.5,
+                    unit="mm",
+                )
+            )
     for pi, (x, y, _r) in enumerate(pins):
         for ai, av in enumerate(avoids):
             if _poly_ok(av) and _pt_in(av, x, y):
-                issues.append(_issue("PIN_IN_AVOID", "定位销落入避位区",
-                                     f"定位销 #{pi+1} 落入避位区 #{ai+1}，销钉会顶起 PCB。",
-                                     "error", SRC_STRUCT,
-                                     object_id=f"pin-{pi+1}/avoid-{ai+1}"))
+                issues.append(
+                    _issue(
+                        "PIN_IN_AVOID",
+                        "定位销落入避位区",
+                        f"定位销 #{pi + 1} 落入避位区 #{ai + 1}，销钉会顶起 PCB。",
+                        "error",
+                        SRC_STRUCT,
+                        object_id=f"pin-{pi + 1}/avoid-{ai + 1}",
+                    )
+                )
 
     # ── C. 压扣孔 ────────────────────────────────────────────────
     if len(screws) < 2:
-        issues.append(_issue("CLAMPS_INSUFFICIENT", "压扣数量不足",
-                             f"当前 {len(screws)} 个压扣孔，推荐至少 2 个防止浮板。",
-                             "warning", SRC_STRUCT,
-                             current=float(len(screws)), required=2.0, unit="个"))
+        issues.append(
+            _issue(
+                "CLAMPS_INSUFFICIENT",
+                "压扣数量不足",
+                f"当前 {len(screws)} 个压扣孔，推荐至少 2 个防止浮板。",
+                "warning",
+                SRC_STRUCT,
+                current=float(len(screws)),
+                required=2.0,
+                unit="个",
+            )
+        )
     for si, (x, y) in enumerate(screws):
         if _pt_in(sink, x, y):
-            issues.append(_issue("CLAMP_IN_SINK", "压扣孔落入沉板区",
-                                 f"压扣孔 #{si+1} 落入沉板区，压扣会压伤板边元件。",
-                                 "error", SRC_STRUCT, object_id=f"screw-{si+1}"))
+            issues.append(
+                _issue(
+                    "CLAMP_IN_SINK",
+                    "压扣孔落入沉板区",
+                    f"压扣孔 #{si + 1} 落入沉板区，压扣会压伤板边元件。",
+                    "error",
+                    SRC_STRUCT,
+                    object_id=f"screw-{si + 1}",
+                )
+            )
         for ai, av in enumerate(avoids):
             if _poly_ok(av) and _pt_in(av, x, y):
-                issues.append(_issue("CLAMP_IN_AVOID", "压扣孔落入避位区",
-                                     f"压扣孔 #{si+1} 与避位区 #{ai+1} 重叠。",
-                                     "error", SRC_STRUCT, object_id=f"screw-{si+1}/avoid-{ai+1}"))
+                issues.append(
+                    _issue(
+                        "CLAMP_IN_AVOID",
+                        "压扣孔落入避位区",
+                        f"压扣孔 #{si + 1} 与避位区 #{ai + 1} 重叠。",
+                        "error",
+                        SRC_STRUCT,
+                        object_id=f"screw-{si + 1}/avoid-{ai + 1}",
+                    )
+                )
 
     # ── D. 挡锡条 ────────────────────────────────────────────────
     for bi, strip in enumerate(tin_strips):
         try:
             if sink is not None and strip is not None and strip.intersects(sink):
-                issues.append(_issue("BARRIER_SINK_COLLISION", "挡锡条与沉板区干涉",
-                                     f"挡锡条 #{bi+1} 与沉板区重叠，可能压坏板边元件。",
-                                     "warning", SRC_STRUCT, object_id=f"tin-strip-{bi+1}"))
+                issues.append(
+                    _issue(
+                        "BARRIER_SINK_COLLISION",
+                        "挡锡条与沉板区干涉",
+                        f"挡锡条 #{bi + 1} 与沉板区重叠，可能压坏板边元件。",
+                        "warning",
+                        SRC_STRUCT,
+                        object_id=f"tin-strip-{bi + 1}",
+                    )
+                )
         except Exception as e:
             log.debug("挡锡条 %d 几何退化跳过: %s", bi + 1, e)
             continue
     for hi, hole in enumerate(tin_holes):
         hx, hy = (hole[0], hole[1]) if isinstance(hole, (list, tuple)) else (hole.x, hole.y)
         if _pt_in(sink, hx, hy):
-            issues.append(_issue("TIN_HOLE_IN_SINK", "挡锡条孔落入沉板区",
-                                 f"挡锡条孔 ({hx:.1f}, {hy:.1f}) 落入沉板区。",
-                                 "error", SRC_STRUCT, object_id=f"tin-hole-{hi+1}"))
+            issues.append(
+                _issue(
+                    "TIN_HOLE_IN_SINK",
+                    "挡锡条孔落入沉板区",
+                    f"挡锡条孔 ({hx:.1f}, {hy:.1f}) 落入沉板区。",
+                    "error",
+                    SRC_STRUCT,
+                    object_id=f"tin-hole-{hi + 1}",
+                )
+            )
 
     # ── E. 避位 / 上锡 / 取手 ────────────────────────────────────
     for ai, av in enumerate(avoids):
@@ -202,56 +316,91 @@ def run_drc(r1, r2) -> list[dict]:
                 continue
             try:
                 if av.intersects(so):
-                    issues.append(_issue("AVOID_SOLDER_OVERLAP", "避位区与上锡区重叠",
-                                         f"避位区 #{ai+1} 与上锡区 #{si+1} 重叠，"
-                                         "波峰焊时会同时顶板与上锡，工艺冲突。",
-                                         "warning", SRC_DFM,
-                                         object_id=f"avoid-{ai+1}/solder-{si+1}"))
+                    issues.append(
+                        _issue(
+                            "AVOID_SOLDER_OVERLAP",
+                            "避位区与上锡区重叠",
+                            f"避位区 #{ai + 1} 与上锡区 #{si + 1} 重叠，"
+                            "波峰焊时会同时顶板与上锡，工艺冲突。",
+                            "warning",
+                            SRC_DFM,
+                            object_id=f"avoid-{ai + 1}/solder-{si + 1}",
+                        )
+                    )
             except Exception as e:
                 log.debug("避位/上锡交集判定跳过: %s", e)
                 continue
     for hi, h in enumerate(handles):
         if _poly_ok(outer) and not outer.covers(h):
-            issues.append(_issue("HANDLE_OUTSIDE_BODY", "取手位超出治具",
-                                 f"取手位 #{hi+1} 超出治具外框。", "error",
-                                 SRC_STRUCT, object_id=f"handle-{hi+1}"))
+            issues.append(
+                _issue(
+                    "HANDLE_OUTSIDE_BODY",
+                    "取手位超出治具",
+                    f"取手位 #{hi + 1} 超出治具外框。",
+                    "error",
+                    SRC_STRUCT,
+                    object_id=f"handle-{hi + 1}",
+                )
+            )
         for ai, av in enumerate(avoids):
             if _poly_ok(av) and _poly_ok(h):
                 try:
                     if h.intersects(av):
-                        issues.append(_issue("HANDLE_AVOID_COLLISION", "取手位与避位区重叠",
-                                             f"取手位 #{hi+1} 与避位区 #{ai+1} 重叠。",
-                                             "warning", SRC_STRUCT,
-                                             object_id=f"handle-{hi+1}/avoid-{ai+1}"))
+                        issues.append(
+                            _issue(
+                                "HANDLE_AVOID_COLLISION",
+                                "取手位与避位区重叠",
+                                f"取手位 #{hi + 1} 与避位区 #{ai + 1} 重叠。",
+                                "warning",
+                                SRC_STRUCT,
+                                object_id=f"handle-{hi + 1}/avoid-{ai + 1}",
+                            )
+                        )
                 except Exception as e:
                     log.debug("取手/避位交集判定跳过: %s", e)
                     continue
 
     # ── F. 狗骨头减隙刀路检查 ──────────────────────────────────────────
     from shapely.geometry import Point as _Pt
+
     for di, db in enumerate(dogbones):
         cx, cy = getattr(db, "center", (0, 0))
         cr = getattr(db, "cutter_r", 1.85)
         cut_circ = _Pt(cx, cy).buffer(cr, quad_segs=8)
         if _poly_ok(outer) and not outer.covers(cut_circ):
             issues.append(
-                _issue("DOGBONE_BODY_OVERFLOW", "狗骨头清角超出治具外框",
-                       f"狗骨头刀具切削范围 #{di+1} 超出治具主体外框。",
-                       "error", SRC_STRUCT, object_id=f"dogbone-{di+1}")
+                _issue(
+                    "DOGBONE_BODY_OVERFLOW",
+                    "狗骨头清角超出治具外框",
+                    f"狗骨头刀具切削范围 #{di + 1} 超出治具主体外框。",
+                    "error",
+                    SRC_STRUCT,
+                    object_id=f"dogbone-{di + 1}",
+                )
             )
         for si, (sx, sy) in enumerate(screws):
             if cut_circ.contains(_Pt(sx, sy)):
                 issues.append(
-                    _issue("DOGBONE_CLAMP_COLLISION", "狗骨头与压扣孔干涉",
-                           f"狗骨头清角 #{di+1} 刀路与压扣孔 #{si+1} 重叠。",
-                           "error", SRC_STRUCT, object_id=f"dogbone-{di+1}/screw-{si+1}")
+                    _issue(
+                        "DOGBONE_CLAMP_COLLISION",
+                        "狗骨头与压扣孔干涉",
+                        f"狗骨头清角 #{di + 1} 刀路与压扣孔 #{si + 1} 重叠。",
+                        "error",
+                        SRC_STRUCT,
+                        object_id=f"dogbone-{di + 1}/screw-{si + 1}",
+                    )
                 )
         for pi, (px, py, _pr) in enumerate(pins):
             if cut_circ.contains(_Pt(px, py)):
                 issues.append(
-                    _issue("DOGBONE_PIN_COLLISION", "狗骨头与定位销干涉",
-                           f"狗骨头清角 #{di+1} 刀路与定位销 #{pi+1} 重叠。",
-                           "error", SRC_STRUCT, object_id=f"dogbone-{di+1}/pin-{pi+1}")
+                    _issue(
+                        "DOGBONE_PIN_COLLISION",
+                        "狗骨头与定位销干涉",
+                        f"狗骨头清角 #{di + 1} 刀路与定位销 #{pi + 1} 重叠。",
+                        "error",
+                        SRC_STRUCT,
+                        object_id=f"dogbone-{di + 1}/pin-{pi + 1}",
+                    )
                 )
 
     # ── G. 工业合规（企业级新增，出处见头注）─────────────────────────
@@ -261,12 +410,19 @@ def run_drc(r1, r2) -> list[dict]:
         minx, miny, maxx, maxy = outer.bounds
         short_side = min(maxx - minx, maxy - miny)
         if short_side > rail_max:
-            issues.append(_issue(
-                "RAIL_WIDTH_OVERFLOW", "治具超出波峰焊轨距",
-                f"治具短边 {short_side:.1f}mm 超出默认轨距上限 {rail_max:.0f}mm——"
-                "治具无法放入波峰焊轨道；请减小拼版片数或改用双治具分板。",
-                "error", SRC_SIZE,
-                current=round(short_side, 1), required=rail_max, unit="mm"))
+            issues.append(
+                _issue(
+                    "RAIL_WIDTH_OVERFLOW",
+                    "治具超出波峰焊轨距",
+                    f"治具短边 {short_side:.1f}mm 超出默认轨距上限 {rail_max:.0f}mm——"
+                    "治具无法放入波峰焊轨道；请减小拼版片数或改用双治具分板。",
+                    "error",
+                    SRC_SIZE,
+                    current=round(short_side, 1),
+                    required=rail_max,
+                    unit="mm",
+                )
+            )
     # G2. 最小开口宽度：避位/上锡开口过窄易挂锡、难加工（Macaos ≥3.8mm）
     for group_name, group in (("avoid", avoids), ("solder", solders)):
         for gi, g in enumerate(group):
@@ -275,13 +431,20 @@ def run_drc(r1, r2) -> list[dict]:
             gx0, gy0, gx1, gy1 = g.bounds
             gmin = min(gx1 - gx0, gy1 - gy0)
             if 0 < gmin < MIN_OPENING_MM:
-                issues.append(_issue(
-                    "MIN_OPENING_WIDTH", "开口宽度过窄",
-                    f"{group_name} 开口 #{gi+1} 最小尺寸 {gmin:.2f}mm < "
-                    f"{MIN_OPENING_MM}mm（Macaos 指南），易挂锡且铣刀加工困难。",
-                    "warning", SRC_DFM,
-                    current=round(gmin, 2), required=MIN_OPENING_MM, unit="mm",
-                    object_id=f"{group_name}-{gi+1}"))
+                issues.append(
+                    _issue(
+                        "MIN_OPENING_WIDTH",
+                        "开口宽度过窄",
+                        f"{group_name} 开口 #{gi + 1} 最小尺寸 {gmin:.2f}mm < "
+                        f"{MIN_OPENING_MM}mm（Macaos 指南），易挂锡且铣刀加工困难。",
+                        "warning",
+                        SRC_DFM,
+                        current=round(gmin, 2),
+                        required=MIN_OPENING_MM,
+                        unit="mm",
+                        object_id=f"{group_name}-{gi + 1}",
+                    )
+                )
     # G3. 薄壁：沉板区与避位/上锡之间壁厚 < 推荐值（APTPCB 肋墙 ≥0.8，推荐 1.5）
     if _poly_ok(sink):
         for group_name, group in (("avoid", avoids), ("solder", solders)):
@@ -293,23 +456,37 @@ def run_drc(r1, r2) -> list[dict]:
                 except Exception:  # noqa: S112
                     continue
                 if d < MIN_WALL_MM:
-                    issues.append(_issue(
-                        "THIN_WALL", "薄壁风险",
-                        f"沉板区与 {group_name} #{gi+1} 壁厚仅 {d:.2f}mm < "
-                        f"{MIN_WALL_MM}mm（APTPCB 推荐值），高温高频振动下易开裂。",
-                        "warning", SRC_DFM,
-                        current=round(d, 2), required=MIN_WALL_MM, unit="mm",
-                        object_id=f"wall-sink/{group_name}-{gi+1}"))
+                    issues.append(
+                        _issue(
+                            "THIN_WALL",
+                            "薄壁风险",
+                            f"沉板区与 {group_name} #{gi + 1} 壁厚仅 {d:.2f}mm < "
+                            f"{MIN_WALL_MM}mm（APTPCB 推荐值），高温高频振动下易开裂。",
+                            "warning",
+                            SRC_DFM,
+                            current=round(d, 2),
+                            required=MIN_WALL_MM,
+                            unit="mm",
+                            object_id=f"wall-sink/{group_name}-{gi + 1}",
+                        )
+                    )
     # G4. 拼版间距：片间距 < 3mm 挡锡墙易挂锡（行业下限）
     grid = getattr(r2, "panel_grid", None)
     if grid and grid.get("copies", 1) > 1:
         gap = float(grid.get("gap", DEFAULT_PANEL_GAP))
         if gap < MIN_PANEL_GAP:
-            issues.append(_issue(
-                "PANEL_GAP_TOO_SMALL", "拼版间距过小",
-                f"拼版片间距 {gap:.1f}mm < {MIN_PANEL_GAP}mm，挡锡墙过窄易挂锡连片。",
-                "warning", SRC_DFM,
-                current=round(gap, 2), required=MIN_PANEL_GAP, unit="mm"))
+            issues.append(
+                _issue(
+                    "PANEL_GAP_TOO_SMALL",
+                    "拼版间距过小",
+                    f"拼版片间距 {gap:.1f}mm < {MIN_PANEL_GAP}mm，挡锡墙过窄易挂锡连片。",
+                    "warning",
+                    SRC_DFM,
+                    current=round(gap, 2),
+                    required=MIN_PANEL_GAP,
+                    unit="mm",
+                )
+            )
 
     return issues
 
@@ -333,8 +510,12 @@ def gate(issues: list[dict]) -> dict:
     for i in issues:
         if SEVERITY_ORDER[i["severity"]] > SEVERITY_ORDER[worst]:
             worst = i["severity"]
-    return {"allowed": production_allowed(issues), "counts": c, "worst": worst,
-            "total": len(issues)}
+    return {
+        "allowed": production_allowed(issues),
+        "counts": c,
+        "worst": worst,
+        "total": len(issues),
+    }
 
 
 def apply_watermark(dxf_path, text: str = "PREVIEW — 未通过 DRC 门禁，禁止生产") -> str:

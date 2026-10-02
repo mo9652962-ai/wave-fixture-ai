@@ -6,6 +6,7 @@
 
 安全：输出路径统一 resolve + 白名单后缀，限制在指定父目录内。
 """
+
 from __future__ import annotations
 
 import logging
@@ -75,14 +76,20 @@ def build_report(
     ap(f"| 治具外形 | {_fmt_size(getattr(r2, 'outer_poly', None))} mm |")
     ap(f"| 沉板槽深 | {material.get('board_pocket_depth', '-')} mm |")
     if stats:
-        ap(f"| 拼版阵列 | {stats.get('cols', 1)} × {stats.get('rows', 1)}（间距 {stats.get('gap', 0)}mm，共 {stats.get('copies', 1)} 片）|")
-        ap(f"| 阵列总占位 | {stats.get('total', ['-','-'])[0]} × {stats.get('total', ['-','-'])[1]} mm |")
+        ap(
+            f"| 拼版阵列 | {stats.get('cols', 1)} × {stats.get('rows', 1)}（间距 {stats.get('gap', 0)}mm，共 {stats.get('copies', 1)} 片）|"
+        )
+        ap(
+            f"| 板阵列占位 | {stats.get('total', ['-', '-'])[0]} × {stats.get('total', ['-', '-'])[1]} mm（不含治具边框）|"
+        )
     ap(f"| 避位区 | {len(getattr(r2, 'avoid_polys', []) or [])} 处 |")
     ap(f"| 上锡区 | {len(getattr(r2, 'solder_polys', []) or [])} 处 |")
     ap(f"| 盖板孔 | {len(getattr(r2, 'cap_holes', []) or [])} 个 |")
     ap(f"| 定位销 | {len(getattr(r1, 'pins', []) or [])} 个 |")
     ap(f"| 压扣孔 | {len(getattr(r1, 'screws', []) or [])} 个 |")
-    ap(f"| 狗骨头清角 | {len(getattr(r1, 'dogbone_corners', []) or getattr(r2, 'dogbone_corners', []) or [])} 处 |")
+    ap(
+        f"| 狗骨头清角 | {len(getattr(r1, 'dogbone_corners', []) or getattr(r2, 'dogbone_corners', []) or [])} 处 |"
+    )
     ap("")
 
     ap("## 2. 材料与成本")
@@ -108,7 +115,9 @@ def build_report(
         ap("")
         ap("| 项目 | 数值 |")
         ap("|---|---|")
-        tools_str = "、".join(f"T{t['number']} D{t['dia_mm']}mm" for t in gcode_stats.get("tools", []))
+        tools_str = "、".join(
+            f"T{t['number']} D{t['dia_mm']}mm" for t in gcode_stats.get("tools", [])
+        )
         ap(f"| 刀具组 | {len(gcode_stats.get('tools', []))} 组（{tools_str}）|")
         ap(f"| 挖腔操作 | {gcode_stats.get('pocket_ops', '-')} 环 |")
         ap(f"| 外形落料 | {gcode_stats.get('profile_passes', '-')} 层 |")
@@ -118,9 +127,13 @@ def build_report(
 
     ap("## 4. DRC 生产门禁结论")
     ap("")
-    ap(f"- blocking: **{drc_counts.get('blocking', 0)}** · error: **{drc_counts.get('error', 0)}** "
-       f"· warning: {drc_counts.get('warning', 0)} · info: {drc_counts.get('info', 0)}")
-    ap(f"- 结论：{'✅ 允许生产（DXF 无水印）' if drc_ok else '⛔ 不允许生产——仅提供带水印预览版，修正后重新生成'}")
+    ap(
+        f"- blocking: **{drc_counts.get('blocking', 0)}** · error: **{drc_counts.get('error', 0)}** "
+        f"· warning: {drc_counts.get('warning', 0)} · info: {drc_counts.get('info', 0)}"
+    )
+    ap(
+        f"- 结论：{'✅ 允许生产（DXF 无水印）' if drc_ok else '⛔ 不允许生产——仅提供带水印预览版，修正后重新生成'}"
+    )
     ap("")
 
     if interference_summary:
@@ -135,7 +148,9 @@ def build_report(
             ap("| 位号 | 高度 | 原因 |")
             ap("|---|---|---|")
             for s in susp[:5]:
-                ap(f"| {s.get('ref', '?')} | {s.get('height', '-')}mm | {s.get('suspicious_reason', '-')} |")
+                ap(
+                    f"| {s.get('ref', '?')} | {s.get('height', '-')}mm | {s.get('suspicious_reason', '-')} |"
+                )
         ap("")
 
     ap("## 6. 交付物清单")
@@ -148,7 +163,9 @@ def build_report(
         ap("- DXF / PNG / STL / GLB / G 代码（.nc）/ 本报告")
     ap("")
     ap("---")
-    ap("<sub>由 wave-fixture-ai 自动生成 · DRC 规则与材料数据出处见 drc.py / materials.py 头注</sub>")
+    ap(
+        "<sub>由 wave-fixture-ai 自动生成 · DRC 规则与材料数据出处见 drc.py / materials.py 头注</sub>"
+    )
     ap("")
     return "\n".join(L)
 

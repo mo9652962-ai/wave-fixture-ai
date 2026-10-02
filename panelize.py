@@ -8,6 +8,7 @@
 实现方式：先生成单片全部几何（沉板/避位/上锡/销/压扣/狗骨头），再按 (dx, dy) 平移复制
 N×M 份并重建外形与取手——几何一致性由单一数据源保证。
 """
+
 from __future__ import annotations
 
 import logging
@@ -20,7 +21,7 @@ from shapely.ops import unary_union
 log = logging.getLogger("fixture-panelize")
 
 DEFAULT_PANEL_GAP = 5.0  # 片间距 mm（挡锡墙）
-MIN_PANEL_GAP = 3.0      # 行业下限：低于 3mm 挡锡墙易挂锡
+MIN_PANEL_GAP = 3.0  # 行业下限：低于 3mm 挡锡墙易挂锡
 
 
 @dataclass
@@ -31,22 +32,28 @@ class PanelGrid:
     rows: int
     gap: float
     offsets: list[tuple[float, float]]  # 每片原点偏移 (dx, dy)
-    unit_w: float                       # 单片占位宽（含间距）
+    unit_w: float  # 单片占位宽（含间距）
     unit_h: float
-    total_w: float                      # 阵列总占位
+    total_w: float  # 阵列总占位
     total_h: float
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "cols": self.cols, "rows": self.rows, "gap": self.gap,
+            "cols": self.cols,
+            "rows": self.rows,
+            "gap": self.gap,
             "copies": len(self.offsets),
             "unit": [round(self.unit_w, 2), round(self.unit_h, 2)],
             "total": [round(self.total_w, 2), round(self.total_h, 2)],
         }
 
 
-def build_grid(board_bounds: tuple[float, float, float, float],
-               cols: int, rows: int, gap: float = DEFAULT_PANEL_GAP) -> PanelGrid:
+def build_grid(
+    board_bounds: tuple[float, float, float, float],
+    cols: int,
+    rows: int,
+    gap: float = DEFAULT_PANEL_GAP,
+) -> PanelGrid:
     """由单片外形 bounds 生成 N×M 平移网格。cols/rows <1 按 1 处理。"""
     cols = max(int(cols), 1)
     rows = max(int(rows), 1)
@@ -63,8 +70,16 @@ def build_grid(board_bounds: tuple[float, float, float, float],
             offsets.append((dx, dy))
     total_w = cols * w + (cols - 1) * gap
     total_h = rows * h + (rows - 1) * gap
-    return PanelGrid(cols=cols, rows=rows, gap=gap, offsets=offsets,
-                     unit_w=w, unit_h=h, total_w=total_w, total_h=total_h)
+    return PanelGrid(
+        cols=cols,
+        rows=rows,
+        gap=gap,
+        offsets=offsets,
+        unit_w=w,
+        unit_h=h,
+        total_w=total_w,
+        total_h=total_h,
+    )
 
 
 def _shift_geom(geom, dx: float, dy: float):
@@ -77,6 +92,7 @@ def _apply_translation(geom, dx: float, dy: float):
     if geom is None:
         return None
     from shapely.affinity import translate
+
     return translate(geom, xoff=dx, yoff=dy)
 
 
@@ -103,11 +119,29 @@ def panelize_geometry(
     """
     grid = build_grid(board_bounds, cols, rows, gap)
     if len(grid.offsets) <= 1:
-        return grid, sink, list(avoid_polys), list(solder_polys), \
-            list(cap_holes), list(pins), list(handles), list(screws), list(dogbone_corners)
+        return (
+            grid,
+            sink,
+            list(avoid_polys),
+            list(solder_polys),
+            list(cap_holes),
+            list(pins),
+            list(handles),
+            list(screws),
+            list(dogbone_corners),
+        )
 
-    sinks, avoids, solders, caps, new_pins, new_handles, new_screws, new_corners = [], [], [], [], [], [], [], []
-    for (dx, dy) in grid.offsets:
+    sinks, avoids, solders, caps, new_pins, new_handles, new_screws, new_corners = (
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+    )
+    for dx, dy in grid.offsets:
         sinks.append(_apply_translation(sink, dx, dy))
         avoids.extend(_apply_translation(a, dx, dy) for a in avoid_polys)
         solders.extend(_apply_translation(s, dx, dy) for s in solder_polys)
@@ -119,8 +153,10 @@ def panelize_geometry(
             new_corners.append(_shift_corner(db, dx, dy))
 
     paneled_sink = unary_union(sinks) if sinks else sink
-    log.info(f"  拼版 {grid.cols}×{grid.rows}（间距 {grid.gap}mm）→ "
-             f"{len(grid.offsets)} 片，总占位 {grid.total_w:.0f}×{grid.total_h:.0f}mm")
+    log.info(
+        f"  拼版 {grid.cols}×{grid.rows}（间距 {grid.gap}mm）→ "
+        f"{len(grid.offsets)} 片，总占位 {grid.total_w:.0f}×{grid.total_h:.0f}mm"
+    )
     return grid, paneled_sink, avoids, solders, caps, new_pins, new_handles, new_screws, new_corners
 
 
@@ -133,9 +169,14 @@ def _shift_corner(db, dx: float, dy: float):
         cx, cy = db.center
         (x0, y0), (x1, y1) = db.lead_in_line
         return DogboneCorner(
-            index=db.index, vertex=(vx + dx, vy + dy), center=(cx + dx, cy + dy),
-            cutter_r=db.cutter_r, bisector=db.bisector, angle_deg=db.angle_deg,
-            style=db.style, lead_in_line=((x0 + dx, y0 + dy), (x1 + dx, y1 + dy)),
+            index=db.index,
+            vertex=(vx + dx, vy + dy),
+            center=(cx + dx, cy + dy),
+            cutter_r=db.cutter_r,
+            bisector=db.bisector,
+            angle_deg=db.angle_deg,
+            style=db.style,
+            lead_in_line=((x0 + dx, y0 + dy), (x1 + dx, y1 + dy)),
         )
     # 容错：dict 形式
     if isinstance(db, dict):

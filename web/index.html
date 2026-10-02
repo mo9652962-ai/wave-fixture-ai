@@ -691,6 +691,13 @@ async function runInterferenceAnalysis(overrides = null) {
   for (const f of files) {
     fd.append('files', f, f.name);
   }
+  // 拼版参数与 /api/generate 保持一致（拼版后元件按阵列复制）
+  const pc = document.getElementById('panelCols');
+  const pr = document.getElementById('panelRows');
+  const pg = document.getElementById('panelGap');
+  if (pc) fd.append('panel_cols', pc.value || 1);
+  if (pr) fd.append('panel_rows', pr.value || 1);
+  if (pg) fd.append('panel_gap', pg.value || 5);
   if (Object.keys(currentHeightOverrides).length > 0) {
     fd.append('height_overrides', JSON.stringify(currentHeightOverrides));
   }

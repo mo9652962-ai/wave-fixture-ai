@@ -229,8 +229,12 @@ async def api_interference(
         if params2_override:
             from panelize import build_grid, replicate_components
 
-            grid = build_grid(board.bounds, params2_override["panel_cols"],
-                              params2_override["panel_rows"], params2_override["panel_gap"])
+            grid = build_grid(
+                board.bounds,
+                params2_override["panel_cols"],
+                params2_override["panel_rows"],
+                params2_override["panel_gap"],
+            )
             comps = replicate_components(comps, grid)
         # pcb 板范围（优先用板框 gr_rect，否则用元件范围）
         pcb_bounds = get_pcb_board_bounds(str(pcb_path))
@@ -573,7 +577,7 @@ async def api_generate(
 
             mat = get_material(material)
             sheet_t = nearest_sheet_thickness(pallet_thickness, mat)
-            outer_bounds = (getattr(result.outer_poly, "bounds", None) or board.bounds)
+            outer_bounds = getattr(result.outer_poly, "bounds", None) or board.bounds
             ob_w = outer_bounds[2] - outer_bounds[0]
             ob_h = outer_bounds[3] - outer_bounds[1]
             weight_kg = estimate_weight(blank_area((ob_w, ob_h)), sheet_t, mat)
@@ -581,10 +585,18 @@ async def api_generate(
             from cnc_gcode import generate_gcode
 
             gcode_stats = generate_gcode(
-                result.sink_poly, result.avoid_polys, result.solder_polys,
-                result.cap_holes, r1.pins, r1.handles, result.outer_poly,
-                str(gcode_path), material_key=mat.key, pallet_thickness=pallet_thickness,
-                board_thickness=board_thickness, job_name=workdir.name,
+                result.sink_poly,
+                result.avoid_polys,
+                result.solder_polys,
+                result.cap_holes,
+                r1.pins,
+                r1.handles,
+                result.outer_poly,
+                str(gcode_path),
+                material_key=mat.key,
+                pallet_thickness=pallet_thickness,
+                board_thickness=board_thickness,
+                job_name=workdir.name,
                 parent_hint=OUTPUT_DIR,
             )
             gcode_stats["thickness"] = sheet_t
@@ -593,11 +605,18 @@ async def api_generate(
             from report import build_report, write_report
 
             report_md = build_report(
-                workdir.name, r1, result,
+                workdir.name,
+                r1,
+                result,
                 drc_verdict=verdict,
-                material={"key": mat.key, "thickness": sheet_t,
-                          "board_pocket_depth": gcode_stats.get("board_pocket_depth")},
-                weight_kg=weight_kg, cost=cost, gcode_stats=gcode_stats,
+                material={
+                    "key": mat.key,
+                    "thickness": sheet_t,
+                    "board_pocket_depth": gcode_stats.get("board_pocket_depth"),
+                },
+                weight_kg=weight_kg,
+                cost=cost,
+                gcode_stats=gcode_stats,
                 output_urls={
                     "DXF 工程图": dxf_url,
                     "PNG 预览": f"/dl/{workdir.name}.png",
@@ -615,8 +634,10 @@ async def api_generate(
                 "cost": cost,
             }
         except Exception as mat_err:
-            log.warning(f"  企业级交付（G 代码/报告）生成失败，不影响 DXF: {mat_err}\n"
-                        f"{traceback.format_exc()}")
+            log.warning(
+                f"  企业级交付（G 代码/报告）生成失败，不影响 DXF: {mat_err}\n"
+                f"{traceback.format_exc()}"
+            )
 
         msg = "治具生成成功"
         if not verdict["allowed"]:
