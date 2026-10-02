@@ -27,9 +27,12 @@ import trimesh
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("interference")
 
-# 3D 实体重叠体积阈值（mm³）：超过才判为干涉。
-# 5mm³ ≈ 2×2×1.25mm 的小块——低于此值多为元件与治具开孔边缘的数值毛刺。
-INTERFERENCE_VOLUME_THRESHOLD_MM3 = 5.0
+# 3D 实体重叠判定：绝对值阈值 + 相对比例阈值（两者取「或」）
+# - 绝对值 0.5mm³：消除浮点毛刺（元件与开孔边缘的数值噪声 <0.1mm³）
+# - 相对 5%：小元件（0402/0603）自身体积就小，固定阈值会漏报——
+#   例如 0402（1.0×0.5×0.35mm ≈ 0.18mm³）压进治具 0.1mm³ 已是严重干涉
+INTERFERENCE_VOLUME_THRESHOLD_MM3 = 0.5
+INTERFERENCE_RATIO_THRESHOLD = 0.05
 
 # 封装名 → (宽, 高, 厚) 典型尺寸 mm（不含引脚）
 # 参考：IPC/JEDEC 标准封装尺寸 + 主流厂商 datasheet 典型值
@@ -257,8 +260,15 @@ def parse_kicad_pcb(pcb_path: str) -> list[dict]:
     """
     解析 KiCad .kicad_pcb → 元件列表 [{name, x, y, w, h, height, ref}]
     坐标保持原始 pcb 坐标（分析时用 transform_pcb_to_gerber 转换）。
+
+    文件缺失/不可读时返回空列表（不抛异常）——上层按「无元件数据」处理，
+    与 get_pcb_board_bounds 的容错语义保持一致。
     """
-    txt = Path(pcb_path).read_text(encoding="utf-8", errors="replace")
+    try:
+        txt = Path(pcb_path).read_text(encoding="utf-8", errors="replace")
+    except OSError as e:
+        log.warning(f"  读取 .kicad_pcb 失败: {e}")
+        return []
     components = []
 
     # 按 footprint 块切分
@@ -404,11 +414,14 @@ def analyze_interference(
 
         # 判定：3D 实体重叠超阈值才算干涉（2D 覆盖仅作归因）——
         # 原 OR 逻辑会把与治具完全不相交的元件也报出来（真实板实测 36/36 误报）
-        if vol > INTERFERENCE_VOLUME_THRESHOLD_MM3:
+        comp_volume = c["w"] * c["h"] * c["height"]
+        overlap_ratio = (vol / comp_volume) if comp_volume > 0 else 0.0
+        if vol > INTERFERENCE_VOLUME_THRESHOLD_MM3 or overlap_ratio > INTERFERENCE_RATIO_THRESHOLD:
             reports.append({
                 **c,
                 "x": tx, "y": ty,  # 返回转换后坐标（前端 3D 用）
                 "overlap_mm3": round(vol, 2),
+                "overlap_ratio": round(overlap_ratio, 4),
                 "cover_ratio": round(cover_ratio, 2),
                 "avoid_covered": cover_ratio >= cover_threshold,
             })

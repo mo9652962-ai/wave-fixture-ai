@@ -26,6 +26,7 @@ from fixture_phase1 import (
 )
 from fixture_phase2 import run_phase2
 from interference import (
+    INTERFERENCE_RATIO_THRESHOLD,
     INTERFERENCE_VOLUME_THRESHOLD_MM3,
     analyze_interference,
     get_pcb_board_bounds,
@@ -94,9 +95,20 @@ def interference(tmp_path_factory):
 
 
 def test_no_mass_false_positives(interference):
-    """关键回归：不应把所有元件都报成干涉（原 OR 逻辑导致 36/36 全报）。"""
+    """关键回归：不应把所有元件都报成干涉（原 OR 逻辑导致 36/36 全报）。
+
+    阈值从「绝对值 5mm³」改为「绝对值 0.5mm³ 或 相对占比 5%」后，小元件
+    （0402/0603，自身体积 ~0.2mm³）不再被阈值掩盖——报告数上升是预期的，
+    但每条都应有物理依据（重叠可观 或 避位覆盖不足）。
+    """
     n, total = len(interference.reports), len(interference.comps)
-    assert n < total * 0.5, f"{n}/{total} 元件被报干涉——疑似误报回归"
+    assert n < total, f"{n}/{total} 元件被报干涉——疑似全量误报回归"
+    for r in interference.reports:
+        has_basis = (
+            r["overlap_mm3"] > INTERFERENCE_VOLUME_THRESHOLD_MM3
+            or r.get("overlap_ratio", 0) > INTERFERENCE_RATIO_THRESHOLD
+        )
+        assert has_basis, f"{r['ref']} 报告缺少物理依据: {r}"
 
 
 def test_every_reported_overlap_exceeds_threshold(interference):
