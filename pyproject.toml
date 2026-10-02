@@ -20,6 +20,7 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "python-multipart>=0.0.9",
+    "matplotlib>=3.8",  # DXF → PNG 预览渲染（cz 缺省未装会导致预览裂图）
 ]
 
 [project.optional-dependencies]

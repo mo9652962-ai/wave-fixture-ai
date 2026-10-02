@@ -302,18 +302,48 @@ function showResult(data) {
   document.getElementById('downloadDxf').href = data.dxf_url;
   document.getElementById('downloadPng').href = data.png_url;
   const stats = data.stats || {};
+  const drc = data.drc || null;
+  const badge = drc
+    ? (drc.allowed
+        ? '<span style="color:var(--success)">✅ 通过（可生产）</span>'
+        : `<span style="color:var(--danger,#f87171)">⛔ 未通过（预览版）</span>`)
+    : '<span style="color:var(--success)">✅ 生成成功</span>';
   const rows = [
     ['治具外形', stats.board_size || '-'],
     ['避位区', stats.avoid_count + ' 个'],
     ['上锡区', stats.solder_count + ' 个'],
     ['盖板孔', stats.cap_hole_count + ' 个'],
+    ['DRC 门禁', badge],
     ['状态', '<span style="color:var(--success)">✅ 生成成功</span>'],
   ];
-  document.getElementById('statsBody').innerHTML = rows
+  let html = rows
     .map(([k, v]) => `<div class="stat-row"><span class="label">${k}</span><span class="value">${v}</span></div>`)
     .join('');
+  // DRC 问题清单（未通过时展开显示，每条带出处）
+  if (drc && drc.issues && drc.issues.length) {
+    const sevColor = { blocking: '#f87171', error: '#fb923c', warning: '#facc15', info: '#94a3b8' };
+    html += '<div class="stat-row" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">'
+      + `<span class="label">DRC 发现（${drc.total}）</span><span class="value">`
+      + `blocking ${drc.counts.blocking} · error ${drc.counts.error} · warning ${drc.counts.warning}</span></div>`;
+    if (!drc.allowed) {
+      html += '<div style="font-size:12px;line-height:1.6;margin-top:8px;max-height:220px;overflow:auto">';
+      for (const it of drc.issues.slice(0, 12)) {
+        const c = sevColor[it.severity] || '#94a3b8';
+        html += `<div style="margin-bottom:6px"><b style="color:${c}">[${it.severity}]</b> `
+          + `${it.title}<br><span style="color:var(--dim)">${it.detail}</span>`
+          + `<br><span style="color:var(--dim);font-size:11px">出处：${it.source || '-'}</span></div>`;
+      }
+      if (drc.issues.length > 12) html += `<div style="color:var(--dim)">…另 ${drc.issues.length - 12} 条</div>`;
+      html += '</div>';
+    }
+  }
+  document.getElementById('statsBody').innerHTML = html;
   result.classList.add('show');
-  showStatus('✅ 治具生成成功！', 'success');
+  if (drc && !drc.allowed) {
+    showStatus('⚠️ DRC 门禁未通过——已导出带水印预览版，修正后出生产版', 'error');
+  } else {
+    showStatus('✅ 治具生成成功（DRC 通过，可直接生产）！', 'success');
+  }
 }
 
 document.getElementById('resetBtn').addEventListener('click', () => {
