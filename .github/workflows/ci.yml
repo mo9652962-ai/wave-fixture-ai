@@ -23,8 +23,8 @@ jobs:
           enable-cache: true
       - name: Sync dependencies
         run: uv sync --extra dev
-      - name: Run tests
-        run: uv run pytest -q
+      - name: Run tests（覆盖率棘轮：实测 84%，门槛 80%，只升不降）
+        run: uv run pytest -q --cov=fixture_phase1 --cov=fixture_phase2 --cov=fixture_3d --cov=interference --cov=nl_adjust --cov=drc --cov=golden --cov=review --cov=pin_select --cov=web_server --cov-report=term-missing --cov-fail-under=80
 
   lint:
     runs-on: ubuntu-latest
