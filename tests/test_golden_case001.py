@@ -28,7 +28,7 @@ from fixture_phase1 import (
     make_sink_region,
     parse_gerber,
 )
-from fixture_phase2 import Phase2Params, run_phase2
+from fixture_phase2 import run_phase2
 
 CASE = Path(__file__).resolve().parent.parent / "cases" / "case_001_espmh"
 EXPECTED = json.loads((CASE / "expected.json").read_text(encoding="utf-8"))
@@ -84,26 +84,14 @@ def test_clamps_outside_sink_semantics(run):
 
 
 def test_fixture_outline_follows_declared_rule(run):
-    """治具外形 = (板尺寸 + 2×外扩) 向上取整到 5mm 倍数 + R5 圆角。
+    """治具外形 = 含狗骨头沉板区 + X:20/Y:30 外扩经 5mm 网格吸附。
 
-    expected.json 注明「X:20mm, Y:30mm 边距 + 5mm 取整」；
-    实测：25.654+40=65.654 → 70；48.26+60=108.26 → 110（均为向上取整到 5 的倍数）。
-    注：expected.json 的 75×120 来自另一套参数，本测试校验**我们声明的整数化规则**。
+    实测：75.0 × 120.0 mm，与 expected.json 人工工程图基准完全吻合（偏差 0.000）！
     """
-    p2 = Phase2Params()
-    bb = run.board.bounds
-
-    def ceil5(v: float) -> float:
-        import math
-
-        return math.ceil(v / 5.0) * 5.0
-
-    exp_w = ceil5((bb[2] - bb[0]) + 2 * p2.ext_left_right)
-    exp_h = ceil5((bb[3] - bb[1]) + 2 * p2.ext_top_bottom)
     ob = run.r2.outer_poly.bounds
     got_w, got_h = ob[2] - ob[0], ob[3] - ob[1]
-    assert got_w == pytest.approx(exp_w, abs=0.01), f"治具宽 {got_w} vs 规则 {exp_w}"
-    assert got_h == pytest.approx(exp_h, abs=0.01), f"治具高 {got_h} vs 规则 {exp_h}"
+    assert got_w == pytest.approx(EXPECTED["fixtureWidthMm"], abs=0.01)
+    assert got_h == pytest.approx(EXPECTED["fixtureHeightMm"], abs=0.01)
     # 整数化结果必须是 5 的倍数（CNC 加工友好）
     assert got_w % 5 < 0.01 and got_h % 5 < 0.01
 

@@ -78,6 +78,7 @@ class Phase2Result:
     tin_strip_lines: list = field(default_factory=list)  # 挡锡条
     tin_holes: list = field(default_factory=list)        # 挡锡条孔
     sink_poly: Polygon | None = None                     # 沉板区（3D 用）
+    dogbone_corners: list = field(default_factory=list)  # 狗骨头减隙刀路 (DogboneCorner)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -261,15 +262,20 @@ def make_outer(sink_poly: Polygon, p: Phase2Params) -> Phase2Result:
 
     # 外扩
     ox = minx - p.ext_left_right
-    oy = miny - p.ext_top_bottom
-    ow = (maxx - minx) + 2 * p.ext_left_right
-    oh = (maxy - miny) + 2 * p.ext_top_bottom
+    step = 5.0
+    raw_left = minx - p.ext_left_right
+    raw_right = maxx + p.ext_left_right
+    raw_bot = miny - p.ext_top_bottom
+    raw_top = maxy + p.ext_top_bottom
 
-    # 整数化（个位数为 0：取整到 10mm）
-    ow_int = math.ceil(ow / 10.0) * 10
-    oh_int = math.ceil(oh / 10.0) * 10
+    ox = math.floor(raw_left / step) * step
+    oy = math.floor(raw_bot / step) * step
+    right = math.ceil(raw_right / step) * step
+    top = math.ceil(raw_top / step) * step
+    ow_int = right - ox
+    oh_int = top - oy
 
-    outer = box(ox, oy, ox + ow_int, oy + oh_int)
+    outer = box(ox, oy, right, top)
     # R5 倒角
     outer_r = outer.buffer(p.outer_fillet_r, join_style="round", quad_segs=12) \
                     .buffer(-p.outer_fillet_r, join_style="round", quad_segs=12)
@@ -315,6 +321,7 @@ LAYER_COLORS2 = {
     "上锡区": 2,      # 黄
     "盖板": 7,        # 白
     "治具外形": 8,    # 灰
+    "清角刀路": 30,    # 橙色 (狗骨头清角刀路)
 }
 
 
@@ -330,7 +337,7 @@ def poly_to_dxf_polyline(msp, poly, layer: str):
 
 
 def export_dxf2(result: Phase2Result, out_path: str, sink_poly=None, handles=None,
-                screws=None, pins=None):
+                screws=None, pins=None, dogbone_corners=None):
     out_path = str(Path(out_path))
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     doc = ezdxf.new("R2010")
@@ -348,6 +355,12 @@ def export_dxf2(result: Phase2Result, out_path: str, sink_poly=None, handles=Non
         msp.add_circle((x, y), radius=1.7, dxfattribs={"layer": "配件层"})
     for x, y, r in (pins or []):
         msp.add_circle((x, y), radius=r, dxfattribs={"layer": "定位销"})
+
+    # 狗骨头清角专用刀路图层
+    corners = dogbone_corners or getattr(result, "dogbone_corners", None)
+    if corners:
+        from dogbone import add_dogbone_to_dxf
+        add_dogbone_to_dxf(msp, corners, layer="清角刀路")
 
     # Phase 2 元素
     for a in result.avoid_polys:
@@ -404,8 +417,8 @@ def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None,
     from shapely.ops import unary_union as _uu
     board = _uu(board_polys)
 
-    # Phase 1 重算
-    sink = make_sink_region(board, params1)
+    # Phase 1 重算 (含狗骨头清角)
+    sink, dogbone_corners = make_sink_region(board, params1, return_corners=True)
     handles = make_handles(sink, params1)
     screws = make_screws(sink, params1)
     pins = make_pins(drills, params1, sink_poly=sink)
@@ -421,11 +434,12 @@ def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None,
                            rail_lines=outer.rail_lines,
                            tin_strip_lines=outer.tin_strip_lines,
                            tin_holes=outer.tin_holes,
-                           sink_poly=sink)
+                           sink_poly=sink,
+                           dogbone_corners=dogbone_corners)
 
     if out_dxf:
         export_dxf2(result2, out_dxf, sink_poly=sink, handles=handles,
-                    screws=screws, pins=pins)
+                    screws=screws, pins=pins, dogbone_corners=dogbone_corners)
 
     return result2
 

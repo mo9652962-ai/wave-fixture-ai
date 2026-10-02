@@ -93,6 +93,7 @@ def run_drc(r1, r2) -> list[dict]:
     solders = getattr(r2, "solder_polys", []) or []
     tin_holes = getattr(r2, "tin_holes", []) or []
     tin_strips = getattr(r2, "tin_strip_lines", []) or []
+    dogbones = getattr(r1, "dogbone_corners", []) or getattr(r2, "dogbone_corners", []) or []
 
     # ── A. 结构边界 ──────────────────────────────────────────────
     if not _poly_ok(board):
@@ -218,6 +219,33 @@ def run_drc(r1, r2) -> list[dict]:
                 except Exception as e:
                     log.debug("取手/避位交集判定跳过: %s", e)
                     continue
+
+    # ── F. 狗骨头减隙刀路检查 ──────────────────────────────────────────
+    from shapely.geometry import Point as _Pt
+    for di, db in enumerate(dogbones):
+        cx, cy = getattr(db, "center", (0, 0))
+        cr = getattr(db, "cutter_r", 1.85)
+        cut_circ = _Pt(cx, cy).buffer(cr, quad_segs=8)
+        if _poly_ok(outer) and not outer.covers(cut_circ):
+            issues.append(
+                _issue("DOGBONE_BODY_OVERFLOW", "狗骨头清角超出治具外框",
+                       f"狗骨头刀具切削范围 #{di+1} 超出治具主体外框。",
+                       "error", SRC_STRUCT, object_id=f"dogbone-{di+1}")
+            )
+        for si, (sx, sy) in enumerate(screws):
+            if cut_circ.contains(_Pt(sx, sy)):
+                issues.append(
+                    _issue("DOGBONE_CLAMP_COLLISION", "狗骨头与压扣孔干涉",
+                           f"狗骨头清角 #{di+1} 刀路与压扣孔 #{si+1} 重叠。",
+                           "error", SRC_STRUCT, object_id=f"dogbone-{di+1}/screw-{si+1}")
+                )
+        for pi, (px, py, _pr) in enumerate(pins):
+            if cut_circ.contains(_Pt(px, py)):
+                issues.append(
+                    _issue("DOGBONE_PIN_COLLISION", "狗骨头与定位销干涉",
+                           f"狗骨头清角 #{di+1} 刀路与定位销 #{pi+1} 重叠。",
+                           "error", SRC_STRUCT, object_id=f"dogbone-{di+1}/pin-{pi+1}")
+                )
 
     return issues
 

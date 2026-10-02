@@ -4,9 +4,12 @@
 
 启动: python web_server.py [--port 8000]
 """
+
 from __future__ import annotations
 
+import json
 import logging
+import re
 import sys
 import tempfile
 import time
@@ -37,6 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 def _resolve_web_dir() -> Path:
     """定位前端静态目录，兼容源码运行与 pip 安装两种布局。
 
@@ -46,10 +50,10 @@ def _resolve_web_dir() -> Path:
     """
     here = Path(__file__).resolve().parent
     candidates = [
-        here / "web",                                        # 源码布局
-        Path(sys.prefix) / "share" / "wave-fixture-ai",      # venv 安装（实测位置）
-        Path(sys.base_prefix) / "share" / "wave-fixture-ai", # 系统级安装
-        here.parent.parent / "share" / "wave-fixture-ai",    # site-packages 上两级（兼容布局）
+        here / "web",  # 源码布局
+        Path(sys.prefix) / "share" / "wave-fixture-ai",  # venv 安装（实测位置）
+        Path(sys.base_prefix) / "share" / "wave-fixture-ai",  # 系统级安装
+        here.parent.parent / "share" / "wave-fixture-ai",  # site-packages 上两级（兼容布局）
     ]
     # 最可靠：按发行版元数据定位（pip 安装时 data-files 的相对位置由安装器决定）
     try:
@@ -81,19 +85,24 @@ TMP_DIR.mkdir(exist_ok=True)
 
 def _extract_upload(files: list[UploadFile]) -> Path:
     """把上传的多个 Gerber 文件解压到一个临时目录，返回目录路径"""
-    job_id = f"job_{int(time.time()*1000)}"
+    job_id = f"job_{int(time.time() * 1000)}"
     workdir = TMP_DIR / job_id
     workdir.mkdir(parents=True, exist_ok=True)
     for f in files:
         data = f.file.read()
-        name = f.filename or "unknown"
+        raw_name = Path(f.filename or "unknown").name
+        name = re.sub(r"[^\w\-.]", "_", raw_name)
         # 支持 zip 包
         if name.lower().endswith(".zip"):
             zpath = workdir / name
             zpath.write_bytes(data)
             try:
                 with zipfile.ZipFile(zpath) as z:
-                    z.extractall(workdir)
+                    for member in z.infolist():
+                        # 防止 zip slip 路径穿越
+                        target = (workdir / member.filename).resolve()
+                        if target.is_relative_to(workdir.resolve()):
+                            z.extract(member, workdir)
             except Exception as e:
                 log.warning(f"  zip 解压失败: {e}")
             continue
@@ -107,17 +116,72 @@ _SESSION_PARAMS: dict = {}
 
 
 @app.post("/api/interference")
-async def api_interference(files: list[UploadFile] = File(...)):
-    """上传 Gerber + KiCad .kicad_pcb → 3D 治具 + 元件干涉分析"""
+async def api_interference(
+    files: list[UploadFile] = File(default=[]),
+    job_id: str | None = Form(None),
+    height_overrides: str = Form("{}"),
+):
+    """上传 Gerber + KiCad .kicad_pcb → 3D 治具 + 元件干涉分析（支持高度覆盖与可疑元件交互）"""
     try:
-        workdir = _extract_upload(files)
+        workdir = None
+        if job_id:
+            safe_id = Path(job_id).name
+            candidate = (TMP_DIR / safe_id).resolve()
+            if candidate.is_relative_to(TMP_DIR.resolve()) and candidate.is_dir():
+                workdir = candidate
+                job_id = safe_id
+                if files:
+                    for f in files:
+                        data = f.file.read()
+                        raw_name = Path(f.filename or "unknown").name
+                        name = re.sub(r"[^\w\-.]", "_", raw_name)
+                        if name.lower().endswith(".zip"):
+                            zpath = workdir / name
+                            zpath.write_bytes(data)
+                            try:
+                                with zipfile.ZipFile(zpath) as z:
+                                    for member in z.infolist():
+                                        target = (workdir / member.filename).resolve()
+                                        if target.is_relative_to(workdir.resolve()):
+                                            z.extract(member, workdir)
+                            except Exception as e:
+                                log.warning(f"  zip 解压失败: {e}")
+                        else:
+                            (workdir / name).write_bytes(data)
+
+        if workdir is None:
+            if not files:
+                raise HTTPException(400, "必须上传文件或提供有效的 job_id")
+            workdir = _extract_upload(files)
+            job_id = workdir.name
+
+        # 解析用户高度覆盖
+        overrides_dict: dict[str, float] = {}
+        if height_overrides:
+            try:
+                raw_ov = (
+                    json.loads(height_overrides)
+                    if isinstance(height_overrides, str)
+                    else dict(height_overrides)
+                )
+                for k, v in raw_ov.items():
+                    try:
+                        overrides_dict[str(k).strip()] = float(v)
+                    except (ValueError, TypeError):
+                        pass
+            except Exception as e:
+                log.warning(f"  height_overrides 解析失败: {e}")
+
         # 找 .kicad_pcb 文件
         pcb_files = list(Path(workdir).rglob("*.kicad_pcb"))
         if not pcb_files:
-            return JSONResponse({
-                "ok": False,
-                "message": "未找到 .kicad_pcb 文件——干涉分析需要 KiCad 工程文件（含元件位置）。Gerber 只有焊盘几何，没有元件高度信息。",
-            })
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "job_id": job_id,
+                    "message": "未找到 .kicad_pcb 文件——干涉分析需要 KiCad 工程文件（含元件位置）。Gerber 只有焊盘几何，没有元件高度信息。",
+                }
+            )
         pcb_path = pcb_files[0]
 
         # 生成治具 3D
@@ -135,59 +199,88 @@ async def api_interference(files: list[UploadFile] = File(...)):
         result2 = run_phase2(str(workdir), None)
         if result2 is None:
             raise HTTPException(422, "治具生成失败")
-        mesh = build_fixture_3d(sink, result2.avoid_polys, result2.solder_polys,
-                                result2.outer_poly, Fixture3DParams())
-        stl_path = OUTPUT_DIR / f"{workdir.name}-interf.stl"
+        mesh = build_fixture_3d(
+            sink, result2.avoid_polys, result2.solder_polys, result2.outer_poly, Fixture3DParams()
+        )
+        stl_path = OUTPUT_DIR / f"{job_id}-interf.stl"
         export_stl(mesh, str(stl_path))
 
         # 元件解析 + 干涉分析（带坐标变换：KiCad → Gerber）
         from interference import (
             analyze_interference,
             get_pcb_board_bounds,
+            get_suspicious_components,
             parse_kicad_pcb,
         )
-        comps = parse_kicad_pcb(str(pcb_path))
+
+        comps = parse_kicad_pcb(str(pcb_path), height_overrides=overrides_dict)
         # pcb 板范围（优先用板框 gr_rect，否则用元件范围）
         pcb_bounds = get_pcb_board_bounds(str(pcb_path))
         if pcb_bounds is None and comps:
             pcb_bounds = (
-                min(c["x"] for c in comps) - 5, min(c["y"] for c in comps) - 5,
-                max(c["x"] for c in comps) + 5, max(c["y"] for c in comps) + 5,
+                min(c["x"] for c in comps) - 5,
+                min(c["y"] for c in comps) - 5,
+                max(c["x"] for c in comps) + 5,
+                max(c["y"] for c in comps) + 5,
             )
         # gerber 板范围（沉板区 = PCB 区域）
         gerber_bounds = sink.bounds if sink is not None else None
-        reports = analyze_interference(str(stl_path), comps, pcb_bounds=pcb_bounds, gerber_bounds=gerber_bounds,
-                                       avoid_polys=result2.avoid_polys)
+        reports = analyze_interference(
+            str(stl_path),
+            comps,
+            pcb_bounds=pcb_bounds,
+            gerber_bounds=gerber_bounds,
+            avoid_polys=result2.avoid_polys,
+        )
+        suspicious_comps = get_suspicious_components(
+            comps,
+            reports,
+            pcb_bounds=pcb_bounds,
+            gerber_bounds=gerber_bounds,
+        )
 
         # 导出 GLB 供前端 3D 可视化
-        glb_path = OUTPUT_DIR / f"{workdir.name}-interf.glb"
+        glb_path = OUTPUT_DIR / f"{job_id}-interf.glb"
         try:
             from fixture_3d import export_glb
+
             export_glb(mesh, str(glb_path))
-            glb_url = f"/dl/{workdir.name}-interf.glb"
+            glb_url = f"/dl/{job_id}-interf.glb"
         except Exception:
             glb_url = None
 
         # 干涉元件盒数据（前端 three.js 叠加高亮）
         interference_boxes = [
             {
-                "ref": r["ref"], "name": r["name"],
-                "x": r["x"], "y": r["y"],
-                "w": r["w"], "h": r["h"], "height": r["height"],
+                "ref": r["ref"],
+                "name": r["name"],
+                "x": r["x"],
+                "y": r["y"],
+                "w": r["w"],
+                "h": r["h"],
+                "height": r["height"],
                 "overlap_mm3": r["overlap_mm3"],
+                "interfering": True,
             }
             for r in reports
         ]
 
-        return JSONResponse({
-            "ok": True,
-            "component_count": len(comps),
-            "interference_count": len(reports),
-            "interferences": reports,
-            "interference_boxes": interference_boxes,
-            "glb_url": glb_url,
-            "message": f"分析完成：{len(comps)} 个元件，{len(reports)} 个干涉" if reports else f"分析完成：{len(comps)} 个元件，✅ 无干涉",
-        })
+        return JSONResponse(
+            {
+                "ok": True,
+                "job_id": job_id,
+                "component_count": len(comps),
+                "interference_count": len(reports),
+                "interferences": reports,
+                "interference_boxes": interference_boxes,
+                "suspicious_components": suspicious_comps,
+                "height_overrides": overrides_dict,
+                "glb_url": glb_url,
+                "message": f"分析完成：{len(comps)} 个元件，{len(reports)} 个干涉"
+                if reports
+                else f"分析完成：{len(comps)} 个元件，✅ 无干涉",
+            }
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -207,16 +300,23 @@ async def api_adjust(instruction: str = Form(""), files: list[UploadFile] = File
         # 当前参数（从会话状态继承，或默认）
         from fixture_phase1 import FixtureParams
         from fixture_phase2 import Phase2Params
-        p1 = _SESSION_PARAMS.get(job_id, {}).get("p1", {k: v for k, v in FixtureParams().__dict__.items()})
-        p2 = _SESSION_PARAMS.get(job_id, {}).get("p2", {k: v for k, v in Phase2Params().__dict__.items()})
+
+        p1 = _SESSION_PARAMS.get(job_id, {}).get(
+            "p1", {k: v for k, v in FixtureParams().__dict__.items()}
+        )
+        p2 = _SESSION_PARAMS.get(job_id, {}).get(
+            "p2", {k: v for k, v in Phase2Params().__dict__.items()}
+        )
 
         # 解析调整
         r = parse_adjust_command(instruction, p1, p2)
         if not r.matched:
-            return JSONResponse({
-                "ok": False,
-                "message": f"未识别的指令：「{instruction}」。支持如「避位区外扩1mm」「治具外形倒角改5mm」「沉板区外扩0.5mm」等",
-            })
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "message": f"未识别的指令：「{instruction}」。支持如「避位区外扩1mm」「治具外形倒角改5mm」「沉板区外扩0.5mm」等",
+                }
+            )
 
         # 应用调整
         if r.param in p1:
@@ -229,22 +329,24 @@ async def api_adjust(instruction: str = Form(""), files: list[UploadFile] = File
 
         # 用调整后参数重新生成
         from fixture_phase2 import run_phase2
+
         dxf_path = OUTPUT_DIR / f"{job_id}-adjusted.dxf"
         png_path = OUTPUT_DIR / f"{job_id}-adjusted.png"
         # 只传被修改的参数（覆盖默认值）
-        result = run_phase2(str(workdir), str(dxf_path),
-                            params1_override=p1, params2_override=p2)
+        result = run_phase2(str(workdir), str(dxf_path), params1_override=p1, params2_override=p2)
         if result is None:
             raise HTTPException(422, "调整后生成失败")
 
         # 渲染 PNG
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             import ezdxf
             import matplotlib.pyplot as plt
             from ezdxf.addons.drawing import Frontend, RenderContext
             from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+
             doc = ezdxf.readfile(str(dxf_path))
             ctx = RenderContext(doc)
             fig, ax = plt.subplots(figsize=(16, 10))
@@ -256,17 +358,19 @@ async def api_adjust(instruction: str = Form(""), files: list[UploadFile] = File
         except Exception as e:
             log.warning(f"  PNG 渲染失败: {e}")
 
-        return JSONResponse({
-            "ok": True,
-            "matched": True,
-            "param": r.param,
-            "old_value": r.old_value,
-            "new_value": r.new_value,
-            "action": r.action,
-            "message": r.message,
-            "dxf_url": f"/dl/{job_id}-adjusted.dxf",
-            "png_url": f"/dl/{job_id}-adjusted.png",
-        })
+        return JSONResponse(
+            {
+                "ok": True,
+                "matched": True,
+                "param": r.param,
+                "old_value": r.old_value,
+                "new_value": r.new_value,
+                "action": r.action,
+                "message": r.message,
+                "dxf_url": f"/dl/{job_id}-adjusted.dxf",
+                "png_url": f"/dl/{job_id}-adjusted.png",
+            }
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -311,22 +415,24 @@ async def api_generate3d(files: list[UploadFile] = File(...)):
             glb_ok = False
 
         # 干涉分析（无元件高度数据时返回空，提示需 KiCad 3D 模型）
-        return JSONResponse({
-            "ok": True,
-            "stl_url": f"/dl/{workdir.name}-3d.stl",
-            "glb_url": f"/dl/{workdir.name}-3d.glb" if glb_ok else None,
-            "stats": {
-                "volume_mm3": round(mesh.volume, 0),
-                "vertices": len(mesh.vertices),
-                "faces": len(mesh.faces),
-                "avoid_holes": len(avoid),
-                "solder_holes": len(solder),
-            },
-            "interference": {
-                "note": "干涉分析需要 PCB 元件 3D 高度数据（KiCad .kicad_pcb 的 3D 模型或 step 文件），当前仅提供 3D 几何预览。"
-            },
-            "message": "3D 治具生成成功",
-        })
+        return JSONResponse(
+            {
+                "ok": True,
+                "stl_url": f"/dl/{workdir.name}-3d.stl",
+                "glb_url": f"/dl/{workdir.name}-3d.glb" if glb_ok else None,
+                "stats": {
+                    "volume_mm3": round(mesh.volume, 0),
+                    "vertices": len(mesh.vertices),
+                    "faces": len(mesh.faces),
+                    "avoid_holes": len(avoid),
+                    "solder_holes": len(solder),
+                },
+                "interference": {
+                    "note": "干涉分析需要 PCB 元件 3D 高度数据（KiCad .kicad_pcb 的 3D 模型或 step 文件），当前仅提供 3D 几何预览。"
+                },
+                "message": "3D 治具生成成功",
+            }
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -356,13 +462,17 @@ async def api_generate(files: list[UploadFile] = File(...)):
             raise HTTPException(422, "未找到外形层（Edge_Cuts/GM1）")
         board = _uu(board_polys)
         p1 = FixtureParams()
-        sink = make_sink_region(board, p1)
+        sink, dogbone_corners = make_sink_region(board, p1, return_corners=True)
 
         from fixture_phase1 import make_handles, make_pins, make_screws
+
         r1 = SimpleNamespace(
-            board_poly=board, sink_poly=sink,
-            handles=make_handles(sink, p1), screws=make_screws(sink, p1),
+            board_poly=board,
+            sink_poly=sink,
+            handles=make_handles(sink, p1),
+            screws=make_screws(sink, p1),
             pins=make_pins(drills, p1, sink_poly=sink),
+            dogbone_corners=dogbone_corners,
         )
         result = _run2(str(workdir), str(dxf_path))
         if result is None:
@@ -370,6 +480,7 @@ async def api_generate(files: list[UploadFile] = File(...)):
 
         # ── DRC 生产安全门禁（blocking/error → 只出带水印预览版）──
         from drc import apply_watermark, gate, run_drc
+
         issues = run_drc(r1, result)
         verdict = gate(issues)
         dxf_url = f"/dl/{workdir.name}.dxf"
@@ -381,11 +492,13 @@ async def api_generate(files: list[UploadFile] = File(...)):
         # 渲染 PNG 预览
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             import ezdxf
             import matplotlib.pyplot as plt
             from ezdxf.addons.drawing import Frontend, RenderContext
             from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+
             doc = ezdxf.readfile(str(dxf_path))
             ctx = RenderContext(doc)
             fig, ax = plt.subplots(figsize=(16, 10))
@@ -403,22 +516,31 @@ async def api_generate(files: list[UploadFile] = File(...)):
             "avoid_count": len(getattr(result, "avoid_polys", [])),
             "solder_count": len(getattr(result, "solder_polys", [])),
             "cap_hole_count": len(getattr(result, "cap_holes", [])),
+            "dogbone_count": len(getattr(result, "dogbone_corners", [])) or len(dogbone_corners),
         }
         msg = "治具生成成功"
         if not verdict["allowed"]:
-            msg = (f"DRC 门禁未通过（blocking {verdict['counts']['blocking']} / "
-                   f"error {verdict['counts']['error']}）——仅提供带水印预览版，修正后可出生产版")
-        return JSONResponse({
-            "ok": True,
-            "dxf_url": dxf_url,
-            "png_url": f"/dl/{workdir.name}.png",
-            "job_id": workdir.name,
-            "stats": stats,
-            "drc": {"allowed": verdict["allowed"], "counts": verdict["counts"],
-                    "worst": verdict["worst"], "total": verdict["total"],
-                    "issues": issues},
-            "message": msg,
-        })
+            msg = (
+                f"DRC 门禁未通过（blocking {verdict['counts']['blocking']} / "
+                f"error {verdict['counts']['error']}）——仅提供带水印预览版，修正后可出生产版"
+            )
+        return JSONResponse(
+            {
+                "ok": True,
+                "dxf_url": dxf_url,
+                "png_url": f"/dl/{workdir.name}.png",
+                "job_id": workdir.name,
+                "stats": stats,
+                "drc": {
+                    "allowed": verdict["allowed"],
+                    "counts": verdict["counts"],
+                    "worst": verdict["worst"],
+                    "total": verdict["total"],
+                    "issues": issues,
+                },
+                "message": msg,
+            }
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -427,11 +549,16 @@ async def api_generate(files: list[UploadFile] = File(...)):
 
 
 @app.post("/api/review/confirm")
-async def api_review_confirm(job_id: str = Form(...), review_id: str = Form(...),
-                             operator: str = Form(...), answer: str = Form(...)):
+async def api_review_confirm(
+    job_id: str = Form(...),
+    review_id: str = Form(...),
+    operator: str = Form(...),
+    answer: str = Form(...),
+):
     """工程师确认一条 review（低置信度/缺数据人工闭环），写入审计日志。"""
     try:
         from review import confirm_review
+
         hit = confirm_review(REVIEW_DIR, job_id, review_id, operator, answer)
         return JSONResponse({"ok": True, "review": hit})
     except KeyError as e:
@@ -467,7 +594,7 @@ async def api_download(fname: str):
     except (OSError, ValueError):
         raise HTTPException(400, "非法文件名")
     try:
-        p.relative_to(base)          # 不在 output 目录下会抛 ValueError
+        p.relative_to(base)  # 不在 output 目录下会抛 ValueError
     except ValueError:
         raise HTTPException(400, "非法文件名")
     if not p.is_file():

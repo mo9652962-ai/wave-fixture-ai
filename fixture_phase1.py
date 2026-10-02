@@ -29,9 +29,13 @@ log = logging.getLogger("fixture")
 # ─────────────────────────────────────────────────────────────
 @dataclass
 class FixtureParams:
-    # 步骤2: 沉板区
+    # 步骤2: 沉板区与狗骨头清角 (Dogbone Relief)
     sink_expand_mm: float = 0.2        # 外形外扩 0.2mm
-    sink_fillet_r: float = 1.85        # 清角圆弧 R1.85
+    sink_fillet_r: float = 1.85        # 清角圆弧 R1.85 (传统清角回退)
+    enable_dogbone: bool = True        # 开启内凹拐角「狗骨头（Dogbone Relief）」减隙刀路
+    dogbone_r: float = 1.85            # 狗骨头铣刀半径 R1.85 (对应标准 Φ3.7mm 铣刀)
+    dogbone_clearance: float = 0.05    # 减隙角过切避空余量 (mm)
+    dogbone_style: str = "dogbone"     # "dogbone"(标准狗骨头) | "corner_hole"(角孔) | "tbone"
     # 步骤3: 取手位
     handle_w: float = 20.0             # 取手长 20mm
     handle_h: float = 40.0             # 取手宽 40mm
@@ -47,10 +51,11 @@ class FixtureParams:
 @dataclass
 class FixtureResult:
     board_poly: Polygon | None = None       # 原始外形
-    sink_poly: Polygon | None = None        # 沉板区（外扩+清角）
+    sink_poly: Polygon | None = None        # 沉板区（外扩+狗骨头清角）
     handles: list[Polygon] = field(default_factory=list)   # 取手位
     screws: list[tuple[float, float]] = field(default_factory=list)  # 压扣孔 (x,y)
     pins: list[tuple[float, float, float]] = field(default_factory=list)  # 定位销 (x,y,r)
+    dogbone_corners: list = field(default_factory=list)    # 狗骨头拐角刀路列表 (DogboneCorner)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -324,16 +329,32 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
 
 
 # ─────────────────────────────────────────────────────────────
-# 步骤 2: 沉板区（外形外扩 0.2mm + R1.85 清角）
+# 步骤 2: 沉板区（外形外扩 0.2mm + 狗骨头 Dogbone 清角）
 # ─────────────────────────────────────────────────────────────
-def make_sink_region(board_poly: Polygon, p: FixtureParams) -> Polygon:
-    """外形外扩 + 圆角清角"""
-    # 外扩 0.2mm（round join 自动圆角）
-    expanded = board_poly.buffer(p.sink_expand_mm, join_style="round", quad_segs=16)
-    # 再外扩 R1.85 再内缩 R1.85 实现清角圆弧（行业做法：dilate-erode 出圆角）
-    filleted = expanded.buffer(p.sink_fillet_r, join_style="round", quad_segs=16) \
+def make_sink_region(
+    board_poly: Polygon,
+    p: FixtureParams,
+    *,
+    return_corners: bool = False,
+) -> Polygon | tuple[Polygon, list]:
+    """外形外扩 + 狗骨头(Dogbone)内凹拐角减隙清角刀路生成"""
+    if p.enable_dogbone:
+        from dogbone import DogboneParams, generate_dogbone_relief
+        db_params = DogboneParams(
+            cutter_r=p.dogbone_r,
+            style=p.dogbone_style,
+            clearance_mm=p.dogbone_clearance,
+        )
+        sink, corners = generate_dogbone_relief(board_poly, expand_mm=p.sink_expand_mm, params=db_params)
+    else:
+        expanded = board_poly.buffer(p.sink_expand_mm, join_style="round", quad_segs=16)
+        sink = expanded.buffer(p.sink_fillet_r, join_style="round", quad_segs=16) \
                        .buffer(-p.sink_fillet_r, join_style="round", quad_segs=16)
-    return filleted
+        corners = []
+
+    if return_corners:
+        return sink, corners
+    return sink
 
 
 # ─────────────────────────────────────────────────────────────
@@ -441,6 +462,7 @@ LAYER_COLORS = {
     "取手位": 3,      # 绿
     "配件层": 4,      # 青
     "定位销": 5,      # 蓝
+    "清角刀路": 30,    # 橙色（狗骨头切削圆与下刀引线）
 }
 
 def poly_to_dxf_polyline(msp, poly: Polygon, layer: str, close: bool = True):
@@ -478,6 +500,11 @@ def export_dxf(result: FixtureResult, out_path: str, params: FixtureParams):
     for x, y, r in result.pins:
         msp.add_circle((x, y), radius=r, dxfattribs={"layer": "定位销"})
 
+    # 狗骨头专用刀路层
+    if getattr(result, "dogbone_corners", None):
+        from dogbone import add_dogbone_to_dxf
+        add_dogbone_to_dxf(msp, result.dogbone_corners, layer="清角刀路")
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -497,9 +524,9 @@ def run(gerber_dir: str, out_dxf: str, params: FixtureParams | None = None) -> F
     log.info(f"  外形: {len(board_polys)} 个多边形, 尺寸 {board.bounds[2]-board.bounds[0]:.1f}x{board.bounds[3]-board.bounds[1]:.1f}mm")
     log.info(f"  钻孔: {len(drills)} 个")
 
-    # 步骤2: 沉板区
-    sink = make_sink_region(board, params)
-    log.info(f"  步骤2 沉板区: 外扩{params.sink_expand_mm}mm + 清角R{params.sink_fillet_r}")
+    # 步骤2: 沉板区 (含狗骨头清角)
+    sink, dogbone_corners = make_sink_region(board, params, return_corners=True)
+    log.info(f"  步骤2 沉板区: 外扩{params.sink_expand_mm}mm + 狗骨头清角(R{params.dogbone_r}mm, 刀路{len(dogbone_corners)}处)")
 
     # 步骤3: 取手位
     handles = make_handles(sink, params)
@@ -514,7 +541,7 @@ def run(gerber_dir: str, out_dxf: str, params: FixtureParams | None = None) -> F
     log.info(f"  步骤5 定位销: {len(pins)} 个")
 
     result = FixtureResult(board_poly=board, sink_poly=sink, handles=handles,
-                           screws=screws, pins=pins)
+                           screws=screws, pins=pins, dogbone_corners=dogbone_corners)
 
     if out_dxf:
         export_dxf(result, out_dxf, params)

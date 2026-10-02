@@ -120,6 +120,105 @@ header {
   vertical-align: middle; margin-right: 6px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 可疑与干涉元件交互列表 */
+.susp-table-container {
+  margin-top: 14px;
+  background: #11141e;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.susp-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #161b26;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.susp-header-title {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.susp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+.susp-table th {
+  padding: 8px 10px;
+  background: #161b26;
+  color: var(--dim);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.susp-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  vertical-align: middle;
+}
+.susp-table tr:hover {
+  background: rgba(79, 140, 255, 0.08);
+  cursor: pointer;
+}
+.susp-table tr.selected {
+  background: rgba(79, 140, 255, 0.22) !important;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.susp-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.susp-badge.interf {
+  background: rgba(255, 95, 95, 0.2);
+  color: #ff5f5f;
+  border: 1px solid rgba(255, 95, 95, 0.4);
+}
+.susp-badge.warn {
+  background: rgba(250, 204, 21, 0.2);
+  color: #facc15;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+}
+.susp-badge.override {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+.height-input {
+  width: 65px;
+  padding: 4px 6px;
+  background: #1e2330;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  text-align: right;
+  transition: border-color 0.2s;
+}
+.height-input:focus {
+  border-color: var(--accent);
+  outline: none;
+  background: #252b3a;
+}
+.height-input.modified {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  font-weight: bold;
+}
 </style>
   <!-- three.js 用于 3D 预览（ES module 方式，GLTFLoader 非模块版 r150+ 已移除）-->
   <script type="importmap">
@@ -209,8 +308,44 @@ header {
       </p>
       <button class="btn" id="interfBtn" style="background:#e67e22;">🔍 运行干涉分析</button>
       <div id="interfResult" style="margin-top:12px;font-size:13px;color:var(--dim);"></div>
-      <div id="interf3dPanel" style="display:none;margin-top:12px;">
-        <div id="interfContainer" style="width:100%;height:300px;border-radius:8px;border:1px solid var(--border);background:#0a0c12;"></div>
+      <div id="interf3dPanel" style="display:none;margin-top:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:12px;color:var(--dim);">
+            💡 提示：按住鼠标左键旋转 3D 视角，滚轮缩放；点击下方元件可自动聚焦与 3D 高亮
+          </div>
+          <div id="interfStatsBadge" style="font-size:12px;"></div>
+        </div>
+        <div id="interfContainer" style="width:100%;height:360px;border-radius:8px;border:1px solid var(--border);background:#0a0c12;position:relative;"></div>
+
+        <!-- 高度可疑与干涉元件交互列表 -->
+        <div class="susp-table-container" id="suspTableContainer" style="display:none;">
+          <div class="susp-header-bar">
+            <div class="susp-header-title">
+              <span>🔍 高度可疑与干涉元件交互列表</span>
+              <span id="suspCountBadge" style="color:var(--dim);font-weight:normal;font-size:12px;"></span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button class="btn btn-outline" id="resetOverridesBtn" style="padding:4px 10px;font-size:12px;" title="清空全部自定义修改">↺ 重置修改</button>
+              <button class="btn" id="applyOverridesBtn" style="padding:4px 14px;font-size:12px;background:#e67e22;">⚡ 应用高度修改并重新分析</button>
+            </div>
+          </div>
+          <div style="max-height:280px;overflow-y:auto;">
+            <table class="susp-table">
+              <thead>
+                <tr>
+                  <th style="width:95px;">状态</th>
+                  <th style="width:75px;">位号</th>
+                  <th>封装 / 型号</th>
+                  <th style="width:115px;">当前高度(mm)</th>
+                  <th style="width:85px;">原始高度</th>
+                  <th>可疑原因 / 干涉详情</th>
+                  <th style="width:75px;text-align:center;">操作</th>
+                </tr>
+              </thead>
+              <tbody id="suspTableBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -228,6 +363,9 @@ const generateBtn = document.getElementById('generateBtn');
 const result = document.getElementById('result');
 const statusEl = document.getElementById('status');
 const files = [];  // 收集上传文件（存 File 对象）
+let currentJobId = null;
+let currentHeightOverrides = {};
+let currentSuspiciousList = [];
 
 function showStatus(msg, type='') {
   statusEl.textContent = msg;
@@ -287,6 +425,7 @@ generateBtn.addEventListener('click', async () => {
     }
     const data = await resp.json();
     if (data.ok) {
+      if (data.job_id) currentJobId = data.job_id;
       showResult(data);
     }
   } catch (e) {
@@ -416,32 +555,79 @@ document.getElementById('adjustBtn').addEventListener('click', async () => {
   }
 });
 
-// 干涉分析 + 3D 可视化
-document.getElementById('interfBtn').addEventListener('click', async () => {
-  if (!files.length) { showStatus('请先上传 Gerber', 'error'); return; }
+// ── 干涉分析 + 可疑元件交互列表 + 3D 可视化 ───────────────────────────
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+let interfRenderer = null;
+let interfScene = null;
+let interfCamera = null;
+let interfControls = null;
+let interfModel = null;
+let componentMeshMap = {};  // ref -> { mesh, line, originalColor, originalLineColor, data }
+let selectedCompRef = null;
+let THREE_CACHE = null;
+
+// 干涉分析执行函数（支持携带 height_overrides 与 job_id 重用）
+async function runInterferenceAnalysis(overrides = null) {
+  if (!files.length && !currentJobId) {
+    showStatus('请先上传 Gerber 与 .kicad_pcb 文件', 'error');
+    return;
+  }
   const btn = document.getElementById('interfBtn');
+  const applyBtn = document.getElementById('applyOverridesBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>分析中...';
+  if (applyBtn) {
+    applyBtn.disabled = true;
+    applyBtn.innerHTML = '<span class="spinner"></span>重新分析中...';
+  }
+
+  if (overrides !== null) {
+    currentHeightOverrides = overrides;
+  }
+
   const fd = new FormData();
-  for (const f of files) fd.append('files', f, f.name);
+  if (currentJobId) {
+    fd.append('job_id', currentJobId);
+  }
+  for (const f of files) {
+    fd.append('files', f, f.name);
+  }
+  if (Object.keys(currentHeightOverrides).length > 0) {
+    fd.append('height_overrides', JSON.stringify(currentHeightOverrides));
+  }
+
   try {
     const resp = await fetch('/api/interference', { method: 'POST', body: fd });
     const data = await resp.json();
     const resultEl = document.getElementById('interfResult');
+
     if (!data.ok) {
-      resultEl.innerHTML = `<span style="color:var(--error)">❌ ${data.message}</span>`;
+      resultEl.innerHTML = `<span style="color:var(--error)">❌ ${escapeHtml(data.message)}</span>`;
       showStatus('❌ ' + data.message, 'error');
     } else {
-      const n = data.interference_count;
+      if (data.job_id) currentJobId = data.job_id;
+      const n = data.interference_count || 0;
+      const totalComps = data.component_count || 0;
+      currentSuspiciousList = data.suspicious_components || [];
+
+      // 更新状态文字
       if (n > 0) {
-        // 用 DOM 构建避免 XSS（ref/name 来自用户文件）
         const span = document.createElement('span');
         span.style.color = 'var(--error)';
         span.textContent = '⚠️ ' + data.message;
         resultEl.innerHTML = '';
         resultEl.appendChild(span);
         const small = document.createElement('small');
-        small.textContent = data.interferences.map(r => r.ref + ' ' + r.name + ' 重叠' + r.overlap_mm3 + 'mm³').join('；');
+        small.textContent = (data.interferences || []).map(r => r.ref + ' ' + r.name + ' 重叠' + r.overlap_mm3 + 'mm³').join('；');
         resultEl.appendChild(document.createElement('br'));
         resultEl.appendChild(small);
       } else {
@@ -451,16 +637,29 @@ document.getElementById('interfBtn').addEventListener('click', async () => {
         resultEl.innerHTML = '';
         resultEl.appendChild(span);
       }
-      showStatus(n > 0 ? `⚠️ 发现 ${n} 个干涉` : '✅ 无干涉', n > 0 ? 'error' : 'success');
-      // 3D 可视化（有 GLB + 干涉盒）
+      showStatus(n > 0 ? `⚠️ 发现 ${n} 个干涉` : '✅ 无干涉，治具避位安全', n > 0 ? 'error' : 'success');
+
+      // 更新右上角简报 badge
+      const badgeEl = document.getElementById('interfStatsBadge');
+      if (badgeEl) {
+        badgeEl.innerHTML = `<span style="color:${n > 0 ? 'var(--error)' : 'var(--success)'}">● ${n > 0 ? n + ' 处干涉' : '0 干涉'}</span> · ${totalComps} 个元件`;
+      }
+
+      // 3D 可视化面板
       if (data.glb_url) {
         document.getElementById('interf3dPanel').style.display = 'block';
-        // 关键：必须等浏览器完成布局重算后再读 clientWidth/clientHeight——
-        // 紧跟 display:block 的同步调用会读到 0×0（面板此前是 display:none），
-        // 导致 canvas 尺寸为 0、3D 不可见。用 rAF 双帧确保 reflow 已完成。
         requestAnimationFrame(() => requestAnimationFrame(() => {
-          renderInterference3D(data.glb_url, data.interference_boxes || []);
+          renderInterference3D(data.glb_url, data.interference_boxes || [], currentSuspiciousList);
         }));
+      }
+
+      // 渲染可疑元件交互列表
+      const suspPanel = document.getElementById('suspTableContainer');
+      if (currentSuspiciousList.length > 0) {
+        suspPanel.style.display = 'block';
+        renderSuspiciousTable(currentSuspiciousList);
+      } else {
+        suspPanel.style.display = 'none';
       }
     }
   } catch (e) {
@@ -468,65 +667,327 @@ document.getElementById('interfBtn').addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
     btn.innerHTML = '🔍 运行干涉分析';
+    if (applyBtn) {
+      applyBtn.disabled = false;
+      applyBtn.style.background = '#e67e22';
+      applyBtn.innerHTML = '⚡ 应用高度修改并重新分析';
+    }
   }
+}
+
+// 绑定运行干涉分析按钮
+document.getElementById('interfBtn').addEventListener('click', () => {
+  runInterferenceAnalysis();
 });
 
-async function renderInterference3D(glbUrl, boxes) {
+// 绑定应用高度修改按钮
+document.getElementById('applyOverridesBtn').addEventListener('click', () => {
+  runInterferenceAnalysis(currentHeightOverrides);
+});
+
+// 绑定重置高度按钮
+document.getElementById('resetOverridesBtn').addEventListener('click', () => {
+  currentHeightOverrides = {};
+  runInterferenceAnalysis({});
+  showStatus('↺ 已重置所有高度为默认值', 'success');
+});
+
+// 渲染可疑与干涉元件交互列表表格
+function renderSuspiciousTable(list) {
+  const tbody = document.getElementById('suspTableBody');
+  tbody.innerHTML = '';
+  const countBadge = document.getElementById('suspCountBadge');
+  countBadge.textContent = `(共 ${list.length} 个异常/可疑项)`;
+
+  list.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.dataset.ref = item.ref;
+
+    let badgeHtml = '';
+    if (item.interfering) {
+      badgeHtml = `<span class="susp-badge interf">🔴 实体干涉</span>`;
+    } else if (item.source === 'user_override') {
+      badgeHtml = `<span class="susp-badge override">✏️ 已修改</span>`;
+    } else {
+      badgeHtml = `<span class="susp-badge warn">⚠️ 高度可疑</span>`;
+    }
+
+    const isModified = currentHeightOverrides[item.ref] !== undefined;
+    const currentVal = isModified ? currentHeightOverrides[item.ref] : item.height;
+
+    tr.innerHTML = `
+      <td>${badgeHtml}</td>
+      <td><b style="color:var(--accent);">${escapeHtml(item.ref)}</b></td>
+      <td style="color:var(--text);font-family:monospace;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
+      <td>
+        <input type="number" step="0.1" min="0.1" max="100"
+               class="height-input ${isModified ? 'modified' : ''}"
+               value="${currentVal}"
+               data-ref="${escapeHtml(item.ref)}"
+               data-orig="${item.default_height || item.height}">
+      </td>
+      <td style="color:var(--dim);">${item.default_height || item.height}</td>
+      <td style="color:${item.interfering ? '#ff8080' : 'var(--dim)'};font-size:11px;">
+        ${escapeHtml(item.suspicious_reason || '-')}
+      </td>
+      <td style="text-align:center;">
+        <button class="btn btn-outline" style="padding:2px 8px;font-size:11px;" onclick="event.stopPropagation(); window.focusComponent('${escapeHtml(item.ref)}')">🎯 聚焦</button>
+      </td>
+    `;
+
+    // 点击整行在 3D 视角聚焦
+    tr.addEventListener('click', () => {
+      window.focusComponent(item.ref);
+    });
+
+    // 监听高度输入变更
+    const input = tr.querySelector('.height-input');
+    input.addEventListener('change', (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        currentHeightOverrides[item.ref] = val;
+        input.classList.add('modified');
+        const applyBtn = document.getElementById('applyOverridesBtn');
+        applyBtn.style.background = '#2563eb';
+        applyBtn.innerHTML = '⚡ 保存修改并重新分析 (待应用)';
+      }
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        input.blur();
+        document.getElementById('applyOverridesBtn').click();
+      }
+    });
+
+    tbody.appendChild(tr);
+  });
+}
+
+// 聚焦元件（3D 场景与表格联动）
+window.focusComponent = function(ref) {
+  selectedCompRef = ref;
+  // 1. 高亮表格行并滚入视野
+  document.querySelectorAll('#suspTableBody tr').forEach(tr => {
+    if (tr.dataset.ref === ref) {
+      tr.classList.add('selected');
+      tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      tr.classList.remove('selected');
+    }
+  });
+
+  // 2. 3D 视角聚焦与高亮
+  const comp = componentMeshMap[ref];
+  if (!comp || !interfCamera) return;
+
+  // 还原其他 mesh 颜色，高亮目标 mesh
+  Object.keys(componentMeshMap).forEach(k => {
+    const c = componentMeshMap[k];
+    if (k === ref) {
+      c.mesh.material.color.setHex(0x00ffff);
+      c.mesh.material.opacity = 0.95;
+      c.line.material.color.setHex(0x00ffff);
+    } else {
+      c.mesh.material.color.setHex(c.originalColor);
+      c.mesh.material.opacity = c.originalColor === 0xff3333 ? 0.7 : 0.35;
+      c.line.material.color.setHex(c.originalLineColor);
+    }
+  });
+
+  // 摄像机镜头定位
+  const targetPos = comp.mesh.position;
+  if (interfControls) {
+    interfControls.target.copy(targetPos);
+    interfCamera.position.set(targetPos.x + 35, targetPos.y + 30, targetPos.z + 35);
+    interfControls.update();
+  } else {
+    interfCamera.lookAt(targetPos);
+  }
+  showStatus(`🎯 已在 3D 视角定位元件: ${ref}`, 'success');
+};
+
+async function renderInterference3D(glbUrl, boxes, suspiciousList) {
   const container = document.getElementById('interfContainer');
   container.innerHTML = '';
+  componentMeshMap = {};
+  selectedCompRef = null;
+
   try {
     const THREE = await import('three');
+    THREE_CACHE = THREE;
     const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+    let OrbitControls = null;
+    try {
+      const controlsMod = await import('three/addons/controls/OrbitControls.js');
+      OrbitControls = controlsMod.OrbitControls;
+    } catch (e) {
+      console.warn('OrbitControls import fallback:', e);
+    }
+
     const scene = new THREE.Scene();
+    interfScene = scene;
     scene.background = new THREE.Color(0x0a0c12);
-    // 尺寸兜底：容器若因父级刚显示而尚未完成布局（0×0），退到 CSS 声明的 300px / 视口宽度，
-    // 避免 canvas 尺寸为 0 导致 3D 不可见（真机实测：display:none→block 后同步读取过）
-    const w = container.clientWidth || 800, h = container.clientHeight || 300;
-    const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 2000);
-    camera.position.set(150, 120, 150);
-    camera.lookAt(0, 0, 4);
+
+    const w = container.clientWidth || 800;
+    const h = container.clientHeight || 360;
+    const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 2500);
+    interfCamera = camera;
+    camera.position.set(160, 130, 160);
+
     const renderer = new THREE.WebGLRenderer({ antialias: true });
+    interfRenderer = renderer;
     renderer.setSize(w, h);
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
     container.appendChild(renderer.domElement);
 
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(1, 1, 1);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0x404040));
-    scene.add(new THREE.GridHelper(250, 25, 0x4f8cff, 0x2a2e3d));
+    let controls = null;
+    if (OrbitControls) {
+      controls = new OrbitControls(camera, renderer.domElement);
+      interfControls = controls;
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.target.set(0, 0, 4);
+    }
 
+    // 光照
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight1.position.set(100, 150, 100);
+    scene.add(dirLight1);
+    const dirLight2 = new THREE.DirectionalLight(0x90b0ff, 0.6);
+    dirLight2.position.set(-100, -100, -100);
+    scene.add(dirLight2);
+    scene.add(new THREE.AmbientLight(0x555566));
+
+    // 网格辅助
+    const grid = new THREE.GridHelper(260, 26, 0x4f8cff, 0x242838);
+    scene.add(grid);
+
+    // 加载 GLB 治具
     const loader = new GLTFLoader();
     loader.load(glbUrl, (gltf) => {
       const model = gltf.scene;
+      interfModel = model;
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
       model.position.sub(center);
       scene.add(model);
 
-      // 干涉元件盒（红色半透明）
-      const mat = new THREE.MeshPhongMaterial({ color: 0xff3333, transparent: true, opacity: 0.6 });
-      for (const b of boxes) {
-        const geo = new THREE.BoxGeometry(b.w, b.height, b.h);
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(b.x - center.x, b.y - center.y, 1.6 + b.height / 2);
-        scene.add(mesh);
-        const edges = new THREE.EdgesGeometry(geo);
-        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xff0000 }));
-        line.position.copy(mesh.position);
-        scene.add(line);
+      if (controls) {
+        controls.target.set(0, 0, 0);
       }
 
+      // 渲染干涉元件盒 (红色半透明)
+      const interfRefs = new Set();
+      const interfMat = new THREE.MeshPhongMaterial({
+        color: 0xff3333,
+        transparent: true,
+        opacity: 0.7,
+        shininess: 80,
+      });
+
+      for (const b of (boxes || [])) {
+        interfRefs.add(b.ref);
+        const geo = new THREE.BoxGeometry(b.w, b.height, b.h);
+        const mesh = new THREE.Mesh(geo, interfMat.clone());
+        const posX = b.x - center.x;
+        const posY = b.y - center.y;
+        const posZ = 1.6 + b.height / 2;
+        mesh.position.set(posX, posY, posZ);
+        mesh.userData = { ref: b.ref, name: b.name, data: b };
+        scene.add(mesh);
+
+        const edges = new THREE.EdgesGeometry(geo);
+        const line = new THREE.LineSegments(
+          edges,
+          new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 })
+        );
+        line.position.copy(mesh.position);
+        scene.add(line);
+
+        componentMeshMap[b.ref] = {
+          mesh,
+          line,
+          originalColor: 0xff3333,
+          originalLineColor: 0xff0000,
+          data: b,
+        };
+      }
+
+      // 渲染非干涉但可疑的元件盒 (黄橙色微透明)
+      const suspMat = new THREE.MeshPhongMaterial({
+        color: 0xf59e0b,
+        transparent: true,
+        opacity: 0.35,
+        shininess: 40,
+      });
+
+      for (const s of (suspiciousList || [])) {
+        if (interfRefs.has(s.ref)) continue;
+        if (s.x === undefined || s.y === undefined) continue;
+
+        const geo = new THREE.BoxGeometry(s.w, s.height, s.h);
+        const mesh = new THREE.Mesh(geo, suspMat.clone());
+        const posX = s.x - center.x;
+        const posY = s.y - center.y;
+        const posZ = 1.6 + s.height / 2;
+        mesh.position.set(posX, posY, posZ);
+        mesh.userData = { ref: s.ref, name: s.name, data: s };
+        scene.add(mesh);
+
+        const edges = new THREE.EdgesGeometry(geo);
+        const line = new THREE.LineSegments(
+          edges,
+          new THREE.LineBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.5 })
+        );
+        line.position.copy(mesh.position);
+        scene.add(line);
+
+        componentMeshMap[s.ref] = {
+          mesh,
+          line,
+          originalColor: 0xf59e0b,
+          originalLineColor: 0xf59e0b,
+          data: s,
+        };
+      }
+
+      // 点击 3D 元件盒事件 (Raycaster)
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
+      renderer.domElement.addEventListener('click', (event) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        const meshes = Object.values(componentMeshMap).map((c) => c.mesh);
+        const intersects = raycaster.intersectObjects(meshes);
+        if (intersects.length > 0) {
+          const hit = intersects[0].object;
+          if (hit.userData && hit.userData.ref) {
+            window.focusComponent(hit.userData.ref);
+          }
+        }
+      });
+
+      // 渲染循环
       function animate() {
         requestAnimationFrame(animate);
-        model.rotation.y += 0.003;
+        if (controls) {
+          controls.update();
+        } else if (model) {
+          model.rotation.y += 0.003;
+        }
         renderer.render(scene, camera);
       }
       animate();
     }, undefined, (err) => {
       showStatus('⚠️ 3D 加载失败: ' + err.message, 'error');
     });
+
   } catch (e) {
-    showStatus('⚠️ three.js 加载失败（需联网）: ' + e.message, 'error');
+    showStatus('⚠️ three.js 加载失败: ' + e.message, 'error');
   }
 }
 

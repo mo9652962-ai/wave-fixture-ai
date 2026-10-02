@@ -88,13 +88,12 @@ def test_keepouts_and_solder_generated(run):
 
 
 def test_board_bounds_from_kicad_matches_gerber(run):
-    """KiCad 板框与 Gerber 沉板区范围应一致（跨格式一致性）。"""
+    """KiCad 板框与 Gerber 板外形范围应一致（跨格式一致性）。"""
     pb = get_pcb_board_bounds(str(CASE / "board.kicad_pcb"))
     assert pb is not None
-    sb = run.sink.bounds
-    # 沉板区 = 板框外扩 0.2mm
-    assert (sb[2] - sb[0]) == pytest.approx((pb[2] - pb[0]) + 0.4, abs=0.15)
-    assert (sb[3] - sb[1]) == pytest.approx((pb[3] - pb[1]) + 0.4, abs=0.15)
+    bb = run.board.bounds
+    assert (bb[2] - bb[0]) == pytest.approx(pb[2] - pb[0], abs=0.15)
+    assert (bb[3] - bb[1]) == pytest.approx(pb[3] - pb[1], abs=0.15)
 
 
 def test_cross_tool_compatibility():

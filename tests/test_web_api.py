@@ -204,3 +204,54 @@ def test_interference_with_real_kicad(client):
         b = d["interference_boxes"][0]
         for k in ("ref", "name", "x", "y", "w", "h", "height", "overlap_mm3"):
             assert k in b, f"高亮盒缺少字段 {k}"
+    assert "suspicious_components" in d, "必须包含可疑元件交互列表"
+    assert isinstance(d["suspicious_components"], list)
+
+
+def test_interference_height_overrides(client):
+    """支持用户自定义高度覆盖并重新计算干涉。"""
+    files = _files_for_upload()
+    pcb = CASE / "board.kicad_pcb"
+    if not pcb.exists():
+        pytest.skip("case_003 无 kicad_pcb")
+    files.append(("files", ("board.kicad_pcb", pcb.read_bytes(), "text/plain")))
+    # 将 C10 高度覆盖为 25.0mm (超大高度)
+    r = client.post(
+        "/api/interference",
+        files=files,
+        data={"height_overrides": '{"C10": 25.0}'},
+    )
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["ok"] is True
+    assert d["height_overrides"].get("C10") == 25.0
+    # 验证 suspicious_components 包含 C10 且高度更新
+    susp = {c["ref"]: c for c in d["suspicious_components"]}
+    if "C10" in susp:
+        assert susp["C10"]["height"] == 25.0
+        assert susp["C10"]["source"] == "user_override"
+
+
+def test_interference_reuse_job_id(client):
+    """支持携带 job_id 重用此前上传并应用新的高度覆盖。"""
+    files = _files_for_upload()
+    pcb = CASE / "board.kicad_pcb"
+    if not pcb.exists():
+        pytest.skip("case_003 无 kicad_pcb")
+    files.append(("files", ("board.kicad_pcb", pcb.read_bytes(), "text/plain")))
+    r1 = client.post("/api/interference", files=files)
+    assert r1.status_code == 200
+    job_id = r1.json()["job_id"]
+    assert job_id
+
+    # 仅提供 job_id 与新高度覆盖，不重传大文件
+    r2 = client.post(
+        "/api/interference",
+        data={"job_id": job_id, "height_overrides": '{"C1": 15.0}'},
+    )
+    assert r2.status_code == 200, r2.text
+    d2 = r2.json()
+    assert d2["ok"] is True
+    assert d2["job_id"] == job_id
+    assert d2["height_overrides"].get("C1") == 15.0
+

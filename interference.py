@@ -16,6 +16,7 @@ interference — 干涉分析：PCB 元件 vs 治具 3D
 - 连接器: 2.5+
 - ESP32 模块: 3.2
 """
+
 from __future__ import annotations
 
 import logging
@@ -202,7 +203,9 @@ def _fp_key(footprint_name: str) -> str:
     return None
 
 
-def transform_pcb_to_gerber(x: float, y: float, pcb_bounds=None, gerber_bounds=None) -> tuple[float, float]:
+def transform_pcb_to_gerber(
+    x: float, y: float, pcb_bounds=None, gerber_bounds=None
+) -> tuple[float, float]:
     """
     KiCad .kicad_pcb 坐标 → Gerber 坐标变换。
 
@@ -235,7 +238,10 @@ def get_pcb_board_bounds(pcb_path: str) -> tuple | None:
     try:
         txt = Path(pcb_path).read_text(encoding="utf-8", errors="replace")
         # ① 优先 gr_rect
-        for m in re.finditer(r"\(gr_rect[\s\S]*?\(start ([-\d.]+) ([-\d.]+)\)[\s\S]*?\(end ([-\d.]+) ([-\d.]+)\)", txt):
+        for m in re.finditer(
+            r"\(gr_rect[\s\S]*?\(start ([-\d.]+) ([-\d.]+)\)[\s\S]*?\(end ([-\d.]+) ([-\d.]+)\)",
+            txt,
+        ):
             x1, y1, x2, y2 = map(float, m.groups())
             return (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
         # ② 回退：Edge.Cuts 层上所有线段/圆弧的端点集合取包围盒
@@ -256,10 +262,15 @@ def get_pcb_board_bounds(pcb_path: str) -> tuple | None:
     return None
 
 
-def parse_kicad_pcb(pcb_path: str) -> list[dict]:
+def parse_kicad_pcb(
+    pcb_path: str,
+    height_overrides: dict[str, float] | None = None,
+) -> list[dict]:
     """
-    解析 KiCad .kicad_pcb → 元件列表 [{name, x, y, w, h, height, ref}]
+    解析 KiCad .kicad_pcb → 元件列表 [{name, x, y, w, h, height, ref, ...}]
     坐标保持原始 pcb 坐标（分析时用 transform_pcb_to_gerber 转换）。
+
+    height_overrides: 可选的用户自定义位号/型号高度覆盖字典，如 {"K2": 15.0, "C10": 1.2}
 
     文件缺失/不可读时返回空列表（不抛异常）——上层按「无元件数据」处理，
     与 get_pcb_board_bounds 的容错语义保持一致。
@@ -293,7 +304,7 @@ def parse_kicad_pcb(pcb_path: str) -> list[dict]:
                 if depth == 0:
                     break
             i += 1
-        block = txt[start:i + 1]
+        block = txt[start : i + 1]
         pos = i + 1
 
         # 提取位置 (at x y angle)
@@ -306,14 +317,18 @@ def parse_kicad_pcb(pcb_path: str) -> list[dict]:
         ref_m = re.search(r'\(property "Reference" "([^"]+)"', block)
         ref = ref_m.group(1) if ref_m else "?"
 
-        # 元件尺寸
+        # 元件尺寸与高度解析
         key = _fp_key(fp_name)
+        source = "table"
+        is_suspicious = False
+        suspicious_reason = ""
+
         if key:
             w, h, height = FOOTPRINT_DIMS[key]
         else:
             # 未知封装：用 pads 范围估算（粗略）
-            pad_xs = [float(v) for v in re.findall(r'\(at ([-\d.]+) [-\d.]+', block)]
-            pad_ys = [float(v) for v in re.findall(r'\(at [-\d.]+ ([-\d.]+)', block)]
+            pad_xs = [float(v) for v in re.findall(r"\(at ([-\d.]+) [-\d.]+", block)]
+            pad_ys = [float(v) for v in re.findall(r"\(at [-\d.]+ ([-\d.]+)", block)]
             if len(pad_xs) >= 2:
                 w = (max(pad_xs) - min(pad_xs)) + 0.5
                 h = (max(pad_ys) - min(pad_ys)) + 0.5
@@ -321,15 +336,53 @@ def parse_kicad_pcb(pcb_path: str) -> list[dict]:
             else:
                 w, h, height = 2.0, 1.0, 1.0
             key = "unknown"
+            source = "estimated"
+            is_suspicious = True
+            suspicious_reason = "未知封装估算高度 (1.5mm)"
 
-        components.append({
-            "name": fp_name.split(":")[-1],
-            "ref": ref,
-            "x": x, "y": y,
-            "w": w, "h": h,
-            "height": height,
-            "fp_key": key,
-        })
+        default_height = height
+
+        # 封装高度异常特征自检
+        if not is_suspicious:
+            if height >= 10.0:
+                is_suspicious = True
+                suspicious_reason = f"高大立件 (高度 {height}mm ≥ 10mm)"
+            elif height <= 0.2:
+                is_suspicious = True
+                suspicious_reason = f"超薄元件 (高度 {height}mm ≤ 0.2mm)"
+
+        # 用户自定义高度覆盖
+        clean_name = fp_name.split(":")[-1]
+        if height_overrides:
+            val = height_overrides.get(ref)
+            if val is None:
+                val = height_overrides.get(clean_name)
+            if val is not None:
+                try:
+                    height = float(val)
+                    source = "user_override"
+                    is_suspicious = False
+                    suspicious_reason = f"用户自定义调整 ({height:.2f}mm)"
+                except (ValueError, TypeError):
+                    pass
+
+        components.append(
+            {
+                "name": clean_name,
+                "ref": ref,
+                "x": x,
+                "y": y,
+                "w": round(w, 2),
+                "h": round(h, 2),
+                "height": round(height, 2),
+                "default_height": round(default_height, 2),
+                "fp_key": key,
+                "source": source,
+                "is_suspicious": is_suspicious,
+                "suspicious_reason": suspicious_reason,
+                "interfering": False,
+            }
+        )
 
     return components
 
@@ -348,9 +401,22 @@ def build_component_meshes(components: list[dict], pcb_thickness: float = 1.6) -
 def _is_through_hole(footprint_name: str) -> bool:
     """判断是否为插件封装（贯穿治具，不参与避位区干涉检查）"""
     name = footprint_name.lower()
-    th_marks = ["pinheader", "connector", "mountinghole", "terminalblock",
-                "screw", "jack", "socket", "dip-", "dip_", "rj45", "usb",
-                "hdmi", "type-c", "audio"]
+    th_marks = [
+        "pinheader",
+        "connector",
+        "mountinghole",
+        "terminalblock",
+        "screw",
+        "jack",
+        "socket",
+        "dip-",
+        "dip_",
+        "rj45",
+        "usb",
+        "hdmi",
+        "type-c",
+        "audio",
+    ]
     return any(m in name for m in th_marks)
 
 
@@ -382,6 +448,7 @@ def analyze_interference(
     """
     from shapely.geometry import box as sbox
     from shapely.ops import unary_union
+
     fixture = trimesh.load(fixture_stl)
     # 避位区合并（2D 覆盖归因用）
     avoid_union = unary_union(avoid_polys) if avoid_polys else None
@@ -398,7 +465,7 @@ def analyze_interference(
         # 2D 覆盖归因（不触发判定，只报告该元件是否被避位区覆盖）
         cover_ratio = 1.0
         if avoid_union is not None:
-            comp_box = sbox(tx - c["w"]/2, ty - c["h"]/2, tx + c["w"]/2, ty + c["h"]/2)
+            comp_box = sbox(tx - c["w"] / 2, ty - c["h"] / 2, tx + c["w"] / 2, ty + c["h"] / 2)
             inter_area = comp_box.intersection(avoid_union).area
             cover_ratio = inter_area / comp_box.area if comp_box.area > 0 else 0
 
@@ -417,15 +484,73 @@ def analyze_interference(
         comp_volume = c["w"] * c["h"] * c["height"]
         overlap_ratio = (vol / comp_volume) if comp_volume > 0 else 0.0
         if vol > INTERFERENCE_VOLUME_THRESHOLD_MM3 or overlap_ratio > INTERFERENCE_RATIO_THRESHOLD:
-            reports.append({
+            rep_item = {
                 **c,
-                "x": tx, "y": ty,  # 返回转换后坐标（前端 3D 用）
+                "x": tx,
+                "y": ty,  # 返回转换后坐标（前端 3D 用）
                 "overlap_mm3": round(vol, 2),
                 "overlap_ratio": round(overlap_ratio, 4),
                 "cover_ratio": round(cover_ratio, 2),
                 "avoid_covered": cover_ratio >= cover_threshold,
-            })
+                "interfering": True,
+            }
+            c["interfering"] = True
+            c["is_suspicious"] = True
+            reports.append(rep_item)
     return reports
+
+
+def get_suspicious_components(
+    components: list[dict],
+    reports: list[dict],
+    pcb_bounds: tuple[float, float, float, float] | None = None,
+    gerber_bounds: tuple[float, float, float, float] | None = None,
+) -> list[dict]:
+    """
+    提取高度可疑与干涉元件交互列表，供前端 3D 检查与客户点选修改高度。
+
+    优先级排序：
+    1. 发生 3D 实体干涉的元件（按重叠体积降序）
+    2. 未知封装估算高度元件
+    3. 用户已自定义修改高度元件
+    4. 高度超常元件 (>=10mm 或 <=0.2mm)
+    """
+    interfering_map = {r["ref"]: r for r in reports}
+    out: list[dict] = []
+
+    for c in components:
+        ref = c.get("ref", "?")
+        interf = interfering_map.get(ref)
+        item = dict(c)
+        if interf:
+            item["interfering"] = True
+            item["overlap_mm3"] = interf.get("overlap_mm3", 0.0)
+            item["overlap_ratio"] = interf.get("overlap_ratio", 0.0)
+            item["avoid_covered"] = interf.get("avoid_covered", False)
+            item["is_suspicious"] = True
+            item["x"] = interf.get("x", c.get("x"))
+            item["y"] = interf.get("y", c.get("y"))
+            if not item.get("suspicious_reason") or item["suspicious_reason"].startswith("用户"):
+                item["suspicious_reason"] = f"3D 实体干涉 (重叠 {item['overlap_mm3']}mm³)"
+            out.append(item)
+        elif item.get("is_suspicious") or item.get("source") == "user_override":
+            item["interfering"] = False
+            item["overlap_mm3"] = 0.0
+            if pcb_bounds and gerber_bounds:
+                tx, ty = transform_pcb_to_gerber(c["x"], c["y"], pcb_bounds, gerber_bounds)
+                item["x"] = round(tx, 2)
+                item["y"] = round(ty, 2)
+            out.append(item)
+
+    def sort_key(it: dict):
+        return (
+            0 if it.get("interfering") else 1,
+            -it.get("overlap_mm3", 0.0),
+            -it.get("height", 0.0),
+        )
+
+    out.sort(key=sort_key)
+    return out
 
 
 if __name__ == "__main__":
