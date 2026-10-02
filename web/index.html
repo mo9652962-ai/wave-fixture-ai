@@ -121,6 +121,34 @@ header {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* 生产参数栏（企业级） */
+.prod-params {
+  margin-top: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.param-group { display: flex; flex-direction: column; gap: 5px; }
+.param-group label { font-size: 12px; color: var(--dim); }
+.param-group select, .param-group input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 13px;
+  min-width: 120px;
+}
+.param-group select:focus, .param-group input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 /* 可疑与干涉元件交互列表 */
 .susp-table-container {
   margin-top: 14px;
@@ -253,6 +281,36 @@ header {
   <!-- 文件列表 -->
   <div class="file-list" id="fileList">
     <div id="fileItems"></div>
+
+    <!-- 生产参数（企业级：材料 / 拼版 / 板厚） -->
+    <div class="prod-params">
+      <div class="param-group">
+        <label for="materialSelect">🧱 治具材料</label>
+        <select id="materialSelect" title="波峰焊治具材料（Durostone 为行业事实标准）">
+          <option value="durostone" selected>Durostone 合成石（标准）</option>
+          <option value="ricocel">Ricocel 合成石</option>
+          <option value="fr4_high_tg">高 Tg FR-4（低成本）</option>
+          <option value="aluminum">铝合金 6061</option>
+        </select>
+      </div>
+      <div class="param-group">
+        <label for="palletThickness">📏 治具板厚 (mm)</label>
+        <input type="number" id="palletThickness" value="10" min="3" max="20" step="1">
+      </div>
+      <div class="param-group">
+        <label for="panelCols">🧩 拼版 列×行</label>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input type="number" id="panelCols" value="1" min="1" max="8" style="width:56px;">
+          <span style="color:var(--dim);">×</span>
+          <input type="number" id="panelRows" value="1" min="1" max="8" style="width:56px;">
+        </div>
+      </div>
+      <div class="param-group">
+        <label for="panelGap">↔ 片间距 (mm)</label>
+        <input type="number" id="panelGap" value="5" min="3" max="20" step="0.5" title="挡锡墙宽度，行业下限 3mm">
+      </div>
+    </div>
+
     <div style="margin-top: 12px; text-align: center;">
       <button class="btn" id="generateBtn">🚀 生成治具</button>
     </div>
@@ -271,6 +329,8 @@ header {
         <div class="download-bar">
           <a class="btn" id="downloadDxf" href="#" download>⬇️ 下载 DXF</a>
           <a class="btn btn-outline" id="downloadPng" href="#" download>下载 PNG</a>
+          <a class="btn" id="downloadGcode" href="#" download style="background:#16a34a;">⬇️ 下载 CNC G 代码</a>
+          <a class="btn btn-outline" id="downloadReport" href="#" download>📋 生产报告</a>
           <button class="btn btn-outline" id="gen3dBtn">🧊 生成 3D</button>
           <button class="btn btn-outline" id="resetBtn">↺ 重新上传</button>
         </div>
@@ -416,6 +476,12 @@ generateBtn.addEventListener('click', async () => {
   generateBtn.innerHTML = '<span class="spinner"></span>生成中...';
   const fd = new FormData();
   for (const f of files) fd.append('files', f, f.name);
+  // 企业级生产参数
+  fd.append('material', document.getElementById('materialSelect').value);
+  fd.append('panel_cols', document.getElementById('panelCols').value || 1);
+  fd.append('panel_rows', document.getElementById('panelRows').value || 1);
+  fd.append('panel_gap', document.getElementById('panelGap').value || 5);
+  fd.append('pallet_thickness', document.getElementById('palletThickness').value || 10);
   showStatus('生成中，请稍候...');
   try {
     const resp = await fetch('/api/generate', { method: 'POST', body: fd });
@@ -440,7 +506,25 @@ function showResult(data) {
   document.getElementById('previewImg').src = data.png_url;
   document.getElementById('downloadDxf').href = data.dxf_url;
   document.getElementById('downloadPng').href = data.png_url;
+  // 企业级交付按钮（G 代码 / 生产报告，按可用性显隐）
+  const gcodeBtn = document.getElementById('downloadGcode');
+  const reportBtn = document.getElementById('downloadReport');
+  if (data.gcode_url) {
+    gcodeBtn.href = data.gcode_url;
+    gcodeBtn.style.display = '';
+    gcodeBtn.textContent = '⬇️ 下载 CNC G 代码'
+      + (data.gcode_stats ? `（约 ${data.gcode_stats.machining_minutes} min）` : '');
+  } else {
+    gcodeBtn.style.display = 'none';
+  }
+  if (data.report_url) {
+    reportBtn.href = data.report_url;
+    reportBtn.style.display = '';
+  } else {
+    reportBtn.style.display = 'none';
+  }
   const stats = data.stats || {};
+  const mat = data.material || null;
   const drc = data.drc || null;
   const badge = drc
     ? (drc.allowed
@@ -455,6 +539,12 @@ function showResult(data) {
     ['DRC 门禁', badge],
     ['状态', '<span style="color:var(--success)">✅ 生成成功</span>'],
   ];
+  if (stats.panel) {
+    rows.splice(1, 0, ['拼版阵列', `${stats.panel.cols}×${stats.panel.rows}（${stats.panel.copies} 片，间距 ${stats.panel.gap}mm）`]);
+  }
+  if (mat && mat.name) {
+    rows.splice(1, 0, ['材料方案', `${mat.name} ${mat.sheet_thickness}mm · 约 ${mat.weight_kg} kg · ≈¥${mat.cost ? mat.cost.total : '-'}`]);
+  }
   let html = rows
     .map(([k, v]) => `<div class="stat-row"><span class="label">${k}</span><span class="value">${v}</span></div>`)
     .join('');

@@ -24,6 +24,13 @@ SEVERITY_ORDER = {"info": 0, "warning": 1, "error": 2, "blocking": 3}
 CONVEYOR_MAX_W_MM = 508.0
 CONVEYOR_MAX_L_MM = 762.0
 
+# 工业合规常量（G 组规则）：
+RAIL_MAX_MM = 330.0        # 波峰焊轨距默认上限（常见 350mm 轨道 - 两侧余量，设备可配）
+MIN_OPENING_MM = 3.8       # 最小开口宽度（Macaos Selective Wave Soldering Guidelines）
+MIN_WALL_MM = 1.5          # 最小壁厚（APTPCB：肋墙 ≥0.8mm，推荐 1.5mm）
+DEFAULT_PANEL_GAP = 5.0    # 拼版默认片间距
+MIN_PANEL_GAP = 3.0        # 拼版最小片间距（挡锡墙下限）
+
 
 @dataclass
 class DRCIssue:
@@ -246,6 +253,63 @@ def run_drc(r1, r2) -> list[dict]:
                            f"狗骨头清角 #{di+1} 刀路与定位销 #{pi+1} 重叠。",
                            "error", SRC_STRUCT, object_id=f"dogbone-{di+1}/pin-{pi+1}")
                 )
+
+    # ── G. 工业合规（企业级新增，出处见头注）─────────────────────────
+    # G1. 轨道限宽：治具短边（横跨轨道方向）不得超过波峰焊轨距上限
+    rail_max = float(getattr(r2, "rail_max_mm", RAIL_MAX_MM) or RAIL_MAX_MM)
+    if _poly_ok(outer):
+        minx, miny, maxx, maxy = outer.bounds
+        short_side = min(maxx - minx, maxy - miny)
+        if short_side > rail_max:
+            issues.append(_issue(
+                "RAIL_WIDTH_OVERFLOW", "治具超出波峰焊轨距",
+                f"治具短边 {short_side:.1f}mm 超出默认轨距上限 {rail_max:.0f}mm——"
+                "治具无法放入波峰焊轨道；请减小拼版片数或改用双治具分板。",
+                "error", SRC_SIZE,
+                current=round(short_side, 1), required=rail_max, unit="mm"))
+    # G2. 最小开口宽度：避位/上锡开口过窄易挂锡、难加工（Macaos ≥3.8mm）
+    for group_name, group in (("avoid", avoids), ("solder", solders)):
+        for gi, g in enumerate(group):
+            if not _poly_ok(g):
+                continue
+            gx0, gy0, gx1, gy1 = g.bounds
+            gmin = min(gx1 - gx0, gy1 - gy0)
+            if 0 < gmin < MIN_OPENING_MM:
+                issues.append(_issue(
+                    "MIN_OPENING_WIDTH", "开口宽度过窄",
+                    f"{group_name} 开口 #{gi+1} 最小尺寸 {gmin:.2f}mm < "
+                    f"{MIN_OPENING_MM}mm（Macaos 指南），易挂锡且铣刀加工困难。",
+                    "warning", SRC_DFM,
+                    current=round(gmin, 2), required=MIN_OPENING_MM, unit="mm",
+                    object_id=f"{group_name}-{gi+1}"))
+    # G3. 薄壁：沉板区与避位/上锡之间壁厚 < 推荐值（APTPCB 肋墙 ≥0.8，推荐 1.5）
+    if _poly_ok(sink):
+        for group_name, group in (("avoid", avoids), ("solder", solders)):
+            for gi, g in enumerate(group):
+                if not _poly_ok(g):
+                    continue
+                try:
+                    d = sink.exterior.distance(g.exterior)
+                except Exception:  # noqa: S112
+                    continue
+                if d < MIN_WALL_MM:
+                    issues.append(_issue(
+                        "THIN_WALL", "薄壁风险",
+                        f"沉板区与 {group_name} #{gi+1} 壁厚仅 {d:.2f}mm < "
+                        f"{MIN_WALL_MM}mm（APTPCB 推荐值），高温高频振动下易开裂。",
+                        "warning", SRC_DFM,
+                        current=round(d, 2), required=MIN_WALL_MM, unit="mm",
+                        object_id=f"wall-sink/{group_name}-{gi+1}"))
+    # G4. 拼版间距：片间距 < 3mm 挡锡墙易挂锡（行业下限）
+    grid = getattr(r2, "panel_grid", None)
+    if grid and grid.get("copies", 1) > 1:
+        gap = float(grid.get("gap", DEFAULT_PANEL_GAP))
+        if gap < MIN_PANEL_GAP:
+            issues.append(_issue(
+                "PANEL_GAP_TOO_SMALL", "拼版间距过小",
+                f"拼版片间距 {gap:.1f}mm < {MIN_PANEL_GAP}mm，挡锡墙过窄易挂锡连片。",
+                "warning", SRC_DFM,
+                current=round(gap, 2), required=MIN_PANEL_GAP, unit="mm"))
 
     return issues
 

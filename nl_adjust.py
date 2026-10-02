@@ -39,6 +39,9 @@ PARAM_ALIASES = {
     "rail_width": ("phase2", ["轨道宽", "轨道边宽"]),
     "tin_strip_w": ("phase2", ["挡锡条宽", "挡锡条"]),
     "tin_hole_r": ("phase2", ["挡锡条孔径", "挡锡条孔"]),
+    "panel_cols": ("phase2", ["拼版列", "横向拼几片", "拼版片数X", "X向拼版"]),
+    "panel_rows": ("phase2", ["拼版行", "纵向拼几片", "拼版片数Y", "Y向拼版"]),
+    "panel_gap": ("phase2", ["拼版间距", "拼版片距", "拼板间距"]),
 }
 
 

@@ -120,6 +120,9 @@ async def api_interference(
     files: list[UploadFile] = File(default=[]),
     job_id: str | None = Form(None),
     height_overrides: str = Form("{}"),
+    panel_cols: int = Form(1),
+    panel_rows: int = Form(1),
+    panel_gap: float = Form(5.0),
 ):
     """上传 Gerber + KiCad .kicad_pcb → 3D 治具 + 元件干涉分析（支持高度覆盖与可疑元件交互）"""
     try:
@@ -196,7 +199,15 @@ async def api_interference(
             raise HTTPException(422, "未找到外形层")
         board = _uu(board_polys)
         sink = make_sink_region(board, FixtureParams())
-        result2 = run_phase2(str(workdir), None)
+        # 拼版参数（企业级）：与 /api/generate 一致，>1 时启用 N×M 阵列
+        params2_override = {}
+        if panel_cols > 1 or panel_rows > 1:
+            params2_override = {
+                "panel_cols": max(panel_cols, 1),
+                "panel_rows": max(panel_rows, 1),
+                "panel_gap": max(panel_gap, 0.0),
+            }
+        result2 = run_phase2(str(workdir), None, params2_override=params2_override)
         if result2 is None:
             raise HTTPException(422, "治具生成失败")
         mesh = build_fixture_3d(
@@ -214,6 +225,13 @@ async def api_interference(
         )
 
         comps = parse_kicad_pcb(str(pcb_path), height_overrides=overrides_dict)
+        # 拼版时元件按阵列复制（干涉分析覆盖全部拼版片）
+        if params2_override:
+            from panelize import build_grid, replicate_components
+
+            grid = build_grid(board.bounds, params2_override["panel_cols"],
+                              params2_override["panel_rows"], params2_override["panel_gap"])
+            comps = replicate_components(comps, grid)
         # pcb 板范围（优先用板框 gr_rect，否则用元件范围）
         pcb_bounds = get_pcb_board_bounds(str(pcb_path))
         if pcb_bounds is None and comps:
@@ -441,8 +459,16 @@ async def api_generate3d(files: list[UploadFile] = File(...)):
 
 
 @app.post("/api/generate")
-async def api_generate(files: list[UploadFile] = File(...)):
-    """上传 Gerber → 生成治具 DXF + PNG"""
+async def api_generate(
+    files: list[UploadFile] = File(...),
+    material: str = Form("durostone"),
+    panel_cols: int = Form(1),
+    panel_rows: int = Form(1),
+    panel_gap: float = Form(5.0),
+    pallet_thickness: float = Form(10.0),
+    board_thickness: float = Form(1.6),
+):
+    """上传 Gerber → 生成治具 DXF + PNG + G 代码 + 生产报告（企业级交付）"""
     if not files:
         raise HTTPException(400, "未收到文件")
     try:
@@ -450,13 +476,15 @@ async def api_generate(files: list[UploadFile] = File(...)):
         # 生成 DXF
         dxf_path = OUTPUT_DIR / f"{workdir.name}.dxf"
         png_path = OUTPUT_DIR / f"{workdir.name}.png"
+        gcode_path = OUTPUT_DIR / f"{workdir.name}.nc"
+        report_path = OUTPUT_DIR / f"{workdir.name}-report.md"
         # 渲染函数
         from shapely.ops import unary_union as _uu
 
         from fixture_phase1 import FixtureParams, make_sink_region, parse_gerber
         from fixture_phase2 import run_phase2 as _run2
 
-        # phase1（取手/压扣/定位销）→ phase2（避位/上锡/外形）
+        # phase1（取手/压扣/定位销）→ phase2（避位/上锡/外形/拼版）
         board_polys, drills = parse_gerber(str(workdir))
         if not board_polys:
             raise HTTPException(422, "未找到外形层（Edge_Cuts/GM1）")
@@ -474,7 +502,15 @@ async def api_generate(files: list[UploadFile] = File(...)):
             pins=make_pins(drills, p1, sink_poly=sink),
             dogbone_corners=dogbone_corners,
         )
-        result = _run2(str(workdir), str(dxf_path))
+        # 拼版参数（企业级）：>1 时启用 N×M 阵列
+        params2_override = {}
+        if panel_cols > 1 or panel_rows > 1:
+            params2_override = {
+                "panel_cols": max(panel_cols, 1),
+                "panel_rows": max(panel_rows, 1),
+                "panel_gap": max(panel_gap, 0.0),
+            }
+        result = _run2(str(workdir), str(dxf_path), params2_override=params2_override)
         if result is None:
             raise HTTPException(422, "治具生成失败：未找到外形层或解析错误")
 
@@ -518,6 +554,70 @@ async def api_generate(files: list[UploadFile] = File(...)):
             "cap_hole_count": len(getattr(result, "cap_holes", [])),
             "dogbone_count": len(getattr(result, "dogbone_corners", [])) or len(dogbone_corners),
         }
+        if getattr(result, "panel_grid", None):
+            stats["panel"] = result.panel_grid
+
+        # ── 企业级交付：材料估算 + CNC G 代码 + 生产报告 ──────────────
+        gcode_stats = None
+        gcode_url = None
+        report_url = None
+        material_stats = {}
+        try:
+            from materials import (
+                blank_area,
+                estimate_cost,
+                estimate_weight,
+                get_material,
+                nearest_sheet_thickness,
+            )
+
+            mat = get_material(material)
+            sheet_t = nearest_sheet_thickness(pallet_thickness, mat)
+            outer_bounds = (getattr(result.outer_poly, "bounds", None) or board.bounds)
+            ob_w = outer_bounds[2] - outer_bounds[0]
+            ob_h = outer_bounds[3] - outer_bounds[1]
+            weight_kg = estimate_weight(blank_area((ob_w, ob_h)), sheet_t, mat)
+
+            from cnc_gcode import generate_gcode
+
+            gcode_stats = generate_gcode(
+                result.sink_poly, result.avoid_polys, result.solder_polys,
+                result.cap_holes, r1.pins, r1.handles, result.outer_poly,
+                str(gcode_path), material_key=mat.key, pallet_thickness=pallet_thickness,
+                board_thickness=board_thickness, job_name=workdir.name,
+                parent_hint=OUTPUT_DIR,
+            )
+            gcode_stats["thickness"] = sheet_t
+            cost = estimate_cost(weight_kg, mat, gcode_stats.get("machining_minutes", 0.0))
+
+            from report import build_report, write_report
+
+            report_md = build_report(
+                workdir.name, r1, result,
+                drc_verdict=verdict,
+                material={"key": mat.key, "thickness": sheet_t,
+                          "board_pocket_depth": gcode_stats.get("board_pocket_depth")},
+                weight_kg=weight_kg, cost=cost, gcode_stats=gcode_stats,
+                output_urls={
+                    "DXF 工程图": dxf_url,
+                    "PNG 预览": f"/dl/{workdir.name}.png",
+                    "CNC G 代码": f"/dl/{workdir.name}.nc",
+                },
+            )
+            write_report(report_path, report_md, parent_hint=OUTPUT_DIR)
+            gcode_url = f"/dl/{workdir.name}.nc"
+            report_url = f"/dl/{workdir.name}-report.md"
+            material_stats = {
+                "key": mat.key,
+                "name": mat.name_cn,
+                "sheet_thickness": sheet_t,
+                "weight_kg": weight_kg,
+                "cost": cost,
+            }
+        except Exception as mat_err:
+            log.warning(f"  企业级交付（G 代码/报告）生成失败，不影响 DXF: {mat_err}\n"
+                        f"{traceback.format_exc()}")
+
         msg = "治具生成成功"
         if not verdict["allowed"]:
             msg = (
@@ -529,6 +629,10 @@ async def api_generate(files: list[UploadFile] = File(...)):
                 "ok": True,
                 "dxf_url": dxf_url,
                 "png_url": f"/dl/{workdir.name}.png",
+                "gcode_url": gcode_url,
+                "report_url": report_url,
+                "material": material_stats,
+                "gcode_stats": gcode_stats,
                 "job_id": workdir.name,
                 "stats": stats,
                 "drc": {

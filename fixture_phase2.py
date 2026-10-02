@@ -66,6 +66,10 @@ class Phase2Params:
     rail_width: float = 5.0            # 轨道边宽 5mm（虚线）
     tin_strip_w: float = 10.0          # 挡锡条宽 10mm
     tin_hole_r: float = 1.6            # 挡锡条圆孔 R1.6
+    # 步骤10: 拼版阵列（企业级：小板一治具多片，Macaos Panelizer 同款能力）
+    panel_cols: int = 1                # X 向片数
+    panel_rows: int = 1                # Y 向片数
+    panel_gap: float = 5.0             # 片间距 mm（挡锡墙，行业下限 3mm）
 
 
 @dataclass
@@ -79,6 +83,7 @@ class Phase2Result:
     tin_holes: list = field(default_factory=list)        # 挡锡条孔
     sink_poly: Polygon | None = None                     # 沉板区（3D 用）
     dogbone_corners: list = field(default_factory=list)  # 狗骨头减隙刀路 (DogboneCorner)
+    panel_grid: dict | None = None                       # 拼版网格信息（panelize.PanelGrid.to_dict()）
 
 
 # ─────────────────────────────────────────────────────────────
@@ -343,8 +348,22 @@ def export_dxf2(result: Phase2Result, out_path: str, sink_poly=None, handles=Non
     doc = ezdxf.new("R2010")
     for name, color in LAYER_COLORS2.items():
         doc.layers.add(name, color=color)
+    if "拼版信息" not in {l.dxf.name for l in doc.layers}:
+        doc.layers.add("拼版信息", color=8)
 
     msp = doc.modelspace()
+
+    # 拼版信息注记（企业级：N×M 阵列 + 间距，供 CAM/生产核对）
+    grid = getattr(result, "panel_grid", None)
+    if grid:
+        minx, _miny, _maxx, maxy = (result.outer_poly.bounds if result.outer_poly
+                                  else (0, 0, 100, 100))
+        msp.add_text(
+            f"PANEL {grid.get('cols', 1)}x{grid.get('rows', 1)} "
+            f"gap {grid.get('gap', 0)}mm copies {grid.get('copies', 1)} "
+            f"total {grid.get('total', [0, 0])[0]:.1f}x{grid.get('total', [0, 0])[1]:.1f}mm",
+            dxfattribs={"layer": "拼版信息", "height": 4.0},
+        ).set_placement((minx, maxy + 6))
 
     # Phase 1 元素
     if sink_poly:
@@ -427,6 +446,21 @@ def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None,
     avoid = make_avoid_regions(gerber_dir, drills, params2)
     solder = make_solder_regions(gerber_dir, drills, avoid, params2)
     caps = make_cap_holes(gerber_dir, params2)
+
+    # 拼版阵列（企业级）：单片几何 → N×M 复制 → 重建外形/取手/压扣
+    panel_grid = None
+    cols = max(int(getattr(params2, "panel_cols", 1) or 1), 1)
+    rows = max(int(getattr(params2, "panel_rows", 1) or 1), 1)
+    if cols * rows > 1:
+        from panelize import panelize_geometry
+
+        board_bounds = board.bounds
+        grid, sink, avoid, solder, caps, pins, handles, screws, dogbone_corners = panelize_geometry(
+            board_bounds, sink, avoid, solder, caps, pins, handles, screws, dogbone_corners,
+            cols, rows, params2.panel_gap,
+        )
+        panel_grid = grid.to_dict()
+
     outer = make_outer(sink, params2)
 
     result2 = Phase2Result(avoid_polys=avoid, solder_polys=solder,
@@ -435,7 +469,8 @@ def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None,
                            tin_strip_lines=outer.tin_strip_lines,
                            tin_holes=outer.tin_holes,
                            sink_poly=sink,
-                           dogbone_corners=dogbone_corners)
+                           dogbone_corners=dogbone_corners,
+                           panel_grid=panel_grid)
 
     if out_dxf:
         export_dxf2(result2, out_dxf, sink_poly=sink, handles=handles,

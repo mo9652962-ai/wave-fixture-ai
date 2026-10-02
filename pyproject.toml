@@ -56,6 +56,11 @@ py-modules = [
     "review",
     "pin_select",
     "dogbone",
+    "vertical_agent_toolkit",
+    "materials",
+    "panelize",
+    "cnc_gcode",
+    "report",
 ]
 
 [tool.setuptools.data-files]
