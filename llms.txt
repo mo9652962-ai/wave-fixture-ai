@@ -1,0 +1,106 @@
+# Wave Fixture AI
+
+> 波峰焊治具自动出图工具：输入 PCB Gerber 文件，自动生成治具工程图（DXF）与 3D 实体（STL/GLB），
+> 含 DRC 生产安全门禁、元件干涉分析、自然语言参数调整。纯 Python，可 CLI 调用、可作为 HTTP 服务、可 pip 安装。
+
+## 这是什么
+
+把波峰焊治具设计从手工 CAD 描图变成一条命令。13 项自动化步骤 + 4 项工业级能力（DRC 门禁 /
+Golden 回归 / 人工 Review 闭环 / 定位销打分算法）。
+
+**适用场景**：SMT 产线的波峰焊治具（pallet/solder fixture）设计、治具 DFM 检查、
+批量板型治具快速出图、AI Agent 硬件工作流中的制造环节。
+
+## 快速开始
+
+```bash
+pip install wave-fixture-ai
+wave-fixture-ai --port 8000      # Web 界面：拖入 Gerber → 生成 DXF/3D
+```
+
+命令行（不经 Web）：
+
+```bash
+python fixture_phase1.py <gerber_dir> -o fixture.dxf       # 沉板区/取手位/压扣/定位销
+python fixture_phase2.py <gerber_dir> -o fixture-full.dxf  # 完整治具（+避位区/上锡区/外形）
+```
+
+## 输入要求
+
+- **必需**：外形层（`Edge_Cuts.gm1` / `board_outline.GBR` / `*.gko`）+ 钻孔文件（`.drl`）
+- **推荐**：B_Mask（`.gbs`）+ F_Mask（`.gts`）——有焊盘层才会生成避位区与上锡区
+- **干涉分析需要**：KiCad 工程文件 `.kicad_pcb`（Gerber 只有焊盘几何，无元件高度）
+
+## API 端点（HTTP 服务模式）
+
+| 端点 | 作用 |
+|:---|:---|
+| `POST /api/generate` | 上传 Gerber → DXF + PNG 预览（返回 `drc` 门禁结论） |
+| `POST /api/generate3d` | 上传 Gerber → 3D 治具（STL + GLB） |
+| `POST /api/adjust` | 自然语言调整参数 → 重新生成 |
+| `POST /api/interference` | 干涉分析（需 `.kicad_pcb`）→ 报告 + 高亮盒 + GLB |
+| `POST /api/review/confirm` | 确认人工 Review 项（缺数据/低置信度） |
+| `GET /dl/{fname}` | 下载产物 |
+
+## 核心概念
+
+- **DRC 生产安全门禁**：16 条规则，四级严重度（blocking/error/warning/info），每条带出处
+  （对标 Macaos / AGICORP / APTPCB / PCBSync 的 DFM 指南）。存在 blocking/error 时
+  导出的 DXF **自动打水印 PREVIEW**，禁止直接送 CNC。
+- **定位销打分算法**：从钻孔中按「孔径窗口 / NPTH / 靠边距离」打分，选**对角跨距最大**的一对；
+  孔径 2.5–4.5mm 为最优窗口，1.8–2.5mm 次优。
+- **人工 Review 闭环**：缺失层数据时**不自动猜**，挂起 mandatory review，
+  工程师确认后写入审计日志（绑定几何 SHA256，几何变更自动过期）。
+- **Golden Sample 回归**：IoU ≥0.9 / Hausdorff ≤0.5mm / 圆孔双向 best-match。
+
+## 关键设计规则（供 AI 生成/校验时参考）
+
+| 参数 | 默认值 | 说明 |
+|:---|:---|:---|
+| 沉板区外扩 | 0.2mm + R1.85 清角 | 外形外扩后 dilate-erode 圆角 |
+| 取手位 | 20×40mm，重叠 1mm，R2 | 左右各一 |
+| 压扣孔 | Φ3.4，四角**板区外** 10mm | 必须在沉板区之外（压扣压住板边） |
+| 定位销 | 钻孔内缩 0.1mm，销径 ≥1.5mm | 对角选点 |
+| 治具外形 | 外扩 X20/Y30mm，向上取整 5mm | CNC 加工友好 |
+| 传送带极限 | 508×762mm | 超出报 error |
+
+## 常见坑（真实板实测）
+
+1. **同名多份外形文件**（`.GBR`+`.GER`+`.GKO`）会触发 gerbonara 的 `Ambiguous layer names`
+   ——工具已内置去重（优先级 gko>gm1>gbr>ger）。
+2. **外形线段微缺口**（如 0.127mm）导致 `polygonize` 失败——工具用**端点链式闭合**
+   （容差 0.5mm）而非 buffer（后者会得到 0.03mm² 的空心壳）。
+3. **英寸制钻孔**：gerbonara 保留原始英寸值，须 ×25.4——工具按显式 INCH 声明或
+   「孔径<0.2 或坐标<1」启发式自动换算。
+4. **KiCad 板框**可能用 `gr_line` 四条边围成（非 `gr_rect`）——两种写法都支持。
+5. **元件坐标系**：KiCad 与 Gerber 原点/Y 轴不同，须用 `transform_pcb_to_gerber` 对齐
+   （工具已内置，含板框解析）。
+
+## 仓库结构
+
+```
+fixture_phase1.py    步骤 1-5：Gerber 解析 / 沉板区 / 取手位 / 压扣 / 定位销
+fixture_phase2.py    步骤 6-10：避位区 / 上锡区 / 盖板孔 / 治具外形 / DXF 输出
+fixture_3d.py        3D 拉伸与布尔（STL/GLB）
+interference.py      元件干涉分析（2D 覆盖归因 + 3D 布尔判定）
+drc.py               DRC 生产安全门禁（16 规则带出处）
+golden.py            Golden Sample 回归框架
+review.py            人工 Review 闭环（含审计日志）
+pin_select.py        定位销打分选点
+nl_adjust.py         自然语言参数调整（23 参数，确定性规则不用 LLM）
+web_server.py        FastAPI 服务 + 静态前端
+web/index.html       单文件前端（three.js 3D 预览）
+cases/               3 块真实板回归基准（含 golden.json）
+tests/               153 项测试（覆盖率 85%，CI 棘轮 80）
+```
+
+## 验证状态
+
+- 153 项测试全绿，覆盖率 85%（CI 棘轮 80，只升不降）
+- **3 块真实板**端到端回归（EasyEDA / KiCad 手绘 / circuit-agent 生成）
+- 端到端验证过程中发现并修复 **16 个真实缺陷**（详见 VALIDATION.md）
+- CI：双 OS 矩阵（ubuntu/windows）+ ruff lint + 覆盖率门禁
+
+## 许可
+
+MIT

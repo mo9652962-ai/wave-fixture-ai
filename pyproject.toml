@@ -50,6 +50,7 @@ py-modules = [
     "interference",
     "nl_adjust",
     "web_server",
+    "ci_drc_gate",
     "drc",
     "golden",
     "review",
