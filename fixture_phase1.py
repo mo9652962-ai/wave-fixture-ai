@@ -68,12 +68,29 @@ def parse_drills_regex(d: Path) -> list[tuple[float, float, float]]:
         if f.suffix.lower() not in (".drl", ".txt", ".xln"):
             continue
         try:
+            raw_head = f.read_text(encoding="utf-8", errors="replace")[:4096]
+            # 单位声明（用于 gerbonara 输出的归一化——它有时保留原文件单位）
+            head_upper = raw_head.upper()
+            declared_metric = "METRIC" in head_upper or "M71" in head_upper
+            declared_inch = ("INCH" in head_upper or "M72" in head_upper) and not declared_metric
+
             drl = ExcellonFile.open(str(f))
+            got: list[tuple[float, float, float]] = []
             for obj in drl.objects:
                 if obj.__class__.__name__ == "Flash":
-                    dia = obj.aperture.diameter  # mm
-                    drills.append((float(obj.x), float(obj.y), float(dia)))
-            continue  # gerbonara 成功，跳过正则
+                    got.append((float(obj.x), float(obj.y), float(obj.aperture.diameter)))
+            if got:
+                # **单位归一化**（真机缺陷：英寸板 gerbonara 返回原始英寸值——
+                # dia=0.03 / x=0.1，直接当 mm 用会让定位销直径 0.03mm 完全失真）。
+                # 判定：显式 INCH 声明，或「明显是英寸量级」的启发式（孔径 <0.2mm 或坐标全 <1）。
+                max_coord = max(max(abs(x), abs(y)) for x, y, _ in got)
+                max_dia = max(d for _, _, d in got)
+                looks_inch = declared_inch or (not declared_metric and (max_dia < 0.2 or max_coord < 1.0))
+                if looks_inch:
+                    got = [(x * 25.4, y * 25.4, d * 25.4) for x, y, d in got]
+                    log.info(f"  钻孔 {f.name}: 检测为英寸单位，已换算为毫米（×25.4）")
+                drills.extend(got)
+                continue  # gerbonara 成功，跳过正则
         except Exception as e:
             log.warning(f"  钻孔 {f.name} gerbonara 失败，正则回退: {e}")
         try:
