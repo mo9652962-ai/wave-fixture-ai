@@ -169,7 +169,8 @@ reports = analyze_interference('output/fixture.stl', comps)
 | Case | 来源 | 规格 | 覆盖 |
 |:---|:---|:---|:---|
 | `case_001_espmh` | EasyEDA 双排插针板（竞品 production sample + 人工基准） | 25.654×48.26mm · 31 钻孔 · 仅外形层 | 格式兼容（GBR/GER/GKO 三份等价外形）、微缺口闭合、无焊盘层时不凭空生成上锡区 |
-| `case_002_aircon_kicad` | KiCad 空调板（含 B_Cu/B_Mask/Edge_Cuts 全层） | 100×80mm · 169 钻孔 · 5 种孔径 | KiCad 命名规范、大规模钻孔、真实避位/上锡区（20/24 个）、销径告警 |
+| `case_002_aircon_kicad` | KiCad 空调板（含 B_Cu/B_Mask/Edge_Cuts 全层） | 100×80mm · 169 钻孔 · 5 种孔径 | KiCad 命名规范、大规模钻孔、真实避位/上锡区（20/24 个）、销径告警、3D 干涉判定 |
+| `case_003_stm32_4layer` | **circuit-agent 生成的 4 层板**（跨仓/跨工具素材） | 37×37mm · 12 钻孔 · 含 3.2mm 安装孔 | **跨 AI-EDA 工具兼容性**、合格销径走打分正常路径、DRC 全绿正例 |
 
 ```bash
 uv run pytest tests/test_golden_case001.py tests/test_golden_case002_kicad.py -v   # 18 项黄金断言
