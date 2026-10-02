@@ -297,7 +297,7 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
                     log.info(f"  外形 polygonize 兜底 → 面积 {board_polys[0].area:.1f} mm²")
                 else:
                     log.warning("  外形围合失败：未能形成有效闭合环")
-        except Exception as e:  # noqa: BLE001 —— 线段围合失败不阻断（钻孔仍可用）
+        except Exception as e:
             log.warning(f"  线段围合失败: {e}")
 
     # 钻孔：找 .drl/.txt/.xln 文件
