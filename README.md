@@ -162,6 +162,27 @@ reports = analyze_interference('output/fixture.stl', comps)
 - **fastapi + uvicorn** — Web 服务
 - **three.js** — 前端 3D 渲染（ES module）
 
+## 🧪 真实板验证（Golden Case）
+
+`cases/case_001_espmh/` 是**真实 EasyEDA 板**（25.654×48.26mm · 31 钻孔 · G85 格式）的端到端回归基准：
+
+```bash
+uv run pytest tests/test_golden_case001.py -v   # 8 项黄金断言
+```
+
+| 断言 | 基准 | 实测 |
+|:---|:---|:---|
+| 板尺寸 | 25.654 × 48.26 mm | **精确匹配**（偏差 0.000） |
+| 钻孔数 | 31 | **精确匹配** |
+| 板面积 | = W×H | 1238.06 mm²（验证端点链式闭合无多算） |
+| 压扣孔 | 必须在沉板区**外** | 4/4 通过 |
+| 治具外形 | (板 + 2×外扩) 向上取整 5mm | 65.654→70 / 108.26→110 ✓ |
+| 传送带极限 | ≤508×762mm | 通过 |
+
+> 该 case 来自真实生产样本（含人工 `expected.json` 基准），端到端跑通过程中修掉了
+> 7 个真实缺陷（层名兼容 / overrides 语义 / 同层多文件 / 外形微缺口闭合 / 压扣孔位置 /
+> matplotlib 依赖 / 前端门禁渲染）——**单测 52 全绿时仍未被发现，只有真实数据与真实浏览器能暴露**。
+
 ## License
 
 MIT
