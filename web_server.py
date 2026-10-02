@@ -13,6 +13,7 @@ import time
 import traceback
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -26,7 +27,6 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from fixture_3d import Fixture3DParams, build_fixture_3d, export_glb, export_stl
-from fixture_phase2 import run_phase2
 from nl_adjust import parse_adjust_command
 
 app = FastAPI(title="波峰焊治具 AI 设计助手", version="1.0")
@@ -40,6 +40,7 @@ app.add_middleware(
 WEB_DIR = Path(__file__).parent / "web"
 OUTPUT_DIR = Path(__file__).parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
+REVIEW_DIR = Path(__file__).parent / "reviews-data"
 
 # 上传临时目录
 TMP_DIR = Path(tempfile.gettempdir()) / "fixture-uploads"
@@ -312,9 +313,38 @@ async def api_generate(files: list[UploadFile] = File(...)):
         dxf_path = OUTPUT_DIR / f"{workdir.name}.dxf"
         png_path = OUTPUT_DIR / f"{workdir.name}.png"
         # 渲染函数
-        result = run_phase2(str(workdir), str(dxf_path))
+        from shapely.ops import unary_union as _uu
+
+        from fixture_phase1 import FixtureParams, make_sink_region, parse_gerber
+        from fixture_phase2 import run_phase2 as _run2
+
+        # phase1（取手/压扣/定位销）→ phase2（避位/上锡/外形）
+        board_polys, drills = parse_gerber(str(workdir))
+        if not board_polys:
+            raise HTTPException(422, "未找到外形层（Edge_Cuts/GM1）")
+        board = _uu(board_polys)
+        p1 = FixtureParams()
+        sink = make_sink_region(board, p1)
+
+        from fixture_phase1 import make_handles, make_pins, make_screws
+        r1 = SimpleNamespace(
+            board_poly=board, sink_poly=sink,
+            handles=make_handles(sink, p1), screws=make_screws(sink, p1),
+            pins=make_pins(drills, p1),
+        )
+        result = _run2(str(workdir), str(dxf_path))
         if result is None:
             raise HTTPException(422, "治具生成失败：未找到外形层或解析错误")
+
+        # ── DRC 生产安全门禁（blocking/error → 只出带水印预览版）──
+        from drc import apply_watermark, gate, run_drc
+        issues = run_drc(r1, result)
+        verdict = gate(issues)
+        dxf_url = f"/dl/{workdir.name}.dxf"
+        if not verdict["allowed"]:
+            preview = apply_watermark(dxf_path)
+            dxf_url = f"/dl/{Path(preview).name}"
+            log.warning(f"  DRC 门禁未通过（{verdict['counts']}），已输出水印预览版")
 
         # 渲染 PNG 预览
         try:
@@ -342,19 +372,41 @@ async def api_generate(files: list[UploadFile] = File(...)):
             "solder_count": len(getattr(result, "solder_polys", [])),
             "cap_hole_count": len(getattr(result, "cap_holes", [])),
         }
+        msg = "治具生成成功"
+        if not verdict["allowed"]:
+            msg = (f"DRC 门禁未通过（blocking {verdict['counts']['blocking']} / "
+                   f"error {verdict['counts']['error']}）——仅提供带水印预览版，修正后可出生产版")
         return JSONResponse({
             "ok": True,
-            "dxf_url": f"/dl/{workdir.name}.dxf",
+            "dxf_url": dxf_url,
             "png_url": f"/dl/{workdir.name}.png",
             "job_id": workdir.name,
             "stats": stats,
-            "message": "治具生成成功",
+            "drc": {"allowed": verdict["allowed"], "counts": verdict["counts"],
+                    "worst": verdict["worst"], "total": verdict["total"],
+                    "issues": issues},
+            "message": msg,
         })
     except HTTPException:
         raise
     except Exception as e:
         log.error(f"生成失败: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, f"生成失败: {e}")
+
+
+@app.post("/api/review/confirm")
+async def api_review_confirm(job_id: str = Form(...), review_id: str = Form(...),
+                             operator: str = Form(...), answer: str = Form(...)):
+    """工程师确认一条 review（低置信度/缺数据人工闭环），写入审计日志。"""
+    try:
+        from review import confirm_review
+        hit = confirm_review(REVIEW_DIR, job_id, review_id, operator, answer)
+        return JSONResponse({"ok": True, "review": hit})
+    except KeyError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        log.error(f"review 确认失败: {e}")
+        raise HTTPException(500, f"review 确认失败: {e}")
 
 
 def _safe(poly) -> str:

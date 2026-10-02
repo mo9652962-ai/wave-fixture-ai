@@ -36,6 +36,10 @@ py-modules = [
     "interference",
     "nl_adjust",
     "web_server",
+    "drc",
+    "golden",
+    "review",
+    "pin_select",
 ]
 
 [tool.setuptools.data-files]
