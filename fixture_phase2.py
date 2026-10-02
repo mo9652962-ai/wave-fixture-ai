@@ -408,7 +408,7 @@ def run_phase2(gerber_dir: str, out_dxf: str, phase1_result=None,
     sink = make_sink_region(board, params1)
     handles = make_handles(sink, params1)
     screws = make_screws(sink, params1)
-    pins = make_pins(drills, params1)
+    pins = make_pins(drills, params1, sink_poly=sink)
 
     # Phase 2（直接用目录字符串，内部按文件名读层——兼容 KiCad10 无 LPC 命名）
     avoid = make_avoid_regions(gerber_dir, drills, params2)

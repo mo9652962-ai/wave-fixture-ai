@@ -135,6 +135,14 @@ def run_drc(r1, r2) -> list[dict]:
                              f"当前 {len(pins)} 个定位销，推荐至少 2 个以保证 PCB 约束定位。",
                              "warning", SRC_STRUCT,
                              current=float(len(pins)), required=2.0, unit="个"))
+    # 销径过小：<1.5mm 的销在波峰焊高温下强度不足（真实板常见：全板只有细信号过孔）
+    for pi, (_x, _y, pr) in enumerate(pins):
+        if pr * 2 < 1.5:
+            issues.append(_issue("PIN_DIAMETER_TOO_SMALL", "定位销直径过小",
+                                 f"定位销 #{pi+1} 直径 {pr * 2:.2f}mm < 1.5mm，"
+                                 "高温下强度不足且定位精度差；建议选 2.5-4.5mm 安装孔。",
+                                 "warning", SRC_DFM,
+                                 current=round(pr * 2, 3), required=1.5, unit="mm"))
     for pi, (x, y, _r) in enumerate(pins):
         for ai, av in enumerate(avoids):
             if _poly_ok(av) and _pt_in(av, x, y):

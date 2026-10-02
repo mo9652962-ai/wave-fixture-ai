@@ -330,7 +330,7 @@ async def api_generate(files: list[UploadFile] = File(...)):
         r1 = SimpleNamespace(
             board_poly=board, sink_poly=sink,
             handles=make_handles(sink, p1), screws=make_screws(sink, p1),
-            pins=make_pins(drills, p1),
+            pins=make_pins(drills, p1, sink_poly=sink),
         )
         result = _run2(str(workdir), str(dxf_path))
         if result is None:

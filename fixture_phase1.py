@@ -365,14 +365,54 @@ def make_screws(sink_poly: Polygon, p: FixtureParams) -> list[tuple[float, float
 # ─────────────────────────────────────────────────────────────
 # 步骤 5: 定位销（钻孔内缩 0.1mm 生成销钉圆）
 # ─────────────────────────────────────────────────────────────
-def make_pins(drills: list[tuple[float, float, float]], p: FixtureParams) -> list[tuple[float, float, float]]:
-    """钻孔直径内缩 0.1mm 生成销钉圆线"""
-    pins = []
-    for x, y, dia in drills:
-        if dia > 0:
-            r = dia / 2 - p.pin_inset
-            if r > 0:
-                pins.append((x, y, r))
+def make_pins(drills: list[tuple[float, float, float]], p: FixtureParams,
+              sink_poly: Polygon | None = None, *, select: bool = True) -> list[tuple[float, float, float]]:
+    """定位销：从钻孔中**打分选出对角最优的一对**（而非把所有孔都变成销）。
+
+    设计依据（对标竞品 generator._locating_pin_candidates 的「候选→打分→选中」三段式）：
+    - 把全部钻孔都当销钉会污染避位区（DRC 报 PIN_IN_AVOID）且无工艺意义（100+ 个销）
+    - 真实做法：按孔径窗口/靠边/NPTH 打分，取对角线跨距最大的一对，保证 PCB 定位刚度
+
+    select=False 退回旧行为（全部钻孔，向后兼容与调试用）。
+    """
+    if not select:
+        pins = []
+        for x, y, dia in drills:
+            if dia > 0:
+                r = dia / 2 - p.pin_inset
+                if r > 0:
+                    pins.append((x, y, r))
+        return pins
+
+    if sink_poly is not None:
+        bounds = sink_poly.bounds
+    elif drills:
+        xs = [d[0] for d in drills]
+        ys = [d[1] for d in drills]
+        pad = 20.0
+        bounds = (min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad)
+    else:
+        return []
+
+    from pin_select import select_locating_pins
+
+    chosen = select_locating_pins(drills, bounds)
+    pins = [(c.x, c.y, c.dia / 2 - p.pin_inset) for c in chosen if c.dia / 2 - p.pin_inset > 0]
+
+    if not pins and drills:
+        # 无合格候选（孔径都不在窗口内）→ 退回：取最大孔径里对角跨距最大的两个
+        log.warning("  无合格定位销候选（孔径不在 2.5-4.5mm 窗口且非 NPTH），退回对角最大跨距")
+        import itertools
+
+        ordered = sorted(drills, key=lambda d: -d[2])[:10]
+        best, bd = None, -1.0
+        for a, b in itertools.combinations(ordered, 2):
+            dist = ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
+            if dist > bd:
+                bd, best = dist, (a, b)
+        if best:
+            pins = [(x, y, max(dia / 2 - p.pin_inset, 0.5)) for x, y, dia in best]
+    log.info(f"  定位销: 选中 {len(pins)} 个（候选钻孔 {len(drills)} 个）")
     return pins
 
 
@@ -453,7 +493,7 @@ def run(gerber_dir: str, out_dxf: str, params: FixtureParams | None = None) -> F
     log.info(f"  步骤4 压扣孔: {len(screws)} 个")
 
     # 步骤5: 定位销
-    pins = make_pins(drills, params)
+    pins = make_pins(drills, params, sink_poly=sink)
     log.info(f"  步骤5 定位销: {len(pins)} 个")
 
     result = FixtureResult(board_poly=board, sink_poly=sink, handles=handles,

@@ -36,6 +36,13 @@ def score_drill(x: float, y: float, dia: float, sink_bounds: tuple,
     if 2.5 <= dia <= 4.5:
         score += 4.0
         reasons.append("孔径 2.5-4.5 +4")
+    elif 1.8 <= dia < 2.5:
+        # 次优窗口（对标竞品 generator 第 326 行）：小板常见 2.0mm 孔，仍可作定位销
+        score += 2.0
+        reasons.append("孔径 1.8-2.5 +2（次优）")
+    elif 1.5 <= dia < 1.8:
+        score += 0.5
+        reasons.append("孔径 1.5-1.8 +0.5（勉强可用）")
     if dia > 5.0:
         score -= 3.0
         reasons.append("孔径>5 -3")
@@ -47,14 +54,19 @@ def score_drill(x: float, y: float, dia: float, sink_bounds: tuple,
     if nthp:
         score += 4.0
         reasons.append("NPTH +4")
-    if dia < 2.0:
+    if dia < 1.5:
         score -= 2.0
-        reasons.append("孔径<2 -2")
+        reasons.append("孔径<1.5 -2")
     return PinCandidate(x=x, y=y, dia=dia, score=round(score, 2), reasons=reasons, nthp=nthp)
 
 
+def pin_diameter(drill_dia: float, inset: float = 0.1) -> float:
+    """销径 = 孔径 − inset，钳制到 [1.5, 4.0]（对标竞品 pinDiameterMm 做法）。"""
+    return min(max(drill_dia - inset, 1.5), 4.0)
+
+
 def qualifies(c: PinCandidate) -> bool:
-    """合格线：score ≥ 4.0，或 NPTH 且孔径 ≥ 2.0mm。"""
+    """合格线：score ≥ 4.0（标准窗口或靠边+次优组合），或 NPTH 且孔径 ≥ 2.0mm。"""
     return c.score >= 4.0 or (c.nthp and c.dia >= 2.0)
 
 
