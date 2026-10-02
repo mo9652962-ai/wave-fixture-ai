@@ -455,7 +455,12 @@ document.getElementById('interfBtn').addEventListener('click', async () => {
       // 3D 可视化（有 GLB + 干涉盒）
       if (data.glb_url) {
         document.getElementById('interf3dPanel').style.display = 'block';
-        renderInterference3D(data.glb_url, data.interference_boxes || []);
+        // 关键：必须等浏览器完成布局重算后再读 clientWidth/clientHeight——
+        // 紧跟 display:block 的同步调用会读到 0×0（面板此前是 display:none），
+        // 导致 canvas 尺寸为 0、3D 不可见。用 rAF 双帧确保 reflow 已完成。
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          renderInterference3D(data.glb_url, data.interference_boxes || []);
+        }));
       }
     }
   } catch (e) {
@@ -474,7 +479,9 @@ async function renderInterference3D(glbUrl, boxes) {
     const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0c12);
-    const w = container.clientWidth, h = container.clientHeight;
+    // 尺寸兜底：容器若因父级刚显示而尚未完成布局（0×0），退到 CSS 声明的 300px / 视口宽度，
+    // 避免 canvas 尺寸为 0 导致 3D 不可见（真机实测：display:none→block 后同步读取过）
+    const w = container.clientWidth || 800, h = container.clientHeight || 300;
     const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 2000);
     camera.position.set(150, 120, 150);
     camera.lookAt(0, 0, 4);
@@ -534,7 +541,9 @@ async function loadGLB(url) {
     const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0c12);
-    const w = container.clientWidth, h = container.clientHeight;
+    // 尺寸兜底：容器若因父级刚显示而尚未完成布局（0×0），退到 CSS 声明的 300px / 视口宽度，
+    // 避免 canvas 尺寸为 0 导致 3D 不可见（真机实测：display:none→block 后同步读取过）
+    const w = container.clientWidth || 800, h = container.clientHeight || 300;
     const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 1000);
     camera.position.set(150, 100, 150);
     camera.lookAt(0, 0, 4);
