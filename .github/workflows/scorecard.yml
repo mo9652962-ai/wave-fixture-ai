@@ -1,0 +1,38 @@
+name: Scorecard supply-chain security
+
+# OpenSSF Scorecard：18 项供应链安全检查（Token 权限/Pinned 依赖/SAST/分支保护…）。
+# push + 每周日定时扫描，publish_results: true → 结果发布到
+# api.securityscorecards.dev（public repo），README badge 实时取分。
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: "40 2 * * 0"
+  push:
+    branches: [main]
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write   # SARIF 上传 code scanning
+      id-token: write          # OIDC 发布到 Scorecard API
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@f2ea147fec3c2f0d459703eba7405b5e9bcd8c8f # v2.4.2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+      - uses: github/codeql-action/upload-sarif@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
+        with:
+          sarif_file: results.sarif

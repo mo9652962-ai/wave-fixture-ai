@@ -30,6 +30,7 @@
     <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
     <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
+  [![OpenSSF Scorecard](https://api.securityscorecards.dev/badge/github.com/mo9652962-ai/wave-fixture-ai)](https://api.securityscorecards.dev/projects/github.com/mo9652962-ai/wave-fixture-ai)
   </p>
 </div>
 
