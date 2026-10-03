@@ -23,7 +23,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ossf/scorecard-action@f2ea147fec3c2f0d459703eba7405b5e9bcd8c8f # v2.4.2
+      # Pinned to the *commit* the v2.4.2 tag points at. Pinning the annotated
+      # tag object's own SHA instead makes Scorecard reject its own upload as an
+      # "imposter commit" (the tag object is not part of the action's history).
+      - uses: ossf/scorecard-action@05b42c624433fc40578a4040d5cf5e36ddca8cde # v2.4.2
         with:
           results_file: results.sarif
           results_format: sarif
