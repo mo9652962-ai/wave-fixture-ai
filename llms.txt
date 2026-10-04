@@ -44,7 +44,7 @@ python fixture_phase2.py <gerber_dir> -o fixture-full.dxf  # 完整治具（+避
 
 ## 核心概念
 
-- **DRC 生产安全门禁**：30 条规则（含轨道限宽/最小开口 3.8mm/薄壁 1.5mm/拼版间距），四级严重度（blocking/error/warning/info），每条带出处
+- **DRC 生产安全门禁**：32 条规则（含轨道限宽/最小开口 3.8mm/薄壁 1.5mm/拼版间距），四级严重度（blocking/error/warning/info），每条带出处
   （对标 Macaos / AGICORP / APTPCB / PCBSync 的 DFM 指南）。存在 blocking/error 时
   导出的 DXF **自动打水印 PREVIEW**，禁止直接送 CNC。
 - **定位销打分算法**：从钻孔中按「孔径窗口 / NPTH / 靠边距离」打分，选**对角跨距最大**的一对；
@@ -87,7 +87,7 @@ fixture_phase1.py    步骤 1-5：Gerber 解析 / 沉板区 / 取手位 / 压扣
 fixture_phase2.py    步骤 6-10：避位区 / 上锡区 / 盖板孔 / 治具外形 / DXF 输出
 fixture_3d.py        3D 拉伸与布尔（STL/GLB）
 interference.py      元件干涉分析（2D 覆盖归因 + 3D 布尔判定）
-drc.py               DRC 生产安全门禁（30 规则带出处）
+drc.py               DRC 生产安全门禁（32 规则带出处）
 dogbone.py           内凹拐角狗骨头清角（刀路 + DXF 图层）
 panelize.py          拼版阵列 N×M（几何复制 + 元件复制）
 materials.py         材料预设库（Durostone/Ricocel/FR-4/铝）+ 成本估算

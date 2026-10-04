@@ -7,6 +7,7 @@ PDF 10 步规则前 4 步：沉板区 / 取手位 / 压扣孔 / 定位销 → DX
 
 技术栈：gerbonara(解析) + shapely(几何) + ezdxf(DXF)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,38 +25,39 @@ from shapely.ops import unary_union
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("fixture")
 
+
 # ─────────────────────────────────────────────────────────────
 # 工艺参数（PDF 需求 + 行业规范核对）
 # ─────────────────────────────────────────────────────────────
 @dataclass
 class FixtureParams:
     # 步骤2: 沉板区与狗骨头清角 (Dogbone Relief)
-    sink_expand_mm: float = 0.2        # 外形外扩 0.2mm
-    sink_fillet_r: float = 1.85        # 清角圆弧 R1.85 (传统清角回退)
-    enable_dogbone: bool = True        # 开启内凹拐角「狗骨头（Dogbone Relief）」减隙刀路
-    dogbone_r: float = 1.85            # 狗骨头铣刀半径 R1.85 (对应标准 Φ3.7mm 铣刀)
-    dogbone_clearance: float = 0.05    # 减隙角过切避空余量 (mm)
-    dogbone_style: str = "dogbone"     # "dogbone"(标准狗骨头) | "corner_hole"(角孔) | "tbone"
+    sink_expand_mm: float = 0.2  # 外形外扩 0.2mm
+    sink_fillet_r: float = 1.85  # 清角圆弧 R1.85 (传统清角回退)
+    enable_dogbone: bool = True  # 开启内凹拐角「狗骨头（Dogbone Relief）」减隙刀路
+    dogbone_r: float = 1.85  # 狗骨头铣刀半径 R1.85 (对应标准 Φ3.7mm 铣刀)
+    dogbone_clearance: float = 0.05  # 减隙角过切避空余量 (mm)
+    dogbone_style: str = "dogbone"  # "dogbone"(标准狗骨头) | "corner_hole"(角孔) | "tbone"
     # 步骤3: 取手位
-    handle_w: float = 20.0             # 取手长 20mm
-    handle_h: float = 40.0             # 取手宽 40mm
-    handle_overlap: float = 1.0        # 与沉板区重叠 1mm
-    handle_fillet_r: float = 2.0       # 取手倒角 R2
+    handle_w: float = 20.0  # 取手长 20mm
+    handle_h: float = 40.0  # 取手宽 40mm
+    handle_overlap: float = 1.0  # 与沉板区重叠 1mm
+    handle_fillet_r: float = 2.0  # 取手倒角 R2
     # 步骤4: 压扣螺丝孔
-    screw_d: float = 3.4               # Φ3.4mm
-    screw_offset: float = 10.0         # 圆心距沉板区边 10mm
+    screw_d: float = 3.4  # Φ3.4mm
+    screw_offset: float = 10.0  # 圆心距沉板区边 10mm
     # 步骤5: 定位销
-    pin_inset: float = 0.1             # 钻孔内缩 0.1mm
+    pin_inset: float = 0.1  # 钻孔内缩 0.1mm
 
 
 @dataclass
 class FixtureResult:
-    board_poly: Polygon | None = None       # 原始外形
-    sink_poly: Polygon | None = None        # 沉板区（外扩+狗骨头清角）
-    handles: list[Polygon] = field(default_factory=list)   # 取手位
+    board_poly: Polygon | None = None  # 原始外形
+    sink_poly: Polygon | None = None  # 沉板区（外扩+狗骨头清角）
+    handles: list[Polygon] = field(default_factory=list)  # 取手位
     screws: list[tuple[float, float]] = field(default_factory=list)  # 压扣孔 (x,y)
     pins: list[tuple[float, float, float]] = field(default_factory=list)  # 定位销 (x,y,r)
-    dogbone_corners: list = field(default_factory=list)    # 狗骨头拐角刀路列表 (DogboneCorner)
+    dogbone_corners: list = field(default_factory=list)  # 狗骨头拐角刀路列表 (DogboneCorner)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -90,7 +92,9 @@ def parse_drills_regex(d: Path) -> list[tuple[float, float, float]]:
                 # 判定：显式 INCH 声明，或「明显是英寸量级」的启发式（孔径 <0.2mm 或坐标全 <1）。
                 max_coord = max(max(abs(x), abs(y)) for x, y, _ in got)
                 max_dia = max(d for _, _, d in got)
-                looks_inch = declared_inch or (not declared_metric and (max_dia < 0.2 or max_coord < 1.0))
+                looks_inch = declared_inch or (
+                    not declared_metric and (max_dia < 0.2 or max_coord < 1.0)
+                )
                 if looks_inch:
                     got = [(x * 25.4, y * 25.4, d * 25.4) for x, y, d in got]
                     log.info(f"  钻孔 {f.name}: 检测为英寸单位，已换算为毫米（×25.4）")
@@ -127,7 +131,7 @@ def parse_drills_regex(d: Path) -> list[tuple[float, float, float]]:
                     # 英寸板坐标会 >1000mm，若都大则按下/25.4 处理
                     if abs(x) > 600 or abs(y) > 600:
                         x, y = x / 25.4, y / 25.4  # 英寸→mm
-                    dia = (ap_sizes.get(cur_t, 1.0) if cur_t else 1.0)
+                    dia = ap_sizes.get(cur_t, 1.0) if cur_t else 1.0
                     drills.append((x, y, dia))
         except Exception as e2:
             log.warning(f"  钻孔 {f.name} 正则回退也失败: {e2}")
@@ -145,14 +149,42 @@ def parse_drills_regex(d: Path) -> list[tuple[float, float, float]]:
 
 
 def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, float, float]]]:
-    """解析 Gerber 目录 → (外形多边形列表, 钻孔列表[(x,y,r)])"""
+    """解析 Gerber 目录或 ODB++ 归档 → (外形多边形列表, 钻孔列表[(x,y,r)])"""
     d = Path(gerber_dir)
+
+    # 优先检测 ODB++ 复合工程归档 (tgz/tar.gz/zip 或解压目录)
+    from odb_parser import is_odb_archive, parse_odb_package
+
+    if is_odb_archive(d):
+        odb = parse_odb_package(d)
+        if odb.has_outline:
+            drills = [(x, y, dia / 2.0) for x, y, dia in odb.drills]
+            return [odb.board_poly], drills
+
     # ⚠️ 排除 .drl/.txt DRL 文件——KiCad 10 的 G85 新语法会让 gerbonara 崩，
     #    钻孔单独用 _parse_drills_regex 处理
-    gerber_files = [f for f in d.rglob("*")
-                    if f.suffix.lower() in (".gbr", ".ger", ".gba", ".gbl", ".gbs", ".gbo",
-                                             ".gtl", ".gts", ".gto", ".gtp", ".gbp",
-                                             ".gm1", ".g2", ".g3", ".gko")]
+    gerber_files = [
+        f
+        for f in d.rglob("*")
+        if f.suffix.lower()
+        in (
+            ".gbr",
+            ".ger",
+            ".gba",
+            ".gbl",
+            ".gbs",
+            ".gbo",
+            ".gtl",
+            ".gts",
+            ".gto",
+            ".gtp",
+            ".gbp",
+            ".gm1",
+            ".g2",
+            ".g3",
+            ".gko",
+        )
+    ]
     stack = None
     if gerber_files:
         # 同一逻辑层的重复文件（真实板常见：01_board_outline.GBR + 02_board_outline.GER
@@ -219,7 +251,11 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
         log.debug("graphic_layers 读取失败: %s", e)
     if not outline_objs:
         try:
-            op = stack.outline_polygons() if callable(stack.outline_polygons) else stack.outline_polygons
+            op = (
+                stack.outline_polygons()
+                if callable(stack.outline_polygons)
+                else stack.outline_polygons
+            )
             if op is not None:
                 for chunk in op:
                     if isinstance(chunk, list):
@@ -236,6 +272,7 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
 
     # Line/Arc → 线段集合 → shapely LineString → 围成 Polygon
     from shapely.geometry import LineString
+
     lines = []
     for obj in outline_objs:
         cls = obj.__class__.__name__
@@ -294,7 +331,9 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
                             extended = True
                             break
                 if len(chain) >= 4:
-                    gap = ((chain[-1][0] - chain[0][0]) ** 2 + (chain[-1][1] - chain[0][1]) ** 2) ** 0.5
+                    gap = (
+                        (chain[-1][0] - chain[0][0]) ** 2 + (chain[-1][1] - chain[0][1]) ** 2
+                    ) ** 0.5
                     if gap <= tolerance:
                         if gap > 0:  # 显式首尾闭合，消除微缺口
                             chain.append(chain[0])
@@ -340,16 +379,20 @@ def make_sink_region(
     """外形外扩 + 狗骨头(Dogbone)内凹拐角减隙清角刀路生成"""
     if p.enable_dogbone:
         from dogbone import DogboneParams, generate_dogbone_relief
+
         db_params = DogboneParams(
             cutter_r=p.dogbone_r,
             style=p.dogbone_style,
             clearance_mm=p.dogbone_clearance,
         )
-        sink, corners = generate_dogbone_relief(board_poly, expand_mm=p.sink_expand_mm, params=db_params)
+        sink, corners = generate_dogbone_relief(
+            board_poly, expand_mm=p.sink_expand_mm, params=db_params
+        )
     else:
         expanded = board_poly.buffer(p.sink_expand_mm, join_style="round", quad_segs=16)
-        sink = expanded.buffer(p.sink_fillet_r, join_style="round", quad_segs=16) \
-                       .buffer(-p.sink_fillet_r, join_style="round", quad_segs=16)
+        sink = expanded.buffer(p.sink_fillet_r, join_style="round", quad_segs=16).buffer(
+            -p.sink_fillet_r, join_style="round", quad_segs=16
+        )
         corners = []
 
     if return_corners:
@@ -367,14 +410,24 @@ def make_handles(sink_poly: Polygon, p: FixtureParams) -> list[Polygon]:
 
     for side in ("left", "right"):
         if side == "left":
-            h = box(minx - p.handle_w + p.handle_overlap, miny - p.handle_h / 2,
-                    minx + p.handle_overlap, miny + p.handle_h / 2)
+            h = box(
+                minx - p.handle_w + p.handle_overlap,
+                miny - p.handle_h / 2,
+                minx + p.handle_overlap,
+                miny + p.handle_h / 2,
+            )
         else:
-            h = box(maxx - p.handle_overlap, miny - p.handle_h / 2,
-                    maxx + p.handle_w - p.handle_overlap, miny + p.handle_h / 2)
+            h = box(
+                maxx - p.handle_overlap,
+                miny - p.handle_h / 2,
+                maxx + p.handle_w - p.handle_overlap,
+                miny + p.handle_h / 2,
+            )
         # 四角倒角 R2
         r = p.handle_fillet_r
-        h_r = h.buffer(r, join_style="round", quad_segs=16).buffer(-r, join_style="round", quad_segs=16)
+        h_r = h.buffer(r, join_style="round", quad_segs=16).buffer(
+            -r, join_style="round", quad_segs=16
+        )
         handles.append(h_r)
 
     return handles
@@ -403,8 +456,13 @@ def make_screws(sink_poly: Polygon, p: FixtureParams) -> list[tuple[float, float
 # ─────────────────────────────────────────────────────────────
 # 步骤 5: 定位销（钻孔内缩 0.1mm 生成销钉圆）
 # ─────────────────────────────────────────────────────────────
-def make_pins(drills: list[tuple[float, float, float]], p: FixtureParams,
-              sink_poly: Polygon | None = None, *, select: bool = True) -> list[tuple[float, float, float]]:
+def make_pins(
+    drills: list[tuple[float, float, float]],
+    p: FixtureParams,
+    sink_poly: Polygon | None = None,
+    *,
+    select: bool = True,
+) -> list[tuple[float, float, float]]:
     """定位销：从钻孔中**打分选出对角最优的一对**（而非把所有孔都变成销）。
 
     设计依据（对标竞品 generator._locating_pin_candidates 的「候选→打分→选中」三段式）：
@@ -458,12 +516,13 @@ def make_pins(drills: list[tuple[float, float, float]], p: FixtureParams,
 # DXF 输出（分图层）
 # ─────────────────────────────────────────────────────────────
 LAYER_COLORS = {
-    "沉板区": 1,      # 红
-    "取手位": 3,      # 绿
-    "配件层": 4,      # 青
-    "定位销": 5,      # 蓝
-    "清角刀路": 30,    # 橙色（狗骨头切削圆与下刀引线）
+    "沉板区": 1,  # 红
+    "取手位": 3,  # 绿
+    "配件层": 4,  # 青
+    "定位销": 5,  # 蓝
+    "清角刀路": 30,  # 橙色（狗骨头切削圆与下刀引线）
 }
+
 
 def poly_to_dxf_polyline(msp, poly: Polygon, layer: str, close: bool = True):
     """shapely Polygon → DXF POLYLINE"""
@@ -503,6 +562,7 @@ def export_dxf(result: FixtureResult, out_path: str, params: FixtureParams):
     # 狗骨头专用刀路层
     if getattr(result, "dogbone_corners", None):
         from dogbone import add_dogbone_to_dxf
+
         add_dogbone_to_dxf(msp, result.dogbone_corners, layer="清角刀路")
 
     doc.saveas(out_path)
@@ -521,12 +581,16 @@ def run(gerber_dir: str, out_dxf: str, params: FixtureParams | None = None) -> F
         log.error("❌ 未找到外形层（GKO/GM1/Edge_Cuts）")
         return FixtureResult()
     board = unary_union(board_polys)
-    log.info(f"  外形: {len(board_polys)} 个多边形, 尺寸 {board.bounds[2]-board.bounds[0]:.1f}x{board.bounds[3]-board.bounds[1]:.1f}mm")
+    log.info(
+        f"  外形: {len(board_polys)} 个多边形, 尺寸 {board.bounds[2] - board.bounds[0]:.1f}x{board.bounds[3] - board.bounds[1]:.1f}mm"
+    )
     log.info(f"  钻孔: {len(drills)} 个")
 
     # 步骤2: 沉板区 (含狗骨头清角)
     sink, dogbone_corners = make_sink_region(board, params, return_corners=True)
-    log.info(f"  步骤2 沉板区: 外扩{params.sink_expand_mm}mm + 狗骨头清角(R{params.dogbone_r}mm, 刀路{len(dogbone_corners)}处)")
+    log.info(
+        f"  步骤2 沉板区: 外扩{params.sink_expand_mm}mm + 狗骨头清角(R{params.dogbone_r}mm, 刀路{len(dogbone_corners)}处)"
+    )
 
     # 步骤3: 取手位
     handles = make_handles(sink, params)
@@ -540,8 +604,14 @@ def run(gerber_dir: str, out_dxf: str, params: FixtureParams | None = None) -> F
     pins = make_pins(drills, params, sink_poly=sink)
     log.info(f"  步骤5 定位销: {len(pins)} 个")
 
-    result = FixtureResult(board_poly=board, sink_poly=sink, handles=handles,
-                           screws=screws, pins=pins, dogbone_corners=dogbone_corners)
+    result = FixtureResult(
+        board_poly=board,
+        sink_poly=sink,
+        handles=handles,
+        screws=screws,
+        pins=pins,
+        dogbone_corners=dogbone_corners,
+    )
 
     if out_dxf:
         export_dxf(result, out_dxf, params)

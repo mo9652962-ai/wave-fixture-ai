@@ -12,6 +12,7 @@ import math
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import ezdxf
 from shapely.geometry import Point, Polygon, box
@@ -79,6 +80,8 @@ class Phase2Params:
     enable_vent_holes: bool = True  # 开启闭合避位腔排气孔
     vent_hole_r: float = 1.0  # 排气孔半径 1.0mm (Φ2.0mm，机加工标准钻头)
     min_vent_cavity_area: float = 50.0  # 需要排气孔的最小腔体面积 mm²
+    # 步骤12: 铰链式防翘曲上盖 (Hinged Top Hat Cover, AGICORP §2.0)
+    enable_top_hat: bool = False  # 开启铰链式压紧上盖生成
 
 
 @dataclass
@@ -95,6 +98,7 @@ class Phase2Result:
     panel_grid: dict | None = None  # 拼版网格信息（panelize.PanelGrid.to_dict()）
     vent_holes: list = field(default_factory=list)  # 避位腔排气孔 (x,y,r)
     flow_arrow_lines: list = field(default_factory=list)  # 过板流向箭头 (AGICORP §2.1)
+    top_hat: Any | None = None  # 铰链上盖结果 (top_hat.TopHatResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -391,6 +395,11 @@ LAYER_COLORS2 = {
     "清角刀路": 30,  # 橙色 (狗骨头清角刀路)
     "排气孔": 144,  # 青绿 (AGICORP §4.2 导气孔)
     "工程注记": 7,  # 白/银 (过板方向与规格文字)
+    "上盖外形": 3,  # 绿 (防翘曲压紧上盖)
+    "上盖开孔": 1,  # 红
+    "铰链位": 4,  # 青
+    "锁扣位": 6,  # 紫
+    "上盖压柱": 5,  # 蓝
 }
 
 
@@ -483,6 +492,13 @@ def export_dxf2(
             ((ax1 + ax2) / 2.0 - 10.0, ay1 + 2.0)
         )
 
+    # 铰链压紧上盖图层 (Top Hat Cover)
+    tophat = getattr(result, "top_hat", None)
+    if tophat:
+        from top_hat import export_top_hat_to_dxf
+
+        export_top_hat_to_dxf(msp, tophat)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -566,6 +582,12 @@ def run_phase2(
     outer = make_outer(sink, params2)
     vents = make_vent_holes(avoid, solder, params2)
 
+    tophat_res = None
+    if getattr(params2, "enable_top_hat", False):
+        from top_hat import generate_top_hat
+
+        tophat_res = generate_top_hat(outer.outer_poly, sink, board, caps)
+
     result2 = Phase2Result(
         avoid_polys=avoid,
         solder_polys=solder,
@@ -579,6 +601,7 @@ def run_phase2(
         panel_grid=panel_grid,
         vent_holes=vents,
         flow_arrow_lines=outer.flow_arrow_lines,
+        top_hat=tophat_res,
     )
 
     if out_dxf:

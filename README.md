@@ -25,9 +25,9 @@
   <p>
     <a href="https://github.com/mo9652962-ai/wave-fixture-ai/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/mo9652962-ai/wave-fixture-ai/ci.yml?style=flat-square&label=CI" alt="CI"></a>
     <img src="https://img.shields.io/badge/features-21%20automations-2563EB?style=flat-square" alt="features">
-    <img src="https://img.shields.io/badge/DRC-30_Rules-059669?style=flat-square" alt="30 DRC rules">
+    <img src="https://img.shields.io/badge/DRC-32_Rules-059669?style=flat-square" alt="32 DRC rules">
     <img src="https://img.shields.io/badge/KiCad-10%20兼容-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
-    <img src="https://img.shields.io/badge/tests-249%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/tests-255%20passed-success?style=flat-square" alt="tests">
     <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
     <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
@@ -73,7 +73,7 @@
 | 11 | **3D 预览**（STL/GLB 导出 + 浏览器旋转查看）| ✅ |
 | 12 | **干涉分析**（元件 vs 治具：2D 覆盖 + 3D 布尔双层判定）| ✅ |
 | 13 | **自然语言调整**（「避位区外扩1mm」等 29 参数）| ✅ |
-| 14 | **DRC 生产安全门禁**（30 规则 · 四级严重度 · 每条带出处；未过 → 只出水印预览）| ✅ |
+| 14 | **DRC 生产安全门禁**（32 规则 · 四级严重度 · 每条带出处；未过 → 只出水印预览）| ✅ |
 | 15 | **Golden Sample 回归验证**（IoU≥0.9 · Hausdorff≤0.5mm · 圆孔双向 best-match）| ✅ |
 | 16 | **人工 Review 闭环**（缺数据/低置信度挂起 → 工程师确认 → SHA 绑定 + 审计日志）| ✅ |
 | 17 | **定位销打分选点**（孔径窗口 / NPTH / 靠边权重 + 对角最大跨距）| ✅ |
@@ -84,7 +84,7 @@
 
 ## 🚦 DRC 生产安全门禁（工业级核心）
 
-治具出图前跑 30 条设计规则检查，**存在 blocking / error 时导出的 DXF 自动打水印**（`PREVIEW`），
+治具出图前跑 32 条设计规则检查，**存在 blocking / error 时导出的 DXF 自动打水印**（`PREVIEW`），
 禁止直接送 CNC 生产——这是"设计稿"与"生产件"之间的最后防线。
 
 | 级别 | 含义 | 例 |
