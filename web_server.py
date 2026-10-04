@@ -563,6 +563,7 @@ async def api_generate(
             "avoid_count": len(getattr(result, "avoid_polys", [])),
             "solder_count": len(getattr(result, "solder_polys", [])),
             "cap_hole_count": len(getattr(result, "cap_holes", [])),
+            "vent_count": len(getattr(result, "vent_holes", [])),
             "dogbone_count": len(getattr(result, "dogbone_corners", [])) or len(dogbone_corners),
         }
         if getattr(result, "panel_grid", None):
@@ -616,6 +617,7 @@ async def api_generate(
                 pallet_thickness=pallet_thickness,
                 board_thickness=board_thickness,
                 sink_depth=sink_info.get("sink_depth_mm"),
+                vent_holes=getattr(result, "vent_holes", []),
                 job_name=workdir.name,
                 parent_hint=OUTPUT_DIR,
             )

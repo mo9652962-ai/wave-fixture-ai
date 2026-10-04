@@ -75,6 +75,10 @@ class Phase2Params:
     panel_cols: int = 1  # X 向片数
     panel_rows: int = 1  # Y 向片数
     panel_gap: float = 5.0  # 片间距 mm（挡锡墙，行业下限 3mm）
+    # 步骤11: 气孔与导气 (Gas Venting, AGICORP §4.2)
+    enable_vent_holes: bool = True  # 开启闭合避位腔排气孔
+    vent_hole_r: float = 1.0  # 排气孔半径 1.0mm (Φ2.0mm，机加工标准钻头)
+    min_vent_cavity_area: float = 50.0  # 需要排气孔的最小腔体面积 mm²
 
 
 @dataclass
@@ -89,6 +93,8 @@ class Phase2Result:
     sink_poly: Polygon | None = None  # 沉板区（3D 用）
     dogbone_corners: list = field(default_factory=list)  # 狗骨头减隙刀路 (DogboneCorner)
     panel_grid: dict | None = None  # 拼版网格信息（panelize.PanelGrid.to_dict()）
+    vent_holes: list = field(default_factory=list)  # 避位腔排气孔 (x,y,r)
+    flow_arrow_lines: list = field(default_factory=list)  # 过板流向箭头 (AGICORP §2.1)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -269,6 +275,42 @@ def make_cap_holes(stack_or_dir, p: Phase2Params) -> list[tuple[float, float, fl
 
 
 # ─────────────────────────────────────────────────────────────
+# 步骤 8.5: 闭合避位腔排气孔（AGICORP §4.2 气流通道）
+# ─────────────────────────────────────────────────────────────
+def make_vent_holes(
+    avoid_polys: list,
+    solder_polys: list,
+    p: Phase2Params,
+) -> list[tuple[float, float, float]]:
+    """闭合避位腔排气孔（AGICORP §4.2: 防止截留助焊剂气体导致虚焊/漏焊）。
+
+    对面积 ≥ min_vent_cavity_area 的闭合避位腔，在其内部安全点放置 Φ2.0mm 排气孔（通至治具顶面）。
+    返回 [(x, y, r)]
+    """
+    if not p.enable_vent_holes:
+        return []
+    holes: list[tuple[float, float, float]] = []
+    from shapely.ops import unary_union
+
+    solder_union = unary_union(solder_polys) if solder_polys else None
+
+    for av in avoid_polys:
+        if av is None or av.is_empty or av.area < p.min_vent_cavity_area:
+            continue
+        # 若已与上锡区大面积相交贯通，气体可从上锡口排出，无需额外打孔
+        if solder_union and av.intersection(solder_union).area > 15.0:
+            continue
+        inner = av.buffer(-1.5)
+        pt = inner.representative_point() if not inner.is_empty else av.representative_point()
+        holes.append((round(pt.x, 3), round(pt.y, 3), p.vent_hole_r))
+    if holes:
+        log.info(
+            f"  步骤8.5 排气孔: {len(holes)} 个（半径 {p.vent_hole_r}mm，AGICORP §4.2 导气通道）"
+        )
+    return holes
+
+
+# ─────────────────────────────────────────────────────────────
 # 步骤 9: 治具外形 + 轨道边 + 挡锡条
 # ─────────────────────────────────────────────────────────────
 def make_outer(sink_poly: Polygon, p: Phase2Params) -> Phase2Result:
@@ -320,6 +362,15 @@ def make_outer(sink_poly: Polygon, p: Phase2Params) -> Phase2Result:
             x = ox + ow_int * i / 4
             result.tin_holes.append((x, strip_y, p.tin_hole_r))
 
+    # 过板方向指示箭头（AGICORP §2.1）：上导轨处雕刻流向箭头
+    mid_x = ox + ow_int / 2.0
+    arrow_y = top_y - p.rail_width / 2.0
+    result.flow_arrow_lines = [
+        (mid_x - 15.0, arrow_y, mid_x + 15.0, arrow_y),
+        (mid_x + 15.0, arrow_y, mid_x + 9.0, arrow_y + 3.0),
+        (mid_x + 15.0, arrow_y, mid_x + 9.0, arrow_y - 3.0),
+    ]
+
     log.info(f"  步骤9 治具外形: {ow_int:.0f}x{oh_int:.0f}mm 整数化 + R{p.outer_fillet_r} 倒角")
     log.info(f"       轨道边 2 条 + 挡锡条 4 条 + 挡锡条孔 {len(result.tin_holes)} 个")
     return result
@@ -338,6 +389,8 @@ LAYER_COLORS2 = {
     "盖板": 7,  # 白
     "治具外形": 8,  # 灰
     "清角刀路": 30,  # 橙色 (狗骨头清角刀路)
+    "排气孔": 144,  # 青绿 (AGICORP §4.2 导气孔)
+    "工程注记": 7,  # 白/银 (过板方向与规格文字)
 }
 
 
@@ -416,6 +469,19 @@ def export_dxf2(
         msp.add_line((x1, y1), (x2, y2), dxfattribs={"layer": "治具外形"})
     for x, y, r in result.tin_holes:
         msp.add_circle((x, y), radius=r, dxfattribs={"layer": "治具外形"})
+
+    # 排气孔 (AGICORP §4.2 气流通道)
+    for x, y, r in getattr(result, "vent_holes", []):
+        msp.add_circle((x, y), radius=r, dxfattribs={"layer": "排气孔"})
+
+    # 工程注记与过板方向指示 (AGICORP §2.1)
+    for x1, y1, x2, y2 in getattr(result, "flow_arrow_lines", []):
+        msp.add_line((x1, y1), (x2, y2), dxfattribs={"layer": "工程注记"})
+    if getattr(result, "flow_arrow_lines", []):
+        ax1, ay1, ax2, _ = result.flow_arrow_lines[0]
+        msp.add_text("FLOW ===>", dxfattribs={"layer": "工程注记", "height": 3.0}).set_placement(
+            ((ax1 + ax2) / 2.0 - 10.0, ay1 + 2.0)
+        )
 
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
@@ -498,6 +564,7 @@ def run_phase2(
         panel_grid = grid.to_dict()
 
     outer = make_outer(sink, params2)
+    vents = make_vent_holes(avoid, solder, params2)
 
     result2 = Phase2Result(
         avoid_polys=avoid,
@@ -510,6 +577,8 @@ def run_phase2(
         sink_poly=sink,
         dogbone_corners=dogbone_corners,
         panel_grid=panel_grid,
+        vent_holes=vents,
+        flow_arrow_lines=outer.flow_arrow_lines,
     )
 
     if out_dxf:
