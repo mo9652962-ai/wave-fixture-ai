@@ -3,16 +3,14 @@
   "recipe": {
     "name": "Wave Fixture AI",
     "kind": "fastapi",
-    "bootstrap": [
-      "uv sync"
-    ],
+    "bootstrap": [],
     "build": [],
     "test": [
-      "pytest"
+      "pytest -q"
     ],
-    "start": "python web_server.py --port 8000",
-    "port": 8000,
-    "readinessPath": "/health",
+    "start": null,
+    "port": null,
+    "readinessPath": null,
     "evidence": [
       "Detected Python project",
       "FastAPI web_server.py"

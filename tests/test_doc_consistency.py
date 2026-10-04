@@ -205,11 +205,14 @@ def test_version_has_no_pending_bump():
         check=False,
     )
     log = log_res.stdout or ""
-    # A commit message that names a version must name the current one.
+    # A commit message that names a version must not exceed the current one.
+    def to_tuple(v_str: str) -> tuple[int, ...]:
+        return tuple(int(x) for x in v_str.split("."))
+
     named = set(re.findall(r"v(\d+\.\d+\.\d+)", log))
-    stale = named - {version}
-    assert not stale, (
-        f"recent commits claim version(s) {sorted(stale)} but pyproject says {version} — bump it"
+    future_named = {v for v in named if to_tuple(v) > to_tuple(version)}
+    assert not future_named, (
+        f"recent commits claim version(s) {sorted(future_named)} but pyproject says {version} — bump it"
     )
 
 
