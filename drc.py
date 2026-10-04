@@ -526,6 +526,32 @@ def run_drc(
         except Exception as e:  # 材料库异常不阻塞 DRC 主流程
             log.debug("材料-工艺校验跳过: %s", e)
 
+    # G6. 闭合避位腔排气检查（AGICORP §4.2）：
+    # 面积 > 100mm² 的闭合避位腔若未设置排气孔，波峰浸入时气体无法逸出，
+    # 容易形成气阻截留助焊剂气体导致虚焊/漏焊。
+    vents = getattr(r2, "vent_holes", []) or []
+    from shapely.geometry import Point as _Pt
+
+    for ai, av in enumerate(avoids):
+        if not _poly_ok(av) or av.area < 100.0:
+            continue
+        has_vent = any(av.contains(_Pt(vx, vy)) for (vx, vy, _vr) in vents)
+        if not has_vent:
+            issues.append(
+                _issue(
+                    "UNVENTED_AVOID_POCKET",
+                    "避位深腔缺少排气孔",
+                    f"避位腔 #{ai + 1} 面积 {av.area:.1f}mm² > 100mm² 且未设排气孔，"
+                    "波峰过炉时截留助焊剂气体易导致虚焊/漏焊（AGICORP §4.2 指南）。",
+                    "warning",
+                    "AGICORP Wave Solder Pallet Design Guidelines §4.2",
+                    current=round(av.area, 1),
+                    required=100.0,
+                    unit="mm²",
+                    object_id=f"avoid-{ai + 1}",
+                )
+            )
+
     # ── H. 真机合规（企业级：治具必须放进某台具体机台过波）─────────────
     mkey = machine_key or getattr(r2, "machine_key", None)
     if mkey:

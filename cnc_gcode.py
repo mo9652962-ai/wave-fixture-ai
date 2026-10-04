@@ -252,6 +252,7 @@ def generate_gcode(
     pallet_thickness: float = 10.0,
     board_thickness: float = 1.6,
     sink_depth: float | None = None,
+    vent_holes: list | None = None,
     endmill_dia: float = 3.7,
     job_name: str = "wave-fixture",
     parent_hint: str | Path | None = None,
@@ -261,13 +262,15 @@ def generate_gcode(
     sink_depth: 沉板槽深（mm）。None 时按 board_thickness + 0.3 旧公式；
     推荐由 interference.compute_sink_depth() 按底面元件高度计算后传入
     （底面最高元件 + 0.5mm 离板气隙，AptPCB/PCBSync 公式）。
+    vent_holes: 可选排气孔列表 [(x,y,r)]（AGICORP §4.2 导气通道，自动归入钻孔组）。
 
-    加工顺序：钻孔(定位销) → 小腔(盖板/上锡/避位) → 沉板槽 → 取手位 → 外形落料。
+    加工顺序：钻孔(定位销+排气孔) → 小腔(盖板/上锡/避位) → 沉板槽 → 取手位 → 外形落料。
     """
     safe_out = resolve_safe_out_path(out_path, parent_hint)
     mat = get_material(material_key)
-    effective_sink_depth = round(sink_depth if sink_depth is not None
-                                 else board_thickness + BOARD_DEPTH_CLEARANCE, 3)
+    effective_sink_depth = round(
+        sink_depth if sink_depth is not None else board_thickness + BOARD_DEPTH_CLEARANCE, 3
+    )
     tool_r = endmill_dia / 2.0
     stepover = endmill_dia * mat.stepover_pct / 100.0
 
@@ -287,10 +290,11 @@ def generate_gcode(
     b.comment("NOTE: dust extraction required for synthetic stone machining")
     b.comment("Tools: see T commands below")
 
-    # ── T1..Tn 钻孔组（定位销，按孔径分组）──────────────────────
+    # ── T1..Tn 钻孔组（定位销 + 闭合避位腔排气孔，按孔径分组）──────────────────
     tool_no = 1
     pin_groups: dict[float, list[tuple[float, float]]] = {}
-    for x, y, r in pins:
+    all_drills = list(pins) + list(vent_holes or [])
+    for x, y, r in all_drills:
         pin_groups.setdefault(round(2 * r, 2), []).append((x, y))
 
     drill_tools: list[ToolInfo] = []
@@ -368,8 +372,10 @@ def generate_gcode(
 
     # 沉板槽（板厚 + 0.3，不贯穿）
     b.comment(f"=== SINK pocket depth {effective_sink_depth}mm (board sits flush) ===")
-    b.comment("NOTE: AGICORP guideline - 60 deg bottom-side chamfers on solder openings "
-              "maximize wave contact; add chamfer pass if wave coverage insufficient")
+    b.comment(
+        "NOTE: AGICORP guideline - 60 deg bottom-side chamfers on solder openings "
+        "maximize wave contact; add chamfer pass if wave coverage insufficient"
+    )
     if sink is not None and not sink.is_empty:
         sink_parts = list(sink.geoms) if hasattr(sink, "geoms") else [sink]
         for i, sp in enumerate(sink_parts):

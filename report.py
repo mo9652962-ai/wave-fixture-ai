@@ -71,11 +71,11 @@ def build_report(
         machine = get_machine(machine_key)
 
     # 动态章节编号（CNC 节与工艺节按可用性增减）
-    sec = {"spec": 1, "mat": 2, "cnc": 3, "drc": 4, "interf": 5, "proc": 6, "dl": 7}
+    sec = {"spec": 1, "mat": 2, "cnc": 3, "drc": 4, "interf": 5, "fasteners": 6, "proc": 7, "dl": 8}
     if not gcode_stats:
         sec = {k: (v - 1 if v >= 3 else v) for k, v in sec.items()}
     if not include_process:
-        sec = {k: (v - 1 if v >= 6 else v) for k, v in sec.items()}
+        sec = {k: (v - 1 if v >= 7 else v) for k, v in sec.items()}
 
     L: list[str] = []
     ap = L.append
@@ -180,6 +180,36 @@ def build_report(
                     f"| {s.get('ref', '?')} | {s.get('height', '-')}mm | {s.get('suspicious_reason', '-')} |"
                 )
         ap("")
+
+    # 治具标准五金采购与装配清单 (Hardware & Fasteners BOM)
+    ap(f"## {sec['fasteners']}. 治具标准五金采购与装配清单 (Hardware BOM)")
+    ap("")
+    ap("| 序号 | 标准件名称 | 规格型号 | 数量 | 推荐材质 | 安装部位 / 作用 | 更换周期 |")
+    ap("|---|---|---|---|---|---|---|")
+    screws_cnt = len(getattr(r1, "screws", []) or [])
+    pins_cnt = len(getattr(r1, "pins", []) or [])
+    caps_cnt = len(getattr(r2, "cap_holes", []) or [])
+    strips_cnt = len(getattr(r2, "tin_strip_lines", []) or [])
+    vents_cnt = len(getattr(r2, "vent_holes", []) or [])
+    ap(
+        f"| 1 | 旋转压扣 (Turn Clamp) | 30mm 耐高温弹力旋转压扣 | {screws_cnt} 件 | PPS 树脂 / 钛合金 | 沉板区板边，防浮板 | 50,000 次 |"
+    )
+    ap(
+        f"| 2 | 压扣固定沉头螺钉 | M3 × 8mm 沉头十字螺钉 | {screws_cnt} 支 | SUS304 不锈钢 | 配件层沉孔固定 | 随压扣更换 |"
+    )
+    ap(
+        f"| 3 | 阶梯定位销 (Guide Pin) | Φ3.0 阶梯定位销 (基准安装部 Φ4.0) | {pins_cnt} 支 | SUS304 磨光不锈钢 | PCB 定位孔，防错位 | 100,000 次 |"
+    )
+    ap(
+        f"| 4 | 盖板弹力压柱 (Push Plunger) | Φ2.45 × 15mm 弹力顶针柱 | {caps_cnt} 支 | 镀镍弹簧钢 | 盖板丝印位下压防翘曲 | 30,000 次 |"
+    )
+    ap(
+        f"| 5 | 防溢锡挡锡条 (Solder Dam) | 10mm 宽防粘特氟龙挡条 | {strips_cnt} 条 | PTFE / 钛合金 | 传送带导轨侧挡锡 | 20,000 次 |"
+    )
+    ap(
+        f"| 6 | 闭合腔排气通孔 (Vent Hole) | Φ2.0mm 顶面贯穿排气孔 | {vents_cnt} 个 | 治具基体钻孔 | 释放助焊剂热气体防虚焊 | 与治具同寿命 |"
+    )
+    ap("")
 
     # 波峰焊工艺窗口（作业指导书章节）
     if include_process:
