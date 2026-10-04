@@ -196,13 +196,15 @@ def test_version_has_no_pending_bump():
     assert declared, "pyproject.toml has no version"
     version = declared.group(1)
 
-    log = subprocess.run(
+    log_res = subprocess.run(
         ["git", "log", "-20", "--pretty=%s"],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=REPO_ROOT,
         check=False,
-    ).stdout
+    )
+    log = log_res.stdout or ""
     # A commit message that names a version must name the current one.
     named = set(re.findall(r"v(\d+\.\d+\.\d+)", log))
     stale = named - {version}
