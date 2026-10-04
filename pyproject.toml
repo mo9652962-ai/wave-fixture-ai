@@ -64,6 +64,7 @@ py-modules = [
     "report",
     "process",
     "batch_run",
+    "equipment",
 ]
 
 [tool.setuptools.data-files]

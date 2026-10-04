@@ -466,6 +466,7 @@ async def api_generate3d(files: list[UploadFile] = File(...)):
 async def api_generate(
     files: list[UploadFile] = File(...),
     material: str = Form("durostone"),
+    machine: str = Form(""),
     panel_cols: int = Form(1),
     panel_rows: int = Form(1),
     panel_gap: float = Form(5.0),
@@ -521,7 +522,13 @@ async def api_generate(
         # ── DRC 生产安全门禁（blocking/error → 只出带水印预览版）──
         from drc import apply_watermark, gate, run_drc
 
-        issues = run_drc(r1, result, material_key=material)
+        issues = run_drc(
+            r1,
+            result,
+            material_key=material,
+            machine_key=machine or None,
+            pallet_thickness=pallet_thickness,
+        )
         verdict = gate(issues)
         dxf_url = f"/dl/{workdir.name}.dxf"
         if not verdict["allowed"]:
@@ -623,6 +630,7 @@ async def api_generate(
                     "CNC G 代码": f"/dl/{workdir.name}.nc",
                 },
                 process_key="lead_free",
+                machine_key=machine or None,
             )
             write_report(report_path, report_md, parent_hint=OUTPUT_DIR)
             gcode_url = f"/dl/{workdir.name}.nc"
