@@ -25,12 +25,13 @@
   <p>
     <a href="https://github.com/mo9652962-ai/wave-fixture-ai/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/mo9652962-ai/wave-fixture-ai/ci.yml?style=flat-square&label=CI" alt="CI"></a>
     <img src="https://img.shields.io/badge/features-21%20automations-2563EB?style=flat-square" alt="features">
+    <img src="https://img.shields.io/badge/DRC-26_Rules-059669?style=flat-square" alt="26 DRC rules">
     <img src="https://img.shields.io/badge/KiCad-10%20兼容-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
     <img src="https://img.shields.io/badge/tests-232%20passed-success?style=flat-square" alt="tests">
     <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
     <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
-  [![OpenSSF Scorecard](https://api.securityscorecards.dev/badge/github.com/mo9652962-ai/wave-fixture-ai)](https://api.securityscorecards.dev/projects/github.com/mo9652962-ai/wave-fixture-ai)
+    <a href="https://securityscorecards.dev/viewer/?uri=github.com/mo9652962-ai/wave-fixture-ai"><img src="https://img.shields.io/ossf-scorecard/github.com/mo9652962-ai/wave-fixture-ai?style=flat-square&label=Scorecard" alt="Scorecard"></a>
   </p>
 </div>
 
