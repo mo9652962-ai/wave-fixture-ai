@@ -67,6 +67,8 @@ py-modules = [
     "equipment",
     "odb_parser",
     "top_hat",
+    "selective_wave",
+    "fixture_dimensioning",
 ]
 
 [tool.setuptools.data-files]

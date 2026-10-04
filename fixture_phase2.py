@@ -99,6 +99,7 @@ class Phase2Result:
     vent_holes: list = field(default_factory=list)  # 避位腔排气孔 (x,y,r)
     flow_arrow_lines: list = field(default_factory=list)  # 过板流向箭头 (AGICORP §2.1)
     top_hat: Any | None = None  # 铰链上盖结果 (top_hat.TopHatResult)
+    dimensions: list = field(default_factory=list)  # 关键尺寸工程标尺图元
 
 
 # ─────────────────────────────────────────────────────────────
@@ -400,6 +401,7 @@ LAYER_COLORS2 = {
     "铰链位": 4,  # 青
     "锁扣位": 6,  # 紫
     "上盖压柱": 5,  # 蓝
+    "工程尺寸": 7,  # 白/银 (工程尺寸标注)
 }
 
 
@@ -499,6 +501,13 @@ def export_dxf2(
 
         export_top_hat_to_dxf(msp, tophat)
 
+    # 尺寸标注图元 (GB/T 4458.1 & ISO 129-1)
+    dims = getattr(result, "dimensions", [])
+    if dims:
+        from fixture_dimensioning import export_dimensions_to_dxf
+
+        export_dimensions_to_dxf(msp, dims)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -588,6 +597,10 @@ def run_phase2(
 
         tophat_res = generate_top_hat(outer.outer_poly, sink, board, caps)
 
+    from fixture_dimensioning import generate_fixture_dimensions
+
+    dims = generate_fixture_dimensions(outer.outer_poly, sink_poly=sink, pins=pins)
+
     result2 = Phase2Result(
         avoid_polys=avoid,
         solder_polys=solder,
@@ -602,6 +615,7 @@ def run_phase2(
         vent_holes=vents,
         flow_arrow_lines=outer.flow_arrow_lines,
         top_hat=tophat_res,
+        dimensions=dims,
     )
 
     if out_dxf:
