@@ -317,6 +317,10 @@ def parse_kicad_pcb(
         ref_m = re.search(r'\(property "Reference" "([^"]+)"', block)
         ref = ref_m.group(1) if ref_m else "?"
 
+        # 元件所在面（KiCad footprint (layer "F.Cu"/"B.Cu")）——底面感知沉板深度用
+        layer_m = re.search(r'\(layer "([FB])\.Cu"\)', block)
+        side = (layer_m.group(1) + "Side") if layer_m else "unknown"
+
         # 元件尺寸与高度解析
         key = _fp_key(fp_name)
         source = "table"
@@ -376,6 +380,7 @@ def parse_kicad_pcb(
                 "h": round(h, 2),
                 "height": round(height, 2),
                 "default_height": round(default_height, 2),
+                "side": side,
                 "fp_key": key,
                 "source": source,
                 "is_suspicious": is_suspicious,
@@ -387,8 +392,47 @@ def parse_kicad_pcb(
     return components
 
 
+def compute_sink_depth(
+    pcb_path: str,
+    board_thickness: float = 1.6,
+    clearance_mm: float = 0.5,
+    through_hole_skip: bool = True,
+) -> dict:
+    """底面元件感知的沉板槽深计算（工业公式）。
+
+    出处：AptPCB《Solder Fixture Practical Guide》——沉板槽深 = 底面最高元件本体
+    + 0.5mm(0.020") 离板气隙；PCBSync——波峰顶到板底总垂直行程 ≤8.1mm(0.320")；
+    Macaos——元件/PCB 与治具底面最小间隙 0.5mm。
+
+    无底面元件时：槽深 = 板厚 + clearance（板底留气隙，波峰直接接触板底）。
+    底面有元件时：槽深 = 板厚 + max(底面元件高度) + clearance（元件本体沉入槽内，
+    本体底面与槽底留 0.5mm 气隙，避免波峰直接冲击 SMD 本体）。
+
+    返回: {sink_depth_mm, board_thickness, max_bottom_standoff_mm,
+           has_bottom_components, bottom_components: [refs], rule_source}
+    """
+    comps = parse_kicad_pcb(pcb_path)
+    bottoms = [
+        c for c in comps
+        if c.get("side") == "BSide"
+        and (not through_hole_skip or not _is_through_hole(c["name"]))
+        and c.get("height", 0) > 0.2
+    ]
+    max_standoff = max((c["height"] for c in bottoms), default=0.0)
+    has_bottom = bool(bottoms)
+    depth = board_thickness + (max_standoff + clearance_mm if has_bottom else clearance_mm)
+    return {
+        "sink_depth_mm": round(depth, 2),
+        "board_thickness": board_thickness,
+        "max_bottom_standoff_mm": round(max_standoff, 2),
+        "has_bottom_components": has_bottom,
+        "bottom_components": [c["ref"] for c in bottoms],
+        "rule_source": ("AptPCB Solder Fixture Guide + PCBSync (0.5mm 离板气隙)"
+                        if has_bottom else "Macaos (0.5mm 离板气隙)"),
+    }
+
+
 def build_component_meshes(components: list[dict], pcb_thickness: float = 1.6) -> trimesh.Trimesh:
-    """元件 3D 包围盒合体（PCB 表面 z=pcb_thickness 向上）"""
     meshes = []
     for c in components:
         box = trimesh.creation.box(extents=[c["w"], c["h"], c["height"]])

@@ -589,6 +589,18 @@ async def api_generate(
             ob_h = outer_bounds[3] - outer_bounds[1]
             weight_kg = estimate_weight(blank_area((ob_w, ob_h)), sheet_t, mat)
 
+            # 底面元件感知沉板深度（工业公式：底面最高元件 + 0.5mm 离板气隙）
+            sink_info = {}
+            try:
+                from interference import compute_sink_depth
+
+                pcb_files = list(Path(workdir).rglob("*.kicad_pcb"))
+                if pcb_files:
+                    sink_info = compute_sink_depth(str(pcb_files[0]),
+                                                   board_thickness=board_thickness)
+            except Exception as sink_err:
+                log.warning(f"  沉板深度计算跳过: {sink_err}")
+
             from cnc_gcode import generate_gcode
 
             gcode_stats = generate_gcode(
@@ -603,6 +615,7 @@ async def api_generate(
                 material_key=mat.key,
                 pallet_thickness=pallet_thickness,
                 board_thickness=board_thickness,
+                sink_depth=sink_info.get("sink_depth_mm"),
                 job_name=workdir.name,
                 parent_hint=OUTPUT_DIR,
             )
@@ -620,6 +633,7 @@ async def api_generate(
                     "key": mat.key,
                     "thickness": sheet_t,
                     "board_pocket_depth": gcode_stats.get("board_pocket_depth"),
+                    "sink_depth": sink_info,
                 },
                 weight_kg=weight_kg,
                 cost=cost,
@@ -641,6 +655,7 @@ async def api_generate(
                 "sheet_thickness": sheet_t,
                 "weight_kg": weight_kg,
                 "cost": cost,
+                "sink_depth": sink_info,
             }
         except Exception as mat_err:
             log.warning(

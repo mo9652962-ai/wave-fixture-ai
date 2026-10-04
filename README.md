@@ -27,7 +27,7 @@
     <img src="https://img.shields.io/badge/features-21%20automations-2563EB?style=flat-square" alt="features">
     <img src="https://img.shields.io/badge/DRC-29_Rules-059669?style=flat-square" alt="29 DRC rules">
     <img src="https://img.shields.io/badge/KiCad-10%20兼容-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
-    <img src="https://img.shields.io/badge/tests-240%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/tests-244%20passed-success?style=flat-square" alt="tests">
     <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
     <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>

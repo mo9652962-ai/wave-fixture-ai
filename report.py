@@ -92,6 +92,11 @@ def build_report(
     ap("|---|---|")
     ap(f"| 治具外形 | {_fmt_size(getattr(r2, 'outer_poly', None))} mm |")
     ap(f"| 沉板槽深 | {material.get('board_pocket_depth', '-')} mm |")
+    if material.get("sink_depth"):
+        sd = material["sink_depth"]
+        ap(
+            f"| 沉板深度依据 | {'底面最高元件 ' + str(sd.get('max_bottom_standoff_mm')) + 'mm（' + ','.join(sd.get('bottom_components', [])[:3]) + '）+ 0.5mm 离板气隙' if sd.get('has_bottom_components') else '无底面元件——板底留 0.5mm 气隙'} · 出处: {sd.get('rule_source', '-')} |"
+        )
     if stats:
         ap(
             f"| 拼版阵列 | {stats.get('cols', 1)} × {stats.get('rows', 1)}（间距 {stats.get('gap', 0)}mm，共 {stats.get('copies', 1)} 片）|"

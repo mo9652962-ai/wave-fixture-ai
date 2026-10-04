@@ -251,16 +251,23 @@ def generate_gcode(
     material_key: str = "durostone",
     pallet_thickness: float = 10.0,
     board_thickness: float = 1.6,
+    sink_depth: float | None = None,
     endmill_dia: float = 3.7,
     job_name: str = "wave-fixture",
     parent_hint: str | Path | None = None,
 ) -> dict:
     """生成完整治具加工 G 代码。返回统计 dict（含加工时长估算）。
 
+    sink_depth: 沉板槽深（mm）。None 时按 board_thickness + 0.3 旧公式；
+    推荐由 interference.compute_sink_depth() 按底面元件高度计算后传入
+    （底面最高元件 + 0.5mm 离板气隙，AptPCB/PCBSync 公式）。
+
     加工顺序：钻孔(定位销) → 小腔(盖板/上锡/避位) → 沉板槽 → 取手位 → 外形落料。
     """
     safe_out = resolve_safe_out_path(out_path, parent_hint)
     mat = get_material(material_key)
+    effective_sink_depth = round(sink_depth if sink_depth is not None
+                                 else board_thickness + BOARD_DEPTH_CLEARANCE, 3)
     tool_r = endmill_dia / 2.0
     stepover = endmill_dia * mat.stepover_pct / 100.0
 
@@ -273,7 +280,7 @@ def generate_gcode(
         f"Material: {mat.name_en} (key={mat.key}) rho={mat.density_g_cm3}g/cm3 Tmax={mat.max_service_temp_c}C"
     )
     b.comment(
-        f"Pallet thickness: {pallet_thickness}mm  Board pocket depth: {round(board_thickness + BOARD_DEPTH_CLEARANCE, 2)}mm"
+        f"Pallet thickness: {pallet_thickness}mm  Board pocket depth: {effective_sink_depth}mm"
     )
     b.comment("Units: mm (G21)  Abs (G90)  WCS G54  Z0 = pallet top face")
     b.comment("NOTE: plunge is straight-down; swap to helical ramp if material chipping observed")
@@ -360,13 +367,14 @@ def generate_gcode(
         ops += _emit_pocket(b, poly, through_depth, endmill, mat, stepover)
 
     # 沉板槽（板厚 + 0.3，不贯穿）
-    sink_depth = board_thickness + BOARD_DEPTH_CLEARANCE
-    b.comment(f"=== SINK pocket depth {sink_depth}mm (board sits flush) ===")
+    b.comment(f"=== SINK pocket depth {effective_sink_depth}mm (board sits flush) ===")
+    b.comment("NOTE: AGICORP guideline - 60 deg bottom-side chamfers on solder openings "
+              "maximize wave contact; add chamfer pass if wave coverage insufficient")
     if sink is not None and not sink.is_empty:
         sink_parts = list(sink.geoms) if hasattr(sink, "geoms") else [sink]
         for i, sp in enumerate(sink_parts):
             b.comment(f"sink part #{i + 1}")
-            ops += _emit_pocket(b, sp, sink_depth, endmill, mat, stepover)
+            ops += _emit_pocket(b, sp, effective_sink_depth, endmill, mat, stepover)
 
     # 取手位（贯穿）
     b.comment("=== HANDLES through-cut ===")
@@ -412,7 +420,7 @@ def generate_gcode(
         "gcode_path": str(safe_out),
         "material": mat.key,
         "pallet_thickness": pallet_thickness,
-        "board_pocket_depth": round(sink_depth, 2),
+        "board_pocket_depth": round(effective_sink_depth, 2),
         "pocket_ops": ops,
         "profile_passes": profile_ops,
         "drill_groups": len(drill_tools),
