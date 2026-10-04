@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wave-fixture-ai"
-version = "0.2.4"
+version = "0.2.5"
 description = "波峰焊治具 AI 设计助手：Gerber → 治具 DXF/STL/CNC G 代码 · 21 项自动化（沉板/狗骨头清角/拼版/避位/上锡/干涉分析/材料成本/生产工单）"
 readme = "README.md"
 requires-python = ">=3.10"
