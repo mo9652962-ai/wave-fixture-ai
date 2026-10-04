@@ -2255,7 +2255,7 @@ wheels = [
 
 [[package]]
 name = "wave-fixture-ai"
-version = "0.2.1"
+version = "0.2.4"
 source = { editable = "." }
 dependencies = [
     { name = "ezdxf" },
