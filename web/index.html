@@ -6,147 +6,277 @@
 <title>波峰焊治具 AI 设计助手</title>
 <style>
 :root {
-  --bg: #0f1117;
-  --panel: #1a1d27;
-  --border: #2a2e3d;
-  --accent: #4f8cff;
-  --accent-hover: #6ba0ff;
-  --text: #e4e6eb;
-  --dim: #8b90a0;
-  --success: #3ddc84;
-  --error: #ff5f5f;
+  /* 4-tier surface background system (Linear / Grafana dark theme) */
+  --bg-base: #0b0d12;
+  --bg-surface: #11141c;
+  --bg-card: #161b26;
+  --bg-overlay: #1c2230;
+  --bg-hover: #22293a;
+
+  /* Backward compatibility aliases */
+  --bg: var(--bg-base);
+  --panel: var(--bg-surface);
+
+  /* 3-tier text hierarchy */
+  --text-primary: #f1f3f7;
+  --text-secondary: #9aa0b2;
+  --text-muted: #62687a;
+  --text: var(--text-primary);
+  --dim: var(--text-secondary);
+
+  /* Borders & Dividers */
+  --border-subtle: #1e2433;
+  --border-default: #283044;
+  --border-hover: #3d4764;
+  --border: var(--border-default);
+
+  /* Brand Accents */
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-glow: rgba(59, 130, 246, 0.25);
+  --accent-subtle: rgba(59, 130, 246, 0.12);
+
+  /* Semantic Colors */
+  --success: #22c55e;
+  --success-subtle: rgba(34, 197, 94, 0.12);
+  --warn: #f59e0b;
+  --warn-subtle: rgba(245, 158, 11, 0.12);
+  --error: #ef4444;
+  --error-subtle: rgba(239, 68, 68, 0.12);
+  --info: #38bdf8;
+  --info-subtle: rgba(56, 189, 248, 0.12);
+
+  /* 8px Spacing Grid */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Typography Scale */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Shadows & Inset Highlights */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
+  --inset-card: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  /* Motion discipline */
+  --transition-fast: 150ms ease-out;
+  --transition-base: 220ms ease-out;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bg-base);
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+  color: var(--text-primary);
   min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
-.container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+.tabular-nums, .stat-row .value, .height-input, td {
+  font-variant-numeric: tabular-nums;
+}
+.container { max-width: 1120px; margin: 0 auto; padding: 24px 20px; }
+
+/* Header 导航与品牌 */
 header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 0 24px;
+  padding: 16px 0 24px; border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 24px; flex-wrap: wrap; gap: 16px;
 }
-.logo { font-size: 22px; font-weight: 700; }
+.header-brand { display: flex; flex-direction: column; gap: 4px; }
+.logo {
+  font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
+  display: flex; align-items: center; gap: 8px; color: var(--text-primary);
+}
 .logo span { color: var(--accent); }
-.subtitle { color: var(--dim); font-size: 13px; margin-top: 4px; }
-.btn {
-  background: var(--accent); color: #fff; border: none;
-  padding: 8px 18px; border-radius: 8px; font-size: 14px;
-  cursor: pointer; transition: 0.2s; text-decoration: none; display: inline-block;
+.version-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 7px; border-radius: 9999px;
+  font-size: 11px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, monospace;
+  background: var(--accent-subtle); color: var(--accent);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  margin-left: 6px;
 }
-.btn:hover { background: var(--accent-hover); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-outline {
-  background: transparent; border: 1px solid var(--border); color: var(--text);
+.subtitle { color: var(--text-secondary); font-size: 13px; }
+.header-actions { display: flex; align-items: center; gap: 16px; }
+.header-nav { display: flex; align-items: center; gap: 4px; }
+.nav-link {
+  color: var(--text-secondary); font-size: 13px; text-decoration: none;
+  padding: 5px 10px; border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
 }
-.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+.nav-link:hover { color: var(--text-primary); background: var(--bg-card); }
 
-/* 拖拽区 */
+/* 按钮通用体系 */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 13px; font-weight: 500; font-family: inherit;
+  padding: 8px 16px; border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer; transition: all var(--transition-fast);
+  text-decoration: none; white-space: nowrap; line-height: 1.4;
+  outline: none;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary {
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.btn-outline, .btn-ghost {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
+}
+.btn-outline:hover:not(:disabled), .btn-ghost:hover:not(:disabled) {
+  background: var(--bg-overlay);
+  border-color: var(--border-hover);
+  color: #fff;
+}
+.btn-danger-ghost { color: var(--text-secondary); }
+.btn-danger-ghost:hover:not(:disabled) {
+  color: var(--error);
+  border-color: rgba(239, 68, 68, 0.4);
+  background: var(--error-subtle);
+}
+
+/* 拖拽上传区 */
 .dropzone {
-  border: 2px dashed var(--border);
-  border-radius: 12px;
-  padding: 48px 24px;
+  border: 1px dashed var(--border-hover);
+  border-radius: var(--radius-lg);
+  padding: 44px 24px;
   text-align: center;
-  transition: 0.2s;
+  transition: all var(--transition-base);
   cursor: pointer;
-  background: var(--panel);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm), var(--inset-card);
 }
 .dropzone:hover, .dropzone.dragover {
   border-color: var(--accent);
-  background: #1e2333;
+  background: #141824;
+  box-shadow: 0 0 0 1px var(--accent-subtle), var(--shadow-md);
 }
-.dropzone .icon { font-size: 48px; margin-bottom: 12px; }
-.dropzone h3 { font-size: 18px; margin-bottom: 8px; }
-.dropzone p { color: var(--dim); font-size: 13px; }
+.dropzone .icon { font-size: 40px; margin-bottom: 10px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+.dropzone h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); }
+.dropzone p { color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
 
 /* 文件列表 */
 .file-list { margin-top: 16px; display: none; }
 .file-list.show { display: block; }
 .file-item {
   display: flex; align-items: center; justify-content: space-between;
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: 8px; padding: 10px 14px; margin-bottom: 6px;
-  font-size: 13px;
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 9px 14px; margin-bottom: 6px;
+  font-size: 13px; box-shadow: var(--shadow-sm);
 }
-.file-item .fname { color: var(--text); word-break: break-all; }
-.file-item .fstatus { color: var(--dim); font-size: 12px; }
+.file-item .fname { color: var(--text-primary); font-family: ui-monospace, monospace; word-break: break-all; }
+.file-item .fstatus { color: var(--text-muted); font-size: 12px; }
 .file-item .fstatus.ok { color: var(--success); }
 .file-item .fstatus.bad { color: var(--error); }
 
-/* 结果区 */
-.result { display: none; margin-top: 24px; }
-.result.show { display: block; }
-.result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-@media (max-width: 768px) { .result-grid { grid-template-columns: 1fr; } }
-.preview-panel {
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: 12px; padding: 16px;
-}
-.preview-panel h4 { font-size: 14px; margin-bottom: 12px; color: var(--dim); }
-.preview-panel img {
-  width: 100%; border-radius: 8px; background: #0a0c12;
-  border: 1px solid var(--border);
-}
-.stats-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
-.stats-panel h4 { font-size: 14px; margin-bottom: 12px; color: var(--dim); }
-.stat-row {
-  display: flex; justify-content: space-between;
-  padding: 10px 0; border-bottom: 1px solid var(--border);
-  font-size: 14px;
-}
-.stat-row:last-child { border-bottom: none; }
-.stat-row .label { color: var(--dim); }
-.stat-row .value { font-weight: 600; }
-.download-bar { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
-
-/* 状态栏 */
-.status {
-  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  background: var(--panel); border: 1px solid var(--border);
-  padding: 10px 20px; border-radius: 20px; font-size: 13px;
-  display: none; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-}
-.status.show { display: block; }
-.status.error { border-color: var(--error); color: var(--error); }
-.status.success { border-color: var(--success); color: var(--success); }
-
-.hidden { display: none !important; }
-.spinner {
-  display: inline-block; width: 14px; height: 14px;
-  border: 2px solid var(--border); border-top-color: var(--accent);
-  border-radius: 50%; animation: spin 0.8s linear infinite;
-  vertical-align: middle; margin-right: 6px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* 生产参数栏（企业级） */
+/* 生产参数栏分组卡片 */
 .prod-params {
-  margin-top: 14px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.param-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   padding: 12px 14px;
   display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-fast);
 }
-.param-group { display: flex; flex-direction: column; gap: 5px; }
-.param-group label { font-size: 12px; color: var(--dim); }
+.param-card:focus-within {
+  border-color: var(--border-hover);
+}
+.param-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding-bottom: 6px;
+}
+.param-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+.param-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.param-group { display: flex; flex-direction: column; gap: 4px; }
+.param-group label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
 .param-group select, .param-group input {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  padding: 6px 8px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 6px 10px;
   font-size: 13px;
-  min-width: 120px;
+  font-family: inherit;
+  width: 100%;
+  transition: all var(--transition-fast);
 }
 .param-group select:focus, .param-group input:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
   outline: none;
+}
+.panel-matrix-inputs {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.matrix-cross {
+  color: var(--text-muted);
+  font-weight: bold;
+  font-size: 12px;
+}
+.disabled-group {
+  opacity: 0.45;
+  transition: opacity var(--transition-fast);
+}
+.disabled-group input {
+  background: var(--bg-surface) !important;
+  border-color: var(--border-subtle) !important;
+  cursor: not-allowed;
 }
 
 /* 可疑与干涉元件交互列表 */
@@ -247,6 +377,536 @@ header {
   background: rgba(56, 189, 248, 0.15);
   font-weight: bold;
 }
+
+/* P3: 状态筛选栏与 Chips */
+.susp-filter-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+.susp-filter-chip {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--transition-fast);
+  user-select: none;
+  font-family: inherit;
+}
+.susp-filter-chip:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.susp-filter-chip.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.chip-count {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: var(--bg-overlay);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-family: inherit;
+}
+.susp-filter-chip.active .chip-count {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* P3: 元件类型色点（R/C/U/J/D/L/H） */
+.ref-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.ref-dot-R { background-color: #3b82f6; box-shadow: 0 0 5px rgba(59, 130, 246, 0.6); }
+.ref-dot-C { background-color: #eab308; box-shadow: 0 0 5px rgba(234, 179, 8, 0.6); }
+.ref-dot-U { background-color: #a855f7; box-shadow: 0 0 5px rgba(168, 85, 247, 0.6); }
+.ref-dot-J, .ref-dot-CON, .ref-dot-P { background-color: #10b981; box-shadow: 0 0 5px rgba(16, 185, 129, 0.6); }
+.ref-dot-D, .ref-dot-LED { background-color: #f43f5e; box-shadow: 0 0 5px rgba(244, 63, 94, 0.6); }
+.ref-dot-L, .ref-dot-FB { background-color: #06b6d4; box-shadow: 0 0 5px rgba(6, 182, 212, 0.6); }
+.ref-dot-other { background-color: #94a3b8; }
+
+/* P3: 单行重置按钮 & 禁用应用按钮 */
+.row-reset-btn {
+  transition: all var(--transition-fast);
+}
+.row-reset-btn:hover {
+  border-color: #38bdf8 !important;
+  color: #38bdf8 !important;
+  background: rgba(56, 189, 248, 0.12) !important;
+}
+.btn.disabled-action {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  background: var(--bg-overlay) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--border-default) !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+
+/* P1: 顶部细进度条 */
+.top-progress-bar {
+  position: fixed;
+  top: 0; left: 0;
+  width: 0%;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa, #38bdf8);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  z-index: 10000;
+  transition: width 220ms ease-out, opacity 200ms ease-out;
+  opacity: 0;
+}
+.top-progress-bar.active { opacity: 1; }
+
+/* P1: 结果区骨架屏 */
+.result-skeleton { display: none; margin-top: 24px; }
+.result-skeleton.show { display: block; animation: panel-enter 200ms ease-out forwards; }
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.02) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.02) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.6s infinite ease-in-out;
+  border-radius: var(--radius-sm);
+}
+@keyframes skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* 区块进场 8px 上移淡入 */
+.result.show {
+  display: block;
+  animation: panel-enter 220ms ease-out forwards;
+}
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* P1: Toast 堆叠系统 */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  z-index: 9999;
+  max-width: 440px;
+  width: calc(100vw - 48px);
+  pointer-events: none;
+}
+.toast-item {
+  pointer-events: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: toast-slide-in 200ms ease-out forwards;
+  transition: all var(--transition-fast);
+}
+@keyframes toast-slide-in {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.toast-item.info { border-left-color: var(--info); }
+.toast-item.success { border-left-color: var(--success); }
+.toast-item.warn { border-left-color: var(--warn); }
+.toast-item.error { border-left-color: var(--error); }
+.toast-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.toast-msg-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.toast-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+.toast-close-btn:hover { color: var(--text-primary); }
+.toast-details-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  text-decoration: underline;
+  text-align: left;
+}
+.toast-details {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-overlay);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+/* P1: DRC 问题清单卡片化 */
+.drc-collapse {
+  margin-top: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.drc-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  user-select: none;
+  transition: background var(--transition-fast);
+}
+.drc-summary:hover { background: var(--bg-overlay); }
+.drc-issues-list {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.drc-issue-card {
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-left-width: 4px;
+  font-size: 12px;
+}
+.drc-issue-card.blocking { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
+.drc-issue-card.error { border-left-color: #f97316; background: rgba(249, 115, 22, 0.05); }
+.drc-issue-card.warning { border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.05); }
+.drc-issue-card.info { border-left-color: #94a3b8; background: rgba(148, 163, 184, 0.05); }
+.drc-issue-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.drc-issue-detail { color: var(--text-secondary); line-height: 1.4; }
+.drc-issue-source { color: var(--text-muted); font-size: 11px; font-family: ui-monospace, monospace; margin-top: 3px; }
+
+/* P1: 自然语言 Chips */
+.nl-chips-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.nl-chips-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.nl-chip {
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: inherit;
+}
+.nl-chip:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+}
+/* P2: 3D 浮动工具条与图例 */
+.three-toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+  background: rgba(17, 20, 28, 0.88);
+  backdrop-filter: blur(8px);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
+}
+.three-tool-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--transition-fast);
+  font-family: inherit;
+  user-select: none;
+}
+.three-tool-btn:hover {
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+.three-tool-btn.active {
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+.three-legend {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+  background: rgba(17, 20, 28, 0.88);
+  backdrop-filter: blur(8px);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  box-shadow: var(--shadow-sm);
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.legend-dot.interf { background: #ef4444; box-shadow: 0 0 4px #ef4444; }
+.legend-dot.susp { background: #f59e0b; box-shadow: 0 0 4px #f59e0b; }
+.legend-dot.selected { background: #00ffff; box-shadow: 0 0 4px #00ffff; }
+
+/* ============================================================
+   P4: 可访问性 (A11y)、全局焦点状态与对比度强化
+   ============================================================ */
+:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+
+/* 动效纪律：遵守用户的减弱动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   P4: 响应式工程断点 (1440 / 1024 / 768 / 480)
+   ============================================================ */
+/* 1440px 大屏桌面适配合理最大宽度与内边距 */
+@media (max-width: 1440px) {
+  .container {
+    max-width: 1200px;
+    padding: 24px 28px;
+  }
+}
+
+/* 1024px 紧凑桌面与平板横屏 */
+@media (max-width: 1024px) {
+  .container {
+    padding: 20px 20px;
+  }
+  .prod-params {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .prod-params .param-card:nth-child(3) {
+    grid-column: span 2;
+  }
+  .result-grid {
+    gap: 16px;
+  }
+  .nav-link {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+}
+
+/* 768px 平板竖屏：单列堆叠布局 */
+@media (max-width: 768px) {
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding-bottom: 14px;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .header-nav {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .prod-params {
+    grid-template-columns: 1fr;
+  }
+  .prod-params .param-card:nth-child(3) {
+    grid-column: span 1;
+  }
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+  .download-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .download-bar .btn {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
+  }
+  .download-bar .btn-primary {
+    flex: 1 1 100%;
+  }
+  .toast-container {
+    right: 16px;
+    bottom: 16px;
+    max-width: calc(100vw - 32px);
+    width: calc(100vw - 32px);
+  }
+  .three-toolbar {
+    top: 6px;
+    right: 6px;
+    padding: 2px;
+    gap: 3px;
+  }
+  .three-tool-btn {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+  .three-legend {
+    bottom: 6px;
+    left: 6px;
+    padding: 3px 8px;
+    font-size: 10px;
+    gap: 8px;
+  }
+}
+
+/* 480px 移动端窄屏：表格横滚与紧凑触控 */
+@media (max-width: 480px) {
+  .container {
+    padding: 12px 10px;
+  }
+  .logo {
+    font-size: 16px;
+  }
+  .dropzone {
+    padding: 24px 12px;
+  }
+  .dropzone h3 {
+    font-size: 14px;
+  }
+  .dropzone p {
+    font-size: 11px;
+  }
+  .param-card {
+    padding: 10px 12px;
+  }
+  .panel-matrix-inputs input {
+    width: 48px !important;
+  }
+  /* 表格横滚支持，防止挤压文字 */
+  .susp-table-scroll-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .susp-table {
+    min-width: 580px;
+  }
+  .download-bar .btn {
+    flex: 1 1 100%;
+  }
+  .nl-chips-wrap {
+    gap: 6px;
+  }
+  .nl-chip {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+  .toast-container {
+    right: 8px;
+    bottom: 8px;
+    max-width: calc(100vw - 16px);
+    width: calc(100vw - 16px);
+  }
+}
 </style>
   <!-- three.js 用于 3D 预览（ES module 方式，GLTFLoader 非模块版 r150+ 已移除）-->
   <script type="importmap">
@@ -259,71 +919,130 @@ header {
   </script>
 </head>
 <body>
+<div id="topProgressBar" class="top-progress-bar"></div>
 <div class="container">
   <header>
-    <div>
-      <div class="logo">⚙️ 波峰焊治具 <span>AI 设计助手</span></div>
-      <div class="subtitle">拖入 Gerber 文件 → 自动生成治具 DXF 工程图（替代 CAM350 手工画图）</div>
+    <div class="header-brand">
+      <div class="logo">⚙️ 波峰焊治具 <span>AI 设计助手</span><span class="version-badge">v0.2.5</span></div>
+      <div class="subtitle">拖入 Gerber 文件 → 自动生成治具 DXF 工程图与 CNC 刀路（工业级 CAM 避位）</div>
     </div>
-    <a href="https://github.com/mo9652962-ai" target="_blank" class="btn btn-outline">GitHub</a>
+    <div class="header-actions">
+      <nav class="header-nav" aria-label="主要功能导航">
+        <a href="#dropzone" class="nav-link">上传</a>
+        <a href="#result" class="nav-link">2D 预览</a>
+        <a href="#preview3dPanel" class="nav-link">3D 治具</a>
+        <a href="#interfBtn" class="nav-link">干涉分析</a>
+        <a href="#adjustInput" class="nav-link">微调</a>
+      </nav>
+      <a href="https://github.com/mo9652962-ai" target="_blank" rel="noopener noreferrer" class="btn btn-ghost" aria-label="访问 GitHub 仓库">GitHub</a>
+    </div>
   </header>
 
   <!-- 拖拽上传 -->
-  <div class="dropzone" id="dropzone">
+  <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="拖拽或点击上传 Gerber 文件">
     <div class="icon">📁</div>
     <h3>拖入 Gerber 文件到此处</h3>
     <p>支持 .gbr / .gbl / .gbs / .gto / .gbo / .gtl / .gts / .drl / .zip<br>
     或点击选择文件（可多选）</p>
     <input type="file" id="fileInput" multiple hidden
-           accept=".gbr,.gbl,.gbs,.gto,.gbo,.gtl,.gts,.gtp,.gbp,.drl,.txt,.zip">
+           accept=".gbr,.gbl,.gbs,.gto,.gbo,.gtl,.gts,.gtp,.gbp,.drl,.txt,.zip"
+           aria-label="选择 Gerber 或 PCB 工程文件">
   </div>
 
   <!-- 文件列表 -->
   <div class="file-list" id="fileList">
     <div id="fileItems"></div>
 
-    <!-- 生产参数（企业级：材料 / 拼版 / 板厚） -->
-    <div class="prod-params">
-      <div class="param-group">
-        <label for="materialSelect">🧱 治具材料</label>
-        <select id="materialSelect" title="波峰焊治具材料（Durostone 为行业事实标准）">
-          <option value="durostone" selected>Durostone 合成石（标准）</option>
-          <option value="ricocel">Ricocel 合成石</option>
-          <option value="fr4_high_tg">高 Tg FR-4（低成本）</option>
-          <option value="aluminum">铝合金 6061</option>
-        </select>
-      </div>
-      <div class="param-group">
-        <label for="palletThickness">📏 治具板厚 (mm)</label>
-        <input type="number" id="palletThickness" value="10" min="3" max="20" step="1">
-      </div>
-      <div class="param-group">
-        <label for="machineSelect">🏭 过波机台</label>
-        <select id="machineSelect" title="治具将放入哪台波峰焊机（轨距/载荷按真机规格校验）">
-          <option value="" selected>通用 350mm 轨距（缺省）</option>
-          <option value="generic_350">通用 350mm 轨距</option>
-          <option value="jt_350">劲拓 350 系（国产主流）</option>
-          <option value="electrovert_vectra_es">Electrovert VectraES</option>
-          <option value="electrovert_vectra_elite">Electrovert VectraElite</option>
-          <option value="electrovert_electra">Electrovert Electra</option>
-        </select>
-      </div>
-      <div class="param-group">
-        <label for="panelCols">🧩 拼版 列×行</label>
-        <div style="display:flex;gap:4px;align-items:center;">
-          <input type="number" id="panelCols" value="1" min="1" max="8" style="width:56px;">
-          <span style="color:var(--dim);">×</span>
-          <input type="number" id="panelRows" value="1" min="1" max="8" style="width:56px;">
+    <!-- 生产参数（企业级：材料 / 拼版 / 板厚 分组卡片） -->
+    <div class="prod-params" id="prodParams">
+      <div class="param-card">
+        <div class="param-card-header">
+          <span class="param-card-title">🧱 材料工艺</span>
+        </div>
+        <div class="param-card-body">
+          <div class="param-group">
+            <label for="materialSelect">治具材料</label>
+            <select id="materialSelect" title="波峰焊治具材料（Durostone 为行业事实标准）">
+              <option value="durostone" selected>Durostone 合成石（标准）</option>
+              <option value="ricocel">Ricocel 合成石</option>
+              <option value="fr4_high_tg">高 Tg FR-4（低成本）</option>
+              <option value="aluminum">铝合金 6061</option>
+            </select>
+          </div>
+          <div class="param-group">
+            <label for="palletThickness">治具板厚 (mm)</label>
+            <input type="number" id="palletThickness" value="10" min="3" max="20" step="1">
+          </div>
         </div>
       </div>
-      <div class="param-group">
-        <label for="panelGap">↔ 片间距 (mm)</label>
-        <input type="number" id="panelGap" value="5" min="3" max="20" step="0.5" title="挡锡墙宽度，行业下限 3mm">
+
+      <div class="param-card">
+        <div class="param-card-header">
+          <span class="param-card-title">🏭 机台规格</span>
+        </div>
+        <div class="param-card-body">
+          <div class="param-group">
+            <label for="machineSelect">过波机台</label>
+            <select id="machineSelect" title="治具将放入哪台波峰焊机（轨距/载荷按真机规格校验）">
+              <option value="" selected>通用 350mm 轨距（缺省）</option>
+              <option value="generic_350">通用 350mm 轨距</option>
+              <option value="jt_350">劲拓 350 系（国产主流）</option>
+              <option value="electrovert_vectra_es">Electrovert VectraES</option>
+              <option value="electrovert_vectra_elite">Electrovert VectraElite</option>
+              <option value="electrovert_electra">Electrovert Electra</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="param-card">
+        <div class="param-card-header">
+          <span class="param-card-title">🧩 拼版工程</span>
+        </div>
+        <div class="param-card-body">
+          <div class="param-group">
+            <label for="panelCols">拼版 列 × 行</label>
+            <div class="panel-matrix-inputs">
+              <input type="number" id="panelCols" value="1" min="1" max="8" style="width:60px;" aria-label="拼版 列数">
+              <span class="matrix-cross">×</span>
+              <input type="number" id="panelRows" value="1" min="1" max="8" style="width:60px;" aria-label="拼版 行数">
+            </div>
+          </div>
+          <div class="param-group" id="panelGapGroup">
+            <label for="panelGap">片间距 (mm)</label>
+            <input type="number" id="panelGap" value="5" min="3" max="20" step="0.5" title="挡锡墙宽度，行业下限 3mm">
+          </div>
+        </div>
       </div>
     </div>
 
-    <div style="margin-top: 12px; text-align: center;">
-      <button class="btn" id="generateBtn">🚀 生成治具</button>
+    <div style="margin-top: 14px; text-align: center;">
+      <button class="btn btn-primary" id="generateBtn" style="padding: 10px 28px; font-size: 14px;">🚀 生成治具</button>
+    </div>
+  </div>
+
+  <!-- 骨架屏占位 -->
+  <div class="result-skeleton" id="resultSkeleton">
+    <div class="result-grid">
+      <div class="preview-panel">
+        <div class="skeleton" style="width: 120px; height: 16px; margin-bottom: 14px;"></div>
+        <div class="skeleton" style="width: 100%; aspect-ratio: 16/10; border-radius: 8px;"></div>
+      </div>
+      <div class="stats-panel">
+        <div class="skeleton" style="width: 100px; height: 16px; margin-bottom: 16px;"></div>
+        <div style="display:flex; flex-direction:column; gap: 12px;">
+          <div class="skeleton" style="width: 100%; height: 26px;"></div>
+          <div class="skeleton" style="width: 100%; height: 26px;"></div>
+          <div class="skeleton" style="width: 100%; height: 26px;"></div>
+          <div class="skeleton" style="width: 100%; height: 26px;"></div>
+          <div class="skeleton" style="width: 85%; height: 26px;"></div>
+        </div>
+        <div class="download-bar" style="margin-top:20px;">
+          <div class="skeleton" style="width: 110px; height: 34px; border-radius: 6px;"></div>
+          <div class="skeleton" style="width: 110px; height: 34px; border-radius: 6px;"></div>
+          <div class="skeleton" style="width: 100px; height: 34px; border-radius: 6px;"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -338,12 +1057,12 @@ header {
         <h4>生成统计</h4>
         <div id="statsBody"></div>
         <div class="download-bar">
-          <a class="btn" id="downloadDxf" href="#" download>⬇️ 下载 DXF</a>
-          <a class="btn btn-outline" id="downloadPng" href="#" download>下载 PNG</a>
-          <a class="btn" id="downloadGcode" href="#" download style="background:#16a34a;">⬇️ 下载 CNC G 代码</a>
-          <a class="btn btn-outline" id="downloadReport" href="#" download>📋 生产报告</a>
-          <button class="btn btn-outline" id="gen3dBtn">🧊 生成 3D</button>
-          <button class="btn btn-outline" id="resetBtn">↺ 重新上传</button>
+          <a class="btn btn-primary" id="downloadDxf" href="#" download>⬇️ 下载 DXF</a>
+          <a class="btn btn-ghost" id="downloadGcode" href="#" download>⬇️ CNC G 代码</a>
+          <a class="btn btn-ghost" id="downloadReport" href="#" download>📋 生产报告</a>
+          <a class="btn btn-ghost" id="downloadPng" href="#" download>下载 PNG</a>
+          <button class="btn btn-ghost" id="gen3dBtn">🧊 生成 3D</button>
+          <button class="btn btn-ghost btn-danger-ghost" id="resetBtn">↺ 重新上传</button>
         </div>
       </div>
     </div>
@@ -360,13 +1079,17 @@ header {
     <!-- 自然语言调整 -->
     <div class="preview-panel" style="margin-top:20px;">
       <h4>💬 自然语言调整</h4>
-      <p style="color:var(--dim);font-size:13px;margin-bottom:12px;">
-        示例：<code>避位区外扩1mm</code> · <code>治具外形倒角改5mm</code> · <code>沉板区外扩0.5mm</code> · <code>盖板孔径改3mm</code>
-      </p>
+      <div class="nl-chips-wrap">
+        <span class="nl-chips-label">快速指令：</span>
+        <button type="button" class="nl-chip" data-cmd="避位区外扩1mm">避位区外扩 1mm</button>
+        <button type="button" class="nl-chip" data-cmd="治具外形倒角改5mm">外形倒角改 5mm</button>
+        <button type="button" class="nl-chip" data-cmd="沉板区外扩0.5mm">沉板区外扩 0.5mm</button>
+        <button type="button" class="nl-chip" data-cmd="盖板孔径改3mm">盖板孔径改 3mm</button>
+      </div>
       <div style="display:flex;gap:10px;">
-        <input type="text" id="adjustInput" placeholder="输入调整指令，如「避位区外扩1mm」"
+        <input type="text" id="adjustInput" placeholder="输入调整指令，如「避位区外扩1mm」" aria-label="自然语言调整指令输入"
                style="flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;">
-        <button class="btn" id="adjustBtn">调整</button>
+        <button class="btn btn-primary" id="adjustBtn" aria-label="应用微调指令">调整</button>
       </div>
       <div id="adjustResult" style="margin-top:12px;font-size:13px;color:var(--dim);"></div>
     </div>
@@ -377,7 +1100,7 @@ header {
       <p style="color:var(--dim);font-size:13px;margin-bottom:12px;">
         上传 Gerber + KiCad 工程文件（<code>.kicad_pcb</code>），检测元件与治具 3D 干涉。若文件列表里已有 .kicad_pcb 可直接分析。
       </p>
-      <button class="btn" id="interfBtn" style="background:#e67e22;">🔍 运行干涉分析</button>
+      <button class="btn" id="interfBtn" style="background:#e67e22;" aria-label="运行 3D 元件干涉分析">🔍 运行干涉分析</button>
       <div id="interfResult" style="margin-top:12px;font-size:13px;color:var(--dim);"></div>
       <div id="interf3dPanel" style="display:none;margin-top:14px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -396,21 +1119,36 @@ header {
               <span id="suspCountBadge" style="color:var(--dim);font-weight:normal;font-size:12px;"></span>
             </div>
             <div style="display:flex;gap:8px;align-items:center;">
-              <button class="btn btn-outline" id="resetOverridesBtn" style="padding:4px 10px;font-size:12px;" title="清空全部自定义修改">↺ 重置修改</button>
-              <button class="btn" id="applyOverridesBtn" style="padding:4px 14px;font-size:12px;background:#e67e22;">⚡ 应用高度修改并重新分析</button>
+              <button class="btn btn-outline" id="resetOverridesBtn" style="padding:4px 10px;font-size:12px;" title="清空全部自定义修改" aria-label="清空全部自定义修改">↺ 重置修改</button>
+              <button class="btn" id="applyOverridesBtn" style="padding:4px 14px;font-size:12px;" title="应用高度修改并重新分析" aria-label="应用高度修改并重新分析">⚡ 应用高度修改并重新分析</button>
             </div>
           </div>
-          <div style="max-height:280px;overflow-y:auto;">
+          <!-- P3: 状态筛选 chips -->
+          <div class="susp-filter-bar" id="suspFilterBar" role="toolbar" aria-label="元件状态筛选">
+            <button class="susp-filter-chip active" id="filterChipAll" data-filter="all" type="button" aria-label="显示全部元件">
+              全部 <span class="chip-count" id="countFilterAll">0</span>
+            </button>
+            <button class="susp-filter-chip" id="filterChipInterf" data-filter="interf" type="button" aria-label="仅显示实体干涉元件">
+              🔴 实体干涉 <span class="chip-count" id="countFilterInterf">0</span>
+            </button>
+            <button class="susp-filter-chip" id="filterChipWarn" data-filter="warn" type="button" aria-label="仅显示高度可疑元件">
+              ⚠️ 高度可疑 <span class="chip-count" id="countFilterWarn">0</span>
+            </button>
+            <button class="susp-filter-chip" id="filterChipModified" data-filter="modified" type="button" aria-label="仅显示已修改元件">
+              ✏️ 已修改 <span class="chip-count" id="countFilterModified">0</span>
+            </button>
+          </div>
+          <div class="susp-table-scroll-wrap" style="max-height:280px;overflow-y:auto;overflow-x:auto;">
             <table class="susp-table">
               <thead>
                 <tr>
-                  <th style="width:95px;">状态</th>
-                  <th style="width:75px;">位号</th>
-                  <th>封装 / 型号</th>
-                  <th style="width:115px;">当前高度(mm)</th>
-                  <th style="width:85px;">原始高度</th>
-                  <th>可疑原因 / 干涉详情</th>
-                  <th style="width:75px;text-align:center;">操作</th>
+                  <th style="width:95px;" scope="col">状态</th>
+                  <th style="width:85px;" scope="col">位号</th>
+                  <th scope="col">封装 / 型号</th>
+                  <th style="width:110px;" scope="col">当前高度(mm)</th>
+                  <th style="width:80px;" scope="col">原始高度</th>
+                  <th scope="col">可疑原因 / 干涉详情</th>
+                  <th style="width:100px;text-align:center;" scope="col">操作</th>
                 </tr>
               </thead>
               <tbody id="suspTableBody"></tbody>
@@ -422,8 +1160,8 @@ header {
   </div>
 </div>
 
-<!-- 状态提示 -->
-<div class="status" id="status"></div>
+<!-- 状态提示容器 (保持 id="status" 兼容) -->
+<div class="toast-container" id="status"></div>
 
 <script>
 const dropzone = document.getElementById('dropzone');
@@ -433,16 +1171,108 @@ const fileItems = document.getElementById('fileItems');
 const generateBtn = document.getElementById('generateBtn');
 const result = document.getElementById('result');
 const statusEl = document.getElementById('status');
+const topProgressBar = document.getElementById('topProgressBar');
 const files = [];  // 收集上传文件（存 File 对象）
 let currentJobId = null;
 let currentHeightOverrides = {};
 let currentSuspiciousList = [];
+let progressTimer = null;
 
-function showStatus(msg, type='') {
-  statusEl.textContent = msg;
-  statusEl.className = 'status show' + (type ? ' ' + type : '');
-  clearTimeout(showStatus._t);
-  showStatus._t = setTimeout(() => statusEl.classList.remove('show'), 3000);
+// P1: 顶部细进度条控制
+function startTopProgress() {
+  if (!topProgressBar) return;
+  clearInterval(progressTimer);
+  topProgressBar.style.width = '25%';
+  topProgressBar.classList.add('active');
+  progressTimer = setInterval(() => {
+    const current = parseFloat(topProgressBar.style.width) || 25;
+    if (current < 85) {
+      topProgressBar.style.width = (current + Math.random() * 12) + '%';
+    }
+  }, 200);
+}
+
+function finishTopProgress() {
+  if (!topProgressBar) return;
+  clearInterval(progressTimer);
+  topProgressBar.style.width = '100%';
+  setTimeout(() => {
+    topProgressBar.classList.remove('active');
+    setTimeout(() => { topProgressBar.style.width = '0%'; }, 200);
+  }, 220);
+}
+
+// P1: Toast 堆叠系统（最多 3 条，success 5s 自动消失，error 手动关闭 + 详情展开）
+function showStatus(msg, type='', details='') {
+  const container = document.getElementById('status');
+  if (!container) return;
+
+  // 超过 3 条时移除最早的通知
+  while (container.children.length >= 3) {
+    container.removeChild(container.firstChild);
+  }
+
+  const toast = document.createElement('div');
+  const normalizedType = type === 'error' ? 'error' : (type === 'success' ? 'success' : (type === 'warn' ? 'warn' : 'info'));
+  toast.className = `toast-item ${normalizedType}`;
+
+  const iconMap = {
+    info: 'ℹ️',
+    success: '✅',
+    warn: '⚠️',
+    error: '❌'
+  };
+
+  const header = document.createElement('div');
+  header.className = 'toast-header';
+
+  const msgWrap = document.createElement('div');
+  msgWrap.className = 'toast-msg-wrap';
+  const iconSpan = document.createElement('span');
+  iconSpan.textContent = iconMap[normalizedType] || '●';
+  const textSpan = document.createElement('span');
+  textSpan.textContent = msg;
+  msgWrap.appendChild(iconSpan);
+  msgWrap.appendChild(textSpan);
+  header.appendChild(msgWrap);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'toast-close-btn';
+  closeBtn.innerHTML = '&times;';
+  closeBtn.title = '关闭通知';
+  closeBtn.onclick = (e) => {
+    e.stopPropagation();
+    toast.remove();
+  };
+  header.appendChild(closeBtn);
+  toast.appendChild(header);
+
+  if (details) {
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'toast-details-btn';
+    toggleBtn.textContent = '查看详情 ▼';
+    const detailsDiv = document.createElement('div');
+    detailsDiv.className = 'toast-details';
+    detailsDiv.style.display = 'none';
+    detailsDiv.textContent = details;
+    toggleBtn.onclick = () => {
+      const isHidden = detailsDiv.style.display === 'none';
+      detailsDiv.style.display = isHidden ? 'block' : 'none';
+      toggleBtn.textContent = isHidden ? '收起详情 ▲' : '查看详情 ▼';
+    };
+    toast.appendChild(toggleBtn);
+    toast.appendChild(detailsDiv);
+  }
+
+  container.appendChild(toast);
+
+  // 自动淡出：success 5s，info 4s；error 需手动关闭
+  if (normalizedType !== 'error') {
+    const duration = normalizedType === 'success' ? 5000 : 4000;
+    setTimeout(() => {
+      if (toast.parentElement) toast.remove();
+    }, duration);
+  }
 }
 
 function addFile(file) {
@@ -462,6 +1292,20 @@ function addFile(file) {
   fileItems.appendChild(item);
   fileList.classList.add('show');
 }
+
+// 拼版列行联动（当列行均为 1 时，片间距置灰禁用）
+function updatePanelGapState() {
+  const cols = parseInt(document.getElementById('panelCols')?.value) || 1;
+  const rows = parseInt(document.getElementById('panelRows')?.value) || 1;
+  const gapInput = document.getElementById('panelGap');
+  const gapGroup = document.getElementById('panelGapGroup');
+  const isPanelized = cols > 1 || rows > 1;
+  if (gapInput) gapInput.disabled = !isPanelized;
+  if (gapGroup) gapGroup.classList.toggle('disabled-group', !isPanelized);
+}
+document.getElementById('panelCols')?.addEventListener('input', updatePanelGapState);
+document.getElementById('panelRows')?.addEventListener('input', updatePanelGapState);
+updatePanelGapState();
 
 // 拖拽
 dropzone.addEventListener('dragover', e => {
@@ -485,6 +1329,11 @@ generateBtn.addEventListener('click', async () => {
   if (!files.length) { showStatus('请先拖入文件', 'error'); return; }
   generateBtn.disabled = true;
   generateBtn.innerHTML = '<span class="spinner"></span>生成中...';
+  startTopProgress();
+  const skeletonEl = document.getElementById('resultSkeleton');
+  if (skeletonEl) skeletonEl.classList.add('show');
+  result.classList.remove('show');
+
   const fd = new FormData();
   for (const f of files) fd.append('files', f, f.name);
   // 企业级生产参数
@@ -494,7 +1343,7 @@ generateBtn.addEventListener('click', async () => {
   fd.append('panel_rows', document.getElementById('panelRows').value || 1);
   fd.append('panel_gap', document.getElementById('panelGap').value || 5);
   fd.append('pallet_thickness', document.getElementById('palletThickness').value || 10);
-  showStatus('生成中，请稍候...');
+  showStatus('生成中，请稍候...', 'info');
   try {
     const resp = await fetch('/api/generate', { method: 'POST', body: fd });
     if (!resp.ok) {
@@ -507,10 +1356,12 @@ generateBtn.addEventListener('click', async () => {
       showResult(data);
     }
   } catch (e) {
-    showStatus('❌ ' + e.message, 'error');
+    showStatus('❌ ' + e.message, 'error', e.stack || e.message);
   } finally {
     generateBtn.disabled = false;
     generateBtn.innerHTML = '🚀 生成治具';
+    finishTopProgress();
+    if (skeletonEl) skeletonEl.classList.remove('show');
   }
 });
 
@@ -524,7 +1375,7 @@ function showResult(data) {
   if (data.gcode_url) {
     gcodeBtn.href = data.gcode_url;
     gcodeBtn.style.display = '';
-    gcodeBtn.textContent = '⬇️ 下载 CNC G 代码'
+    gcodeBtn.textContent = '⬇️ CNC G 代码'
       + (data.gcode_stats ? `（约 ${data.gcode_stats.machining_minutes} min）` : '');
   } else {
     gcodeBtn.style.display = 'none';
@@ -541,7 +1392,7 @@ function showResult(data) {
   const badge = drc
     ? (drc.allowed
         ? '<span style="color:var(--success)">✅ 通过（可生产）</span>'
-        : `<span style="color:var(--danger,#f87171)">⛔ 未通过（预览版）</span>`)
+        : `<span style="color:var(--error)">⛔ 未通过（预览版）</span>`)
     : '<span style="color:var(--success)">✅ 生成成功</span>';
   const rows = [
     ['治具外形', stats.board_size || '-'],
@@ -560,28 +1411,33 @@ function showResult(data) {
   let html = rows
     .map(([k, v]) => `<div class="stat-row"><span class="label">${k}</span><span class="value">${v}</span></div>`)
     .join('');
-  // DRC 问题清单（未通过时展开显示，每条带出处）
+
+  // P1: DRC 问题清单（卡片化，四级严重度左侧色条 + 可折叠 + 出处行）
   if (drc && drc.issues && drc.issues.length) {
-    const sevColor = { blocking: '#f87171', error: '#fb923c', warning: '#facc15', info: '#94a3b8' };
-    html += '<div class="stat-row" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">'
-      + `<span class="label">DRC 发现（${drc.total}）</span><span class="value">`
-      + `blocking ${drc.counts.blocking} · error ${drc.counts.error} · warning ${drc.counts.warning}</span></div>`;
-    if (!drc.allowed) {
-      html += '<div style="font-size:12px;line-height:1.6;margin-top:8px;max-height:220px;overflow:auto">';
-      for (const it of drc.issues.slice(0, 12)) {
-        const c = sevColor[it.severity] || '#94a3b8';
-        html += `<div style="margin-bottom:6px"><b style="color:${c}">[${it.severity}]</b> `
-          + `${it.title}<br><span style="color:var(--dim)">${it.detail}</span>`
-          + `<br><span style="color:var(--dim);font-size:11px">出处：${it.source || '-'}</span></div>`;
-      }
-      if (drc.issues.length > 12) html += `<div style="color:var(--dim)">…另 ${drc.issues.length - 12} 条</div>`;
-      html += '</div>';
+    html += '<div class="drc-collapse">'
+      + '<details ' + (drc.allowed ? '' : 'open') + '>'
+      + '<summary class="drc-summary">'
+      + '<span>🔍 DRC 生产门禁发现 (' + drc.total + ')</span>'
+      + '<span style="font-size:12px;font-weight:normal;color:var(--text-secondary);">'
+      + 'blocking ' + (drc.counts.blocking || 0) + ' · error ' + (drc.counts.error || 0) + ' · warning ' + (drc.counts.warning || 0)
+      + '</span></summary>'
+      + '<div class="drc-issues-list">';
+
+    for (const it of drc.issues) {
+      const sev = (it.severity || 'info').toLowerCase();
+      html += '<div class="drc-issue-card ' + sev + '">'
+        + '<div class="drc-issue-head">[' + sev.toUpperCase() + '] ' + escapeHtml(it.title) + '</div>'
+        + '<div class="drc-issue-detail">' + escapeHtml(it.detail) + '</div>'
+        + '<div class="drc-issue-source">出处：' + escapeHtml(it.source || '-') + '</div>'
+        + '</div>';
     }
+    html += '</div></details></div>';
   }
   document.getElementById('statsBody').innerHTML = html;
   result.classList.add('show');
   if (drc && !drc.allowed) {
-    showStatus('⚠️ DRC 门禁未通过——已导出带水印预览版，修正后出生产版', 'error');
+    const drcDetails = (drc.issues || []).map(i => `[${i.severity}] ${i.title}: ${i.detail}`).join('\n');
+    showStatus('⚠️ DRC 门禁未通过——已导出带水印预览版，修正后出生产版', 'error', drcDetails);
   } else {
     showStatus('✅ 治具生成成功（DRC 通过，可直接生产）！', 'success');
   }
@@ -655,6 +1511,17 @@ document.getElementById('adjustBtn').addEventListener('click', async () => {
     btn.disabled = false;
     btn.innerHTML = '调整';
   }
+});
+
+// P1: 自然语言快速指令 chips 点击填入
+document.querySelectorAll('.nl-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const input = document.getElementById('adjustInput');
+    if (input) {
+      input.value = chip.dataset.cmd || chip.textContent.trim();
+      input.focus();
+    }
+  });
 });
 
 // ── 干涉分析 + 可疑元件交互列表 + 3D 可视化 ───────────────────────────
@@ -777,12 +1644,117 @@ async function runInterferenceAnalysis(overrides = null) {
     btn.disabled = false;
     btn.innerHTML = '🔍 运行干涉分析';
     if (applyBtn) {
-      applyBtn.disabled = false;
-      applyBtn.style.background = '#e67e22';
-      applyBtn.innerHTML = '⚡ 应用高度修改并重新分析';
+      updateApplyButtonState();
     }
   }
 }
+
+// P3: 元件类型解析辅助（R/C/U/J/D/L/其他）
+function getCompTypeInfo(ref) {
+  const m = String(ref || '').trim().match(/^([A-Za-z]+)/);
+  const prefix = m ? m[1].toUpperCase() : '';
+  if (prefix.startsWith('R')) return { dotClass: 'ref-dot-R', title: '电阻 (R)' };
+  if (prefix.startsWith('C')) return { dotClass: 'ref-dot-C', title: '电容 (C)' };
+  if (prefix.startsWith('U')) return { dotClass: 'ref-dot-U', title: '芯片/IC (U)' };
+  if (prefix.startsWith('J') || prefix.startsWith('CON') || prefix.startsWith('P')) return { dotClass: 'ref-dot-J', title: '连接器/接插件 (J)' };
+  if (prefix.startsWith('D') || prefix.startsWith('LED')) return { dotClass: 'ref-dot-D', title: '二极管/LED (D)' };
+  if (prefix.startsWith('FB') || prefix.startsWith('L')) return { dotClass: 'ref-dot-L', title: '磁珠/电感 (L)' };
+  return { dotClass: 'ref-dot-other', title: '元件 (' + prefix + ')' };
+}
+
+// P3: 应用高度修改按钮状态管理（无修改时禁用）
+function updateApplyButtonState() {
+  const applyBtn = document.getElementById('applyOverridesBtn');
+  if (!applyBtn) return;
+  const count = Object.keys(currentHeightOverrides).length;
+  if (count === 0) {
+    applyBtn.disabled = true;
+    applyBtn.classList.add('disabled-action');
+    applyBtn.innerHTML = '⚡ 应用高度修改 (暂无修改)';
+    applyBtn.title = '尚未修改任何元件高度';
+  } else {
+    applyBtn.disabled = false;
+    applyBtn.classList.remove('disabled-action');
+    applyBtn.style.background = '#2563eb';
+    applyBtn.innerHTML = `⚡ 应用高度修改 (${count} 项待应用)`;
+    applyBtn.title = `点击应用 ${count} 项高度修改并重新分析干涉`;
+  }
+}
+
+// P3: 状态筛选栏切换与计数更新
+let currentSuspFilter = 'all';
+
+function updateSuspTableFilter() {
+  const total = currentSuspiciousList.length;
+  const interfCount = currentSuspiciousList.filter(i => i.interfering).length;
+  const modifiedCount = currentSuspiciousList.filter(i => currentHeightOverrides[i.ref] !== undefined || i.source === 'user_override').length;
+  const warnCount = currentSuspiciousList.filter(i => !i.interfering && currentHeightOverrides[i.ref] === undefined && i.source !== 'user_override').length;
+
+  const cAll = document.getElementById('countFilterAll');
+  const cInterf = document.getElementById('countFilterInterf');
+  const cWarn = document.getElementById('countFilterWarn');
+  const cMod = document.getElementById('countFilterModified');
+  if (cAll) cAll.textContent = total;
+  if (cInterf) cInterf.textContent = interfCount;
+  if (cWarn) cWarn.textContent = warnCount;
+  if (cMod) cMod.textContent = modifiedCount;
+
+  const rows = document.querySelectorAll('#suspTableBody tr');
+  rows.forEach(tr => {
+    const isInterf = tr.dataset.interfering === 'true';
+    const isMod = tr.dataset.modified === 'true';
+    const isWarn = !isInterf && !isMod;
+
+    let visible = true;
+    if (currentSuspFilter === 'interf') visible = isInterf;
+    else if (currentSuspFilter === 'warn') visible = isWarn;
+    else if (currentSuspFilter === 'modified') visible = isMod;
+    tr.style.display = visible ? '' : 'none';
+  });
+}
+
+// 初始化筛选 Chips 点击监听
+function initSuspFilterChips() {
+  const chips = document.querySelectorAll('.susp-filter-chip');
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentSuspFilter = chip.dataset.filter || 'all';
+      updateSuspTableFilter();
+    });
+  });
+}
+
+// P3: 单行重置高度
+window.resetSingleOverride = function(ref) {
+  if (currentHeightOverrides[ref] !== undefined) {
+    delete currentHeightOverrides[ref];
+  }
+  const tr = document.querySelector(`#suspTableBody tr[data-ref="${ref}"]`);
+  if (tr) {
+    const input = tr.querySelector('.height-input');
+    if (input) {
+      input.value = input.dataset.orig;
+      input.classList.remove('modified');
+    }
+    tr.dataset.modified = 'false';
+    const resetBtn = tr.querySelector('.row-reset-btn');
+    if (resetBtn) resetBtn.style.display = 'none';
+
+    // 恢复状态徽章
+    const item = currentSuspiciousList.find(i => i.ref === ref);
+    const badgeTd = tr.querySelector('td:first-child');
+    if (item && badgeTd) {
+      badgeTd.innerHTML = item.interfering
+        ? '<span class="susp-badge interf">🔴 实体干涉</span>'
+        : '<span class="susp-badge warn">⚠️ 高度可疑</span>';
+    }
+  }
+  updateApplyButtonState();
+  updateSuspTableFilter();
+  showStatus(`已还原 ${ref} 高度修改`, 'info');
+};
 
 // 绑定运行干涉分析按钮
 document.getElementById('interfBtn').addEventListener('click', () => {
@@ -791,6 +1763,7 @@ document.getElementById('interfBtn').addEventListener('click', () => {
 
 // 绑定应用高度修改按钮
 document.getElementById('applyOverridesBtn').addEventListener('click', () => {
+  if (Object.keys(currentHeightOverrides).length === 0) return;
   runInterferenceAnalysis(currentHeightOverrides);
 });
 
@@ -806,41 +1779,52 @@ function renderSuspiciousTable(list) {
   const tbody = document.getElementById('suspTableBody');
   tbody.innerHTML = '';
   const countBadge = document.getElementById('suspCountBadge');
-  countBadge.textContent = `(共 ${list.length} 个异常/可疑项)`;
+  if (countBadge) countBadge.textContent = `(共 ${list.length} 个异常/可疑项)`;
 
   list.forEach(item => {
     const tr = document.createElement('tr');
     tr.dataset.ref = item.ref;
+    tr.dataset.interfering = item.interfering ? 'true' : 'false';
+
+    const isModified = currentHeightOverrides[item.ref] !== undefined;
+    tr.dataset.modified = isModified ? 'true' : 'false';
 
     let badgeHtml = '';
-    if (item.interfering) {
-      badgeHtml = `<span class="susp-badge interf">🔴 实体干涉</span>`;
-    } else if (item.source === 'user_override') {
+    if (isModified || item.source === 'user_override') {
       badgeHtml = `<span class="susp-badge override">✏️ 已修改</span>`;
+    } else if (item.interfering) {
+      badgeHtml = `<span class="susp-badge interf">🔴 实体干涉</span>`;
     } else {
       badgeHtml = `<span class="susp-badge warn">⚠️ 高度可疑</span>`;
     }
 
-    const isModified = currentHeightOverrides[item.ref] !== undefined;
     const currentVal = isModified ? currentHeightOverrides[item.ref] : item.height;
+    const typeInfo = getCompTypeInfo(item.ref);
 
     tr.innerHTML = `
       <td>${badgeHtml}</td>
-      <td><b style="color:var(--accent);">${escapeHtml(item.ref)}</b></td>
+      <td>
+        <span style="display:inline-flex;align-items:center;">
+          <span class="ref-dot ${typeInfo.dotClass}" title="${escapeHtml(typeInfo.title)}"></span>
+          <b style="color:var(--accent);">${escapeHtml(item.ref)}</b>
+        </span>
+      </td>
       <td style="color:var(--text);font-family:monospace;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
       <td>
         <input type="number" step="0.1" min="0.1" max="100"
                class="height-input ${isModified ? 'modified' : ''}"
                value="${currentVal}"
                data-ref="${escapeHtml(item.ref)}"
-               data-orig="${item.default_height || item.height}">
+               data-orig="${item.default_height || item.height}"
+               aria-label="元件 ${escapeHtml(item.ref)} 当前高度(mm)">
       </td>
       <td style="color:var(--dim);">${item.default_height || item.height}</td>
       <td style="color:${item.interfering ? '#ff8080' : 'var(--dim)'};font-size:11px;">
         ${escapeHtml(item.suspicious_reason || '-')}
       </td>
-      <td style="text-align:center;">
-        <button class="btn btn-outline" style="padding:2px 8px;font-size:11px;" onclick="event.stopPropagation(); window.focusComponent('${escapeHtml(item.ref)}')">🎯 聚焦</button>
+      <td style="text-align:center;white-space:nowrap;">
+        <button class="btn btn-outline" style="padding:2px 8px;font-size:11px;" onclick="event.stopPropagation(); window.focusComponent('${escapeHtml(item.ref)}')" title="在 3D 视图中聚焦定位">🎯 聚焦</button>
+        <button class="btn btn-outline row-reset-btn" style="padding:2px 6px;font-size:11px;${isModified ? '' : 'display:none;'}" onclick="event.stopPropagation(); window.resetSingleOverride('${escapeHtml(item.ref)}')" title="还原默认高度">↺</button>
       </td>
     `;
 
@@ -851,14 +1835,19 @@ function renderSuspiciousTable(list) {
 
     // 监听高度输入变更
     const input = tr.querySelector('.height-input');
+    const resetBtn = tr.querySelector('.row-reset-btn');
+    const badgeTd = tr.querySelector('td:first-child');
+
     input.addEventListener('change', (e) => {
       const val = parseFloat(e.target.value);
       if (!isNaN(val) && val > 0) {
         currentHeightOverrides[item.ref] = val;
         input.classList.add('modified');
-        const applyBtn = document.getElementById('applyOverridesBtn');
-        applyBtn.style.background = '#2563eb';
-        applyBtn.innerHTML = '⚡ 保存修改并重新分析 (待应用)';
+        tr.dataset.modified = 'true';
+        if (resetBtn) resetBtn.style.display = 'inline-block';
+        if (badgeTd) badgeTd.innerHTML = '<span class="susp-badge override">✏️ 已修改</span>';
+        updateApplyButtonState();
+        updateSuspTableFilter();
       }
     });
     input.addEventListener('keydown', (e) => {
@@ -870,9 +1859,28 @@ function renderSuspiciousTable(list) {
 
     tbody.appendChild(tr);
   });
+
+  updateApplyButtonState();
+  updateSuspTableFilter();
 }
 
-// 聚焦元件（3D 场景与表格联动）
+// P2: 镜头平滑过渡与脉冲动画状态
+let cameraAnim = null;
+let pulseAnim = null;
+
+function lerpCameraTo(targetPos, offset = { x: 35, y: 30, z: 35 }, duration = 300) {
+  if (!interfCamera || !interfControls || !THREE_CACHE) return;
+  cameraAnim = {
+    startPos: interfCamera.position.clone(),
+    endPos: new THREE_CACHE.Vector3(targetPos.x + offset.x, targetPos.y + offset.y, targetPos.z + offset.z),
+    startTarget: interfControls.target.clone(),
+    endTarget: targetPos.clone(),
+    startTime: performance.now(),
+    duration: duration
+  };
+}
+
+// 聚焦元件（3D 场景与表格联动，带 lerp 平滑推进与脉冲效果）
 window.focusComponent = function(ref) {
   selectedCompRef = ref;
   // 1. 高亮表格行并滚入视野
@@ -903,16 +1911,15 @@ window.focusComponent = function(ref) {
     }
   });
 
-  // 摄像机镜头定位
+  // 镜头平滑过渡 (lerp 300ms) + 脉冲动画
   const targetPos = comp.mesh.position;
-  if (interfControls) {
-    interfControls.target.copy(targetPos);
-    interfCamera.position.set(targetPos.x + 35, targetPos.y + 30, targetPos.z + 35);
-    interfControls.update();
-  } else {
+  if (THREE_CACHE && interfControls) {
+    lerpCameraTo(targetPos, { x: 35, y: 30, z: 35 }, 300);
+    pulseAnim = { mesh: comp.mesh, startTime: performance.now(), duration: 350 };
+  } else if (interfCamera) {
     interfCamera.lookAt(targetPos);
   }
-  showStatus(`🎯 已在 3D 视角定位元件: ${ref}`, 'success');
+  showStatus(`🎯 已定位元件: ${ref}`, 'info');
 };
 
 async function renderInterference3D(glbUrl, boxes, suspiciousList) {
@@ -920,6 +1927,8 @@ async function renderInterference3D(glbUrl, boxes, suspiciousList) {
   container.innerHTML = '';
   componentMeshMap = {};
   selectedCompRef = null;
+  cameraAnim = null;
+  pulseAnim = null;
 
   try {
     const THREE = await import('three');
@@ -943,7 +1952,7 @@ async function renderInterference3D(glbUrl, boxes, suspiciousList) {
     interfCamera = camera;
     camera.position.set(160, 130, 160);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     interfRenderer = renderer;
     renderer.setSize(w, h);
     renderer.setPixelRatio(window.devicePixelRatio || 1);
@@ -958,7 +1967,31 @@ async function renderInterference3D(glbUrl, boxes, suspiciousList) {
       controls.target.set(0, 0, 4);
     }
 
-    // 光照
+    // P2: 浮动 3D 工具条
+    const toolbar = document.createElement('div');
+    toolbar.className = 'three-toolbar';
+    toolbar.setAttribute('role', 'toolbar');
+    toolbar.setAttribute('aria-label', '3D 视图控制工具条');
+    toolbar.innerHTML = `
+      <button class="three-tool-btn" id="btn3dReset" title="重置视角 (160, 130, 160)" aria-label="重置视角">🔄 重置</button>
+      <button class="three-tool-btn" id="btn3dTop" title="正上方俯视" aria-label="正上方俯视视角">⬇️ 俯视</button>
+      <button class="three-tool-btn" id="btn3dSpin" title="暂停/恢复自动旋转" aria-label="暂停或开启模型自动旋转">⏸️ 自旋</button>
+      <button class="three-tool-btn" id="btn3dWire" title="治具线框模式切换" aria-label="切换治具线框模式">🔲 线框</button>
+      <button class="three-tool-btn" id="btn3dSnap" title="导出当前 3D 截图 PNG" aria-label="导出当前 3D 视图截图">📸 截图</button>
+    `;
+    container.appendChild(toolbar);
+
+    // P2: 常驻图例 (左下角)
+    const legend = document.createElement('div');
+    legend.className = 'three-legend';
+    legend.innerHTML = `
+      <span class="legend-item"><span class="legend-dot interf"></span> 实体干涉</span>
+      <span class="legend-item"><span class="legend-dot susp"></span> 高度可疑</span>
+      <span class="legend-item"><span class="legend-dot selected"></span> 选中/定位</span>
+    `;
+    container.appendChild(legend);
+
+    // 光照系统
     const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.2);
     dirLight1.position.set(100, 150, 100);
     scene.add(dirLight1);
@@ -968,8 +2001,48 @@ async function renderInterference3D(glbUrl, boxes, suspiciousList) {
     scene.add(new THREE.AmbientLight(0x555566));
 
     // 网格辅助
-    const grid = new THREE.GridHelper(260, 26, 0x4f8cff, 0x242838);
+    const grid = new THREE.GridHelper(260, 26, 0x3b82f6, 0x1f2433);
     scene.add(grid);
+
+    let isWireframe = false;
+    let autoRotate = false;
+
+    // 工具条事件绑定
+    document.getElementById('btn3dReset')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      lerpCameraTo(new THREE.Vector3(0, 0, 0), { x: 160, y: 130, z: 160 }, 300);
+    });
+    document.getElementById('btn3dTop')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      lerpCameraTo(new THREE.Vector3(0, 0, 0), { x: 0.01, y: 0.01, z: 230 }, 300);
+    });
+    document.getElementById('btn3dSpin')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      autoRotate = !autoRotate;
+      e.target.classList.toggle('active', autoRotate);
+      showStatus(autoRotate ? '⏯️ 已开启自动旋转' : '⏸️ 已暂停自动旋转', 'info');
+    });
+    document.getElementById('btn3dWire')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      isWireframe = !isWireframe;
+      e.target.classList.toggle('active', isWireframe);
+      if (interfModel) {
+        interfModel.traverse((node) => {
+          if (node.isMesh) node.material.wireframe = isWireframe;
+        });
+      }
+    });
+    document.getElementById('btn3dSnap')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      renderer.render(scene, camera);
+      const dataUrl = renderer.domElement.toDataURL('image/png');
+      const timeStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const a = document.createElement('a');
+      a.download = `wave-fixture-3d-${timeStr}.png`;
+      a.href = dataUrl;
+      a.click();
+      showStatus(`📸 3D 截图已导出: ${a.download}`, 'success');
+    });
 
     // 加载 GLB 治具
     const loader = new GLTFLoader();
@@ -1060,11 +2133,11 @@ async function renderInterference3D(glbUrl, boxes, suspiciousList) {
         };
       }
 
-      // 点击 3D 元件盒事件 (Raycaster)
+      // 拾取交互 (单击 / 双击聚焦元件盒)
       const raycaster = new THREE.Raycaster();
       const mouse = new THREE.Vector2();
 
-      renderer.domElement.addEventListener('click', (event) => {
+      function handleHit(event) {
         const rect = renderer.domElement.getBoundingClientRect();
         mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -1078,16 +2151,49 @@ async function renderInterference3D(glbUrl, boxes, suspiciousList) {
             window.focusComponent(hit.userData.ref);
           }
         }
-      });
+      }
 
-      // 渲染循环
+      renderer.domElement.addEventListener('click', handleHit);
+      renderer.domElement.addEventListener('dblclick', handleHit);
+
+      // 渲染循环 (带镜头平滑过渡 lerp 与选中脉冲)
       function animate() {
         requestAnimationFrame(animate);
-        if (controls) {
+        const now = performance.now();
+
+        // 镜头 lerp 300ms 平滑推进
+        if (cameraAnim) {
+          const elapsed = now - cameraAnim.startTime;
+          const progress = Math.min(elapsed / cameraAnim.duration, 1);
+          const ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+          interfCamera.position.lerpVectors(cameraAnim.startPos, cameraAnim.endPos, ease);
+          if (controls) {
+            controls.target.lerpVectors(cameraAnim.startTarget, cameraAnim.endTarget, ease);
+            controls.update();
+          }
+          if (progress >= 1) cameraAnim = null;
+        } else if (controls) {
           controls.update();
-        } else if (model) {
-          model.rotation.y += 0.003;
         }
+
+        // 自旋
+        if (autoRotate && model) {
+          model.rotation.y += 0.004;
+        }
+
+        // 选中盒发光微脉冲动画
+        if (pulseAnim) {
+          const pElapsed = now - pulseAnim.startTime;
+          const pProgress = pElapsed / pulseAnim.duration;
+          if (pProgress <= 1) {
+            const s = 1 + 0.16 * Math.sin(pProgress * Math.PI);
+            pulseAnim.mesh.scale.set(s, s, s);
+          } else {
+            pulseAnim.mesh.scale.set(1, 1, 1);
+            pulseAnim = null;
+          }
+        }
+
         renderer.render(scene, camera);
       }
       animate();
@@ -1156,6 +2262,10 @@ async function loadGLB(url) {
     showStatus('⚠️ three.js 加载失败（需联网）: ' + e.message, 'error');
   }
 }
+
+// 初始化可疑元件交互表筛选器与按钮状态
+initSuspFilterChips();
+updateApplyButtonState();
 </script>
 </body>
 </html>
