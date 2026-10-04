@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use WaveFixture AI in your manufacturing workflow, research, or toolchain, please cite it as below."
+authors:
+  - name: "sora"
+    alias: "mo9652962-ai"
+title: "WaveFixture AI: Automated Wave-Soldering Pallet Design and DRC Verification Assistant"
+version: 1.0.0
+date-released: 2026-10-02
+url: "https://github.com/mo9652962-ai/wave-fixture-ai"
+repository-code: "https://github.com/mo9652962-ai/wave-fixture-ai"
+keywords:
+  - "wave soldering"
+  - "pallet design"
+  - "pcb fixture"
+  - "gerber"
+  - "cad automation"
+  - "manufacturing"
+  - "dxf"
+  - "cnc"
+license: "MIT"
