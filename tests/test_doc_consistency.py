@@ -205,11 +205,16 @@ def test_version_has_no_pending_bump():
         check=False,
     )
     log = log_res.stdout or ""
-    # A commit message that names a version must not exceed the current one.
+    # A commit message that names a project version bump must not exceed the current one.
     def to_tuple(v_str: str) -> tuple[int, ...]:
         return tuple(int(x) for x in v_str.split("."))
 
-    named = set(re.findall(r"v(\d+\.\d+\.\d+)", log))
+    # Filter out dependency/action bumps like 'chore(deps): bump X from A to B' or 'ci: bump action'
+    bump_lines = [
+        line for line in log.splitlines()
+        if re.search(r"bump version|release", line, re.IGNORECASE) and "deps" not in line.lower()
+    ]
+    named = set(re.findall(r"\bv?(\d+\.\d+\.\d+)\b", "\n".join(bump_lines)))
     future_named = {v for v in named if to_tuple(v) > to_tuple(version)}
     assert not future_named, (
         f"recent commits claim version(s) {sorted(future_named)} but pyproject says {version} — bump it"
