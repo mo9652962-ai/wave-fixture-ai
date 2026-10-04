@@ -88,11 +88,20 @@ def _poly_ok(poly) -> bool:
         return False
 
 
-def run_drc(r1, r2, material_key: str | None = None) -> list[dict]:
+def run_drc(
+    r1,
+    r2,
+    material_key: str | None = None,
+    machine_key: str | None = None,
+    pallet_thickness: float = 10.0,
+) -> list[dict]:
     """对 phase1/phase2 结果跑全部 DRC 规则，返回发现列表（含 severity 与出处）。
 
     material_key: 可选治具材料 key（materials.MATERIALS）——提供时启用
     材料-工艺交叉校验（G5 MATERIAL_TEMP_WINDOW，如 FR-4 vs 无铅波峰）。
+    machine_key: 可选波峰焊机台画像（equipment.MACHINES）——提供时启用
+    真机合规校验（H 组：轨距/载荷/SMEMA 高度）。
+    pallet_thickness: 治具板厚（H2 载荷估算用）。
     """
     issues: list[dict] = []
     SRC_STRUCT = "竞品逆向框架（wave-soldering-fixture-designer）"
@@ -516,6 +525,70 @@ def run_drc(r1, r2, material_key: str | None = None) -> list[dict]:
                 )
         except Exception as e:  # 材料库异常不阻塞 DRC 主流程
             log.debug("材料-工艺校验跳过: %s", e)
+
+    # ── H. 真机合规（企业级：治具必须放进某台具体机台过波）─────────────
+    mkey = machine_key or getattr(r2, "machine_key", None)
+    if mkey:
+        try:
+            from equipment import get_machine as _get_machine
+            from materials import estimate_weight as _est_weight
+            from materials import get_material as _get_material
+
+            _m = _get_machine(mkey)
+            if _poly_ok(outer):
+                ox0, oy0, ox1, oy1 = outer.bounds
+                short_side = min(ox1 - ox0, oy1 - oy0)
+                # H1. 轨距：治具短边须放得进机台前后导轨之间
+                if short_side > _m.process_width_max_mm:
+                    issues.append(
+                        _issue(
+                            "MACHINE_WIDTH_MISMATCH",
+                            "治具超出机台轨距",
+                            f"治具短边 {short_side:.1f}mm 超出 {_m.name_cn} "
+                            f"轨距上限 {_m.process_width_max_mm:.0f}mm——请改机台、"
+                            "减小拼版或分板。",
+                            "error",
+                            _m.source,
+                            current=round(short_side, 1),
+                            required=float(_m.process_width_max_mm),
+                            unit="mm",
+                        )
+                    )
+                # H2. 载荷：治具毛坯估重（保守：不减开孔）不得超过传送链承载
+                blank_w = _est_weight(
+                    (ox1 - ox0) * (oy1 - oy0), float(pallet_thickness), _get_material(material_key)
+                )
+                if blank_w > _m.conveyor_load_kg:
+                    issues.append(
+                        _issue(
+                            "MACHINE_OVERLOAD",
+                            "治具超出传送链载荷",
+                            f"治具毛坯估重 {blank_w:.2f}kg 超出 {_m.name_cn} 传送链"
+                            f"载荷 {_m.conveyor_load_kg}kg——请减薄板厚/改材料"
+                            "（如 Durostone→FR-4）/减小治具。",
+                            "error",
+                            _m.source,
+                            current=round(blank_w, 2),
+                            required=float(_m.conveyor_load_kg),
+                            unit="kg",
+                        )
+                    )
+                # H3. SMEMA 高度兼容（info）：治具垫高 PCB，板底高度须兼容上下游
+                if not _m.official:
+                    pass  # 非官方画像不产生 info 噪音
+                issues.append(
+                    _issue(
+                        "SMEMA_HEIGHT_CHECK",
+                        "SMEMA 传送高度确认",
+                        f"治具板厚 {pallet_thickness}mm 会垫高 PCB 底面——"
+                        f"确认与上下游设备（IPC-SMEMA-9851 高度窗口 940-965mm）兼容；"
+                        f"{_m.rail_arrangement}。",
+                        "info",
+                        "IPC-SMEMA-9851 Standard",
+                    )
+                )
+        except Exception as e:  # 机台库异常不阻塞 DRC 主流程
+            log.debug("真机合规校验跳过: %s", e)
 
     return issues
 

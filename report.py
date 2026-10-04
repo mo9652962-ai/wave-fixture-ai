@@ -53,6 +53,7 @@ def build_report(
     output_urls: dict | None = None,
     process_key: str = "lead_free",
     include_process: bool = True,
+    machine_key: str | None = None,
 ) -> str:
     """构造 Markdown 生产工单。所有输入均为已算好的 dict/对象（无 IO）。"""
     from materials import get_material
@@ -61,6 +62,13 @@ def build_report(
     stats = getattr(r2, "panel_grid", None)
     drc_counts = drc_verdict.get("counts", {})
     drc_ok = drc_verdict.get("allowed", False)
+
+    # 真机画像（可选）：机台行进入规格表与工艺章节
+    machine = None
+    if machine_key:
+        from equipment import get_machine
+
+        machine = get_machine(machine_key)
 
     # 动态章节编号（CNC 节与工艺节按可用性增减）
     sec = {"spec": 1, "mat": 2, "cnc": 3, "drc": 4, "interf": 5, "proc": 6, "dl": 7}
@@ -92,6 +100,12 @@ def build_report(
             f"| 板阵列占位 | {stats.get('total', ['-', '-'])[0]} × {stats.get('total', ['-', '-'])[1]} mm（不含治具边框）|"
         )
     ap(f"| 避位区 | {len(getattr(r2, 'avoid_polys', []) or [])} 处 |")
+    if machine:
+        official = "" if machine.official else "（行业常见值，以随机手册为准）"
+        ap(
+            f"| 目标机台 | **{machine.name_cn}**（{machine.vendor} {machine.model}）· "
+            f"轨距 ≤{machine.process_width_max_mm:.0f}mm · 传送链载荷 {machine.conveyor_load_kg}kg{official} |"
+        )
     ap(f"| 上锡区 | {len(getattr(r2, 'solder_polys', []) or [])} 处 |")
     ap(f"| 盖板孔 | {len(getattr(r2, 'cap_holes', []) or [])} 个 |")
     ap(f"| 定位销 | {len(getattr(r1, 'pins', []) or [])} 个 |")

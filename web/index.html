@@ -298,6 +298,17 @@ header {
         <input type="number" id="palletThickness" value="10" min="3" max="20" step="1">
       </div>
       <div class="param-group">
+        <label for="machineSelect">🏭 过波机台</label>
+        <select id="machineSelect" title="治具将放入哪台波峰焊机（轨距/载荷按真机规格校验）">
+          <option value="" selected>通用 350mm 轨距（缺省）</option>
+          <option value="generic_350">通用 350mm 轨距</option>
+          <option value="jt_350">劲拓 350 系（国产主流）</option>
+          <option value="electrovert_vectra_es">Electrovert VectraES</option>
+          <option value="electrovert_vectra_elite">Electrovert VectraElite</option>
+          <option value="electrovert_electra">Electrovert Electra</option>
+        </select>
+      </div>
+      <div class="param-group">
         <label for="panelCols">🧩 拼版 列×行</label>
         <div style="display:flex;gap:4px;align-items:center;">
           <input type="number" id="panelCols" value="1" min="1" max="8" style="width:56px;">
@@ -478,6 +489,7 @@ generateBtn.addEventListener('click', async () => {
   for (const f of files) fd.append('files', f, f.name);
   // 企业级生产参数
   fd.append('material', document.getElementById('materialSelect').value);
+  fd.append('machine', document.getElementById('machineSelect')?.value || '');
   fd.append('panel_cols', document.getElementById('panelCols').value || 1);
   fd.append('panel_rows', document.getElementById('panelRows').value || 1);
   fd.append('panel_gap', document.getElementById('panelGap').value || 5);
