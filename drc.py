@@ -646,6 +646,29 @@ def run_drc(
                     )
                 )
 
+    # ── J. 选择焊喷嘴避障几何校验 (Selective Soldering Nozzle DFM) ────────
+    if solders:
+        try:
+            from selective_wave import verify_selective_solder_clearance
+
+            nozzle_violations = verify_selective_solder_clearance(solders, avoids)
+            for v in nozzle_violations:
+                issues.append(
+                    _issue(
+                        "SELECTIVE_NOZZLE_COLLISION",
+                        v["title"],
+                        v["detail"],
+                        v["severity"],
+                        v["source"],
+                        current=v.get("current"),
+                        required=v.get("required"),
+                        unit=v.get("unit"),
+                        object_id=v.get("object_id"),
+                    )
+                )
+        except Exception as e:
+            log.debug("选择焊喷嘴避障校验跳过: %s", e)
+
     return issues
 
 
