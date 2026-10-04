@@ -616,6 +616,36 @@ def run_drc(
         except Exception as e:  # 机台库异常不阻塞 DRC 主流程
             log.debug("真机合规校验跳过: %s", e)
 
+    # ── I. 铰链式上盖防翘曲机构检查 (Top Hat Cover DFM) ────────────────
+    tophat = getattr(r2, "top_hat", None)
+    if tophat:
+        hinges = getattr(tophat, "hinge_holes", []) or []
+        latches = getattr(tophat, "latch_holes", []) or []
+        for hi, (hx, hy, _hr) in enumerate(hinges):
+            if _poly_ok(outer) and not _contains_point(outer, hx, hy):
+                issues.append(
+                    _issue(
+                        "TOPHAT_HINGE_OVERFLOW",
+                        "上盖铰链孔超出治具基体",
+                        f"上盖铰链孔 #{hi + 1} ({hx:.1f}, {hy:.1f}) 超出治具外框，无法紧固。",
+                        "error",
+                        "AGICORP Top Hat Design Guide",
+                        object_id=f"hinge-{hi + 1}",
+                    )
+                )
+        for li, (lx, ly, _lr) in enumerate(latches):
+            if _poly_ok(outer) and not _contains_point(outer, lx, ly):
+                issues.append(
+                    _issue(
+                        "TOPHAT_LATCH_OVERFLOW",
+                        "上盖锁扣孔超出治具基体",
+                        f"上盖锁扣孔 #{li + 1} ({lx:.1f}, {ly:.1f}) 超出治具外框，无法紧固。",
+                        "error",
+                        "AGICORP Top Hat Design Guide",
+                        object_id=f"latch-{li + 1}",
+                    )
+                )
+
     return issues
 
 

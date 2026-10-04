@@ -65,6 +65,8 @@ py-modules = [
     "process",
     "batch_run",
     "equipment",
+    "odb_parser",
+    "top_hat",
 ]
 
 [tool.setuptools.data-files]
