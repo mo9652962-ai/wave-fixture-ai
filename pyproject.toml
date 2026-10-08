@@ -73,6 +73,7 @@ py-modules = [
     "stiffener_bar",
     "gold_finger_mask",
     "lightening_pockets",
+    "process_card",
 ]
 
 [tool.setuptools.data-files]

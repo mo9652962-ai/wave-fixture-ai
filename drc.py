@@ -753,6 +753,51 @@ def run_drc(
                 )
             )
 
+    # ── O. 贴片波峰阴影区防范检查 (IPC-7351 & SMTA 波峰焊规范) ─────────
+    # 两个相邻密集避位/上锡区在过板方向间距过小 (<1.0mm) 时，迎锡面元器件会阻挡熔融波峰，
+    # 导致背风侧元器件产生阻波阴影，产生大面积虚焊。
+    for i, a1 in enumerate(avoids):
+        if not _poly_ok(a1):
+            continue
+        for j, a2 in enumerate(avoids[i + 1 :]):
+            if not _poly_ok(a2):
+                continue
+            dist = a1.distance(a2)
+            if 0.0 < dist < 1.0:
+                issues.append(
+                    _issue(
+                        "CHIP_WAVE_SHADOW_RISK",
+                        "密集贴片区存在波峰阴影效应漏焊风险",
+                        f"避位区 #{i + 1} 与 #{i + 1 + j + 1} 间距仅 {dist:.2f}mm < 1.0mm；"
+                        "波峰焊时迎波面元件会阻挡熔融焊锡流，背波面引脚极易因阴影效应产生漏焊（IPC-7351）。",
+                        "warning",
+                        "IPC-7351 & SMTA Wave Solder Shadow Effect Guidelines",
+                        current=round(dist, 2),
+                        required=1.0,
+                        unit="mm",
+                    )
+                )
+                break
+
+    # ── P. CNC 机加工刀具长径比与深腔可达性检查 (CNC 加工工艺守则) ─────────
+    # 开孔深度与铣刀直径比例 (L/D) 若 > 3.0，铣刀悬伸过长会导致振刀、侧壁斜度超差甚至断刀
+    endmill_dia = 3.7  # 标配 Φ3.7mm 铣刀
+    effective_depth = float(pallet_thickness)
+    ld_ratio = effective_depth / endmill_dia if endmill_dia > 0 else 1.0
+    if ld_ratio > 3.0:
+        issues.append(
+            _issue(
+                "FIXTURE_TOOL_ACCESSIBILITY",
+                "开孔深径比过大存在铣刀振刀断刀风险",
+                f"治具加工深度 {effective_depth:.1f}mm 对应标配 Φ{endmill_dia}mm 铣刀的长径比 L/D={ld_ratio:.2f} > 3.0；"
+                "悬伸过长加工深腔极易引起振刀接刀痕与断刀，建议改用大直径刀具开粗或减薄治具板厚。",
+                "warning",
+                "CNC Tooling Deflection & Machinability Guidelines (L/D <= 3.0)",
+                current=round(ld_ratio, 2),
+                required=3.0,
+            )
+        )
+
     return issues
 
 
