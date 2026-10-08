@@ -113,6 +113,7 @@ class Phase2Result:
         None  # 热电偶测温孔通道与传感器感应切角 (thermal_profile.ThermalProfileResult)
     )
     barcode_tag: Any | None = None  # MES 追溯条码标牌槽与防呆特征 (barcode_tag.BarcodeTagResult)
+    solder_dam: Any | None = None  # 波峰焊防浮渣扰流槽与倾角动态浸锡 (solder_dam.SolderDamResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -421,6 +422,7 @@ LAYER_COLORS2 = {
     "减重槽": 9,  # 浅灰 (底部热平衡减重开槽)
     "测温孔": 140,  # 浅蓝 (K型热电偶测温通道与走线槽)
     "追溯标识": 20,  # 浅紫/洋红 (MES 二维码标牌沉槽与防呆标记)
+    "防渣导流": 150,  # 蓝绿 (波峰焊防浮渣扰流槽与倾角导流)
 }
 
 
@@ -569,6 +571,13 @@ def export_dxf2(
 
         export_barcode_tag_to_dxf(msp, bt)
 
+    # 波峰焊防浮渣扰流槽与倾角导流 (Ersa / SEHO Solder Dam)
+    sd = getattr(result, "solder_dam", None)
+    if sd:
+        from solder_dam import export_solder_dam_to_dxf
+
+        export_solder_dam_to_dxf(msp, sd)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -662,6 +671,7 @@ def run_phase2(
     from fixture_dimensioning import generate_fixture_dimensions
     from gold_finger_mask import detect_edge_connectors_and_fingers, generate_gold_finger_masks
     from lightening_pockets import generate_lightening_pockets
+    from solder_dam import generate_solder_dam_and_incline
     from stiffener_bar import generate_stiffener_bars
     from thermal_profile import generate_thermocouple_channels
     from wave_chamfer import generate_wave_flow_chamfers
@@ -673,6 +683,7 @@ def run_phase2(
     bt_res = generate_traceability_and_poka_yoke(
         outer.outer_poly, sink_poly=sink, job_name=Path(gerber_dir).name
     )
+    sd_res = generate_solder_dam_and_incline(outer.outer_poly, sink_poly=sink)
 
     finger_regs = detect_edge_connectors_and_fingers(board)
     gold_shields = generate_gold_finger_masks(board, finger_regs)
@@ -707,6 +718,7 @@ def run_phase2(
         lightening=lightening_res,
         thermal_profile=tp_res,
         barcode_tag=bt_res,
+        solder_dam=sd_res,
     )
 
     if out_dxf:
