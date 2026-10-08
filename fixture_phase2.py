@@ -82,6 +82,9 @@ class Phase2Params:
     min_vent_cavity_area: float = 50.0  # 需要排气孔的最小腔体面积 mm²
     # 步骤12: 铰链式防翘曲上盖 (Hinged Top Hat Cover, AGICORP §2.0)
     enable_top_hat: bool = False  # 开启铰链式压紧上盖生成
+    # 步骤13: 治具底部热平衡减重开槽 (SMTA 热剖面平衡规范)
+    enable_lightening: bool = True  # 开启底部减重散热沉槽
+    lightening_depth_mm: float = 5.0  # 减重开槽深度 (mm)
 
 
 @dataclass
@@ -102,6 +105,10 @@ class Phase2Result:
     dimensions: list = field(default_factory=list)  # 关键尺寸工程标尺图元
     chamfers: list = field(default_factory=list)  # 底面 60°/45° 波峰导流倒角与脱锡槽
     stiffener: Any | None = None  # 大跨度防下垂加强横梁 (stiffener_bar.StiffenerResult)
+    gold_shields: list = field(
+        default_factory=list
+    )  # 板边金手指防爬锡遮罩压条 (gold_finger_mask.GoldFingerShield)
+    lightening: Any | None = None  # 底部热平衡减重开槽 (lightening_pockets.LighteningPocketResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -406,6 +413,8 @@ LAYER_COLORS2 = {
     "工程尺寸": 7,  # 白/银 (工程尺寸标注)
     "导流倒角": 14,  # 橄榄绿/金 (底面 60°/45° 导流斜面与脱锡槽)
     "加强筋": 8,  # 灰 (大跨度防下垂加强横梁)
+    "金手指遮罩": 40,  # 金黄色 (边缘金手指防爬锡压条)
+    "减重槽": 9,  # 浅灰 (底部热平衡减重开槽)
 }
 
 
@@ -526,6 +535,20 @@ def export_dxf2(
 
         export_stiffeners_to_dxf(msp, stiffener)
 
+    # 边缘金手指防爬锡遮罩压条 (IPC-A-610G & AGICORP §5.0)
+    shields = getattr(result, "gold_shields", [])
+    if shields:
+        from gold_finger_mask import export_gold_finger_masks_to_dxf
+
+        export_gold_finger_masks_to_dxf(msp, shields)
+
+    # 底部热平衡减重开槽 (SMTA)
+    lightening = getattr(result, "lightening", None)
+    if lightening and getattr(lightening, "pockets", None):
+        from lightening_pockets import export_lightening_pockets_to_dxf
+
+        export_lightening_pockets_to_dxf(msp, lightening)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -616,12 +639,26 @@ def run_phase2(
         tophat_res = generate_top_hat(outer.outer_poly, sink, board, caps)
 
     from fixture_dimensioning import generate_fixture_dimensions
+    from gold_finger_mask import detect_edge_connectors_and_fingers, generate_gold_finger_masks
+    from lightening_pockets import generate_lightening_pockets
     from stiffener_bar import generate_stiffener_bars
     from wave_chamfer import generate_wave_flow_chamfers
 
     dims = generate_fixture_dimensions(outer.outer_poly, sink_poly=sink, pins=pins)
     chamfers = generate_wave_flow_chamfers(solder)
     stiffener = generate_stiffener_bars(outer.outer_poly, sink_poly=sink)
+
+    finger_regs = detect_edge_connectors_and_fingers(board)
+    gold_shields = generate_gold_finger_masks(board, finger_regs)
+
+    lightening_res = None
+    if getattr(params2, "enable_lightening", True):
+        lightening_res = generate_lightening_pockets(
+            outer.outer_poly,
+            sink_poly=sink,
+            keepouts=avoid + solder,
+            pocket_depth_mm=getattr(params2, "lightening_depth_mm", 5.0),
+        )
 
     result2 = Phase2Result(
         avoid_polys=avoid,
@@ -640,6 +677,8 @@ def run_phase2(
         dimensions=dims,
         chamfers=chamfers,
         stiffener=stiffener,
+        gold_shields=gold_shields,
+        lightening=lightening_res,
     )
 
     if out_dxf:
