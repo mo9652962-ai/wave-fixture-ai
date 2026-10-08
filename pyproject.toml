@@ -74,6 +74,7 @@ py-modules = [
     "gold_finger_mask",
     "lightening_pockets",
     "process_card",
+    "thermal_profile",
 ]
 
 [tool.setuptools.data-files]

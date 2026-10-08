@@ -109,6 +109,9 @@ class Phase2Result:
         default_factory=list
     )  # 板边金手指防爬锡遮罩压条 (gold_finger_mask.GoldFingerShield)
     lightening: Any | None = None  # 底部热平衡减重开槽 (lightening_pockets.LighteningPocketResult)
+    thermal_profile: Any | None = (
+        None  # 热电偶测温孔通道与传感器感应切角 (thermal_profile.ThermalProfileResult)
+    )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -415,6 +418,7 @@ LAYER_COLORS2 = {
     "加强筋": 8,  # 灰 (大跨度防下垂加强横梁)
     "金手指遮罩": 40,  # 金黄色 (边缘金手指防爬锡压条)
     "减重槽": 9,  # 浅灰 (底部热平衡减重开槽)
+    "测温孔": 140,  # 浅蓝 (K型热电偶测温通道与走线槽)
 }
 
 
@@ -549,6 +553,13 @@ def export_dxf2(
 
         export_lightening_pockets_to_dxf(msp, lightening)
 
+    # 热电偶测温孔通道与传感器感应切角 (SMTA & IPC-SMEMA-9851)
+    tp = getattr(result, "thermal_profile", None)
+    if tp:
+        from thermal_profile import export_thermal_profile_to_dxf
+
+        export_thermal_profile_to_dxf(msp, tp)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -642,11 +653,13 @@ def run_phase2(
     from gold_finger_mask import detect_edge_connectors_and_fingers, generate_gold_finger_masks
     from lightening_pockets import generate_lightening_pockets
     from stiffener_bar import generate_stiffener_bars
+    from thermal_profile import generate_thermocouple_channels
     from wave_chamfer import generate_wave_flow_chamfers
 
     dims = generate_fixture_dimensions(outer.outer_poly, sink_poly=sink, pins=pins)
     chamfers = generate_wave_flow_chamfers(solder)
     stiffener = generate_stiffener_bars(outer.outer_poly, sink_poly=sink)
+    tp_res = generate_thermocouple_channels(solder, outer.outer_poly, sink_poly=sink)
 
     finger_regs = detect_edge_connectors_and_fingers(board)
     gold_shields = generate_gold_finger_masks(board, finger_regs)
@@ -679,6 +692,7 @@ def run_phase2(
         stiffener=stiffener,
         gold_shields=gold_shields,
         lightening=lightening_res,
+        thermal_profile=tp_res,
     )
 
     if out_dxf:
