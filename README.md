@@ -291,6 +291,8 @@ uv run pytest tests/test_golden_case*.py -v    # 25 项真实板黄金断言
 > 3D 干涉分析在真实板（36 元件）上的输出：报出的大体积元件（继电器 1886–2260mm³、
 > 数码管 3163mm³）避位覆盖仅 0.04–0.60，是**真实设计缺陷**（大件落在避位区外会被治具压到）。
 
-## License
+## 📄 许可证、安全与隐私 (License, Security & Privacy)
 
-MIT
+- **开源许可证**：[MIT License](LICENSE) © 2026 sora
+- **安全政策**：[SECURITY.md](SECURITY.md)
+- **隐私保护**：[PRIVACY.md](PRIVACY.md)（100% 本地运算、零外部遥测、工业图纸绝对保密）
