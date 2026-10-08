@@ -829,6 +829,50 @@ def run_drc(
             )
         )
 
+    # ── S. 工业 4.0 MES 追溯条码/二维码沉槽检查 (IPC-1782 追溯规范) ────
+    # 面积 >= 20000mm² 的自动化量产治具，若未规划条码/二维码沉槽，
+    # 提示无法通过扫码枪绑定批次工单与炉温曲线。
+    bt = getattr(r2, "barcode_tag", None)
+    has_tag = bool(bt and getattr(bt, "tag_recess_poly", None) and not bt.tag_recess_poly.is_empty)
+    if (
+        _poly_ok(outer)
+        and outer.area >= 20000.0
+        and getattr(r2, "require_mes_traceability", False)
+        and not has_tag
+    ):
+        issues.append(
+            _issue(
+                "TRACEABILITY_TAG_RECESS_MISSING",
+                "量产治具缺少 MES 追溯二维码标牌槽",
+                "自动化产线要求托盘绑定 MES 工单追溯码，治具边框未预留 25×12mm 标牌沉槽（IPC-1782 追溯标准）。",
+                "warning",
+                "IPC-1782 Component and Carrier Traceability Standard",
+            )
+        )
+
+    # ── T. 丰田精益生产防呆防反向倒角检查 (Poka-Yoke 规则) ─────────────
+    # 对称或长宽比接近 1.0 (0.85 ~ 1.15) 的近正方形板，沉板区若未设第一引脚防呆切角，
+    # 操作员极易 180° 反向错装压坏元件。
+    if _poly_ok(sink):
+        sx0, sy0, sx1, sy1 = sink.bounds
+        sw = sx1 - sx0
+        sh = sy1 - sy0
+        aspect = sw / sh if sh > 0 else 1.0
+        poka_lines = getattr(bt, "poka_yoke_lines", []) if bt else []
+        if 0.85 <= aspect <= 1.15 and not poka_lines:
+            issues.append(
+                _issue(
+                    "POKA_YOKE_KEYING_MISSING",
+                    "近对称板型沉板区缺少防呆防反向切角",
+                    f"沉板区长宽比 {aspect:.2f} 接近正方形，若无第一脚 45° 防呆导向切角，"
+                    "操作员手工放板极易发生 180° 反向错装压坏器件（TPS Poka-Yoke 精益防呆准则）。",
+                    "warning",
+                    "Toyota Production System (TPS) Poka-Yoke Error-Proofing Standard",
+                    current=round(aspect, 2),
+                    required=1.2,
+                )
+            )
+
     return issues
 
 

@@ -112,6 +112,7 @@ class Phase2Result:
     thermal_profile: Any | None = (
         None  # 热电偶测温孔通道与传感器感应切角 (thermal_profile.ThermalProfileResult)
     )
+    barcode_tag: Any | None = None  # MES 追溯条码标牌槽与防呆特征 (barcode_tag.BarcodeTagResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -419,6 +420,7 @@ LAYER_COLORS2 = {
     "金手指遮罩": 40,  # 金黄色 (边缘金手指防爬锡压条)
     "减重槽": 9,  # 浅灰 (底部热平衡减重开槽)
     "测温孔": 140,  # 浅蓝 (K型热电偶测温通道与走线槽)
+    "追溯标识": 20,  # 浅紫/洋红 (MES 二维码标牌沉槽与防呆标记)
 }
 
 
@@ -560,6 +562,13 @@ def export_dxf2(
 
         export_thermal_profile_to_dxf(msp, tp)
 
+    # MES 追溯条码标牌槽与防呆特征 (IPC-1782 & Poka-Yoke)
+    bt = getattr(result, "barcode_tag", None)
+    if bt:
+        from barcode_tag import export_barcode_tag_to_dxf
+
+        export_barcode_tag_to_dxf(msp, bt)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -649,6 +658,7 @@ def run_phase2(
 
         tophat_res = generate_top_hat(outer.outer_poly, sink, board, caps)
 
+    from barcode_tag import generate_traceability_and_poka_yoke
     from fixture_dimensioning import generate_fixture_dimensions
     from gold_finger_mask import detect_edge_connectors_and_fingers, generate_gold_finger_masks
     from lightening_pockets import generate_lightening_pockets
@@ -660,6 +670,9 @@ def run_phase2(
     chamfers = generate_wave_flow_chamfers(solder)
     stiffener = generate_stiffener_bars(outer.outer_poly, sink_poly=sink)
     tp_res = generate_thermocouple_channels(solder, outer.outer_poly, sink_poly=sink)
+    bt_res = generate_traceability_and_poka_yoke(
+        outer.outer_poly, sink_poly=sink, job_name=Path(gerber_dir).name
+    )
 
     finger_regs = detect_edge_connectors_and_fingers(board)
     gold_shields = generate_gold_finger_masks(board, finger_regs)
@@ -693,6 +706,7 @@ def run_phase2(
         gold_shields=gold_shields,
         lightening=lightening_res,
         thermal_profile=tp_res,
+        barcode_tag=bt_res,
     )
 
     if out_dxf:
