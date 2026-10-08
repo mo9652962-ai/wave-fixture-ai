@@ -717,6 +717,42 @@ def run_drc(
                 )
             )
 
+    # ── M. 边缘金手指接触防爬锡检查 (IPC-A-610G §7.1.4 & AGICORP §5.0) ──
+    # 若存在板边金手指且未配置遮罩压条，警告焊料毛细沾污报废风险
+    gold_shields = getattr(r2, "gold_shields", []) or []
+    has_unprotected_gold = bool(getattr(r2, "has_unprotected_gold_fingers", False))
+    if has_unprotected_gold and not gold_shields:
+        issues.append(
+            _issue(
+                "GOLD_FINGER_UNPROTECTED",
+                "板边金手指缺少防爬锡遮罩",
+                "检测到板边关键金手指/接触插头但未配置保护压条，"
+                "波峰焊时焊锡易发生毛细爬附导致金手指沾锡报废（IPC-A-610G Class 3 缺陷）。",
+                "warning",
+                "IPC-A-610G §7.1.4 & AGICORP §5.0",
+            )
+        )
+
+    # ── N. 治具底部热容与减重散热平衡检查 (SMTA 热剖面平衡准则) ─────────
+    # 治具外框面积大且未开设减重槽时，过大热容易导致整板温差失衡
+    lightening_res = getattr(r2, "lightening", None)
+    if _poly_ok(outer) and outer.area >= 25000.0:
+        ratio = getattr(lightening_res, "lightening_ratio_pct", 0.0) if lightening_res else 0.0
+        if ratio < 10.0:
+            issues.append(
+                _issue(
+                    "THERMAL_MASS_IMBALANCE",
+                    "治具实心区过大热容失衡风险",
+                    f"治具面积 {outer.area:.0f}mm² 较大且减重率仅 {ratio:.1f}% < 10.0%；"
+                    "大面积实心合成石热容极大，过预热区易引起冷焊与温差失衡，建议开设底部减重散热槽。",
+                    "warning",
+                    "SMTA Wave Soldering Thermal Profiling Guidelines",
+                    current=round(ratio, 1),
+                    required=10.0,
+                    unit="%",
+                )
+            )
+
     return issues
 
 

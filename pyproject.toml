@@ -71,6 +71,8 @@ py-modules = [
     "fixture_dimensioning",
     "wave_chamfer",
     "stiffener_bar",
+    "gold_finger_mask",
+    "lightening_pockets",
 ]
 
 [tool.setuptools.data-files]
