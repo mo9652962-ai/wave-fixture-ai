@@ -69,6 +69,8 @@ py-modules = [
     "top_hat",
     "selective_wave",
     "fixture_dimensioning",
+    "wave_chamfer",
+    "stiffener_bar",
 ]
 
 [tool.setuptools.data-files]
