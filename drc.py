@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import asdict, dataclass
 
 log = logging.getLogger("fixture-drc")
@@ -870,6 +871,49 @@ def run_drc(
                     "Toyota Production System (TPS) Poka-Yoke Error-Proofing Standard",
                     current=round(aspect, 2),
                     required=1.2,
+                )
+            )
+
+    # ── U. 波峰焊迎锡前缘防浮渣扰流槽与撇渣切刀检查 (Ersa / SEHO 规范) ──
+    # 量产大型治具 (进板长 >= 240mm 或面积 >= 40000mm²)，若迎锡侧前缘未开 8mm 防渣槽，
+    # 锡槽表面漂浮的氧化锡渣极易直接冲入沉板开孔污染通孔引脚。
+    sd = getattr(r2, "solder_dam", None)
+    has_dam = bool(sd and getattr(sd, "dam_poly", None) and not sd.dam_poly.is_empty)
+    if (
+        _poly_ok(outer)
+        and (outer.bounds[2] - outer.bounds[0] >= 240.0 or outer.area >= 40000.0)
+        and getattr(r2, "require_dross_skimmer", False)
+        and not has_dam
+    ):
+        issues.append(
+            _issue(
+                "SOLDER_DAM_DROSS_SKIMMER_MISSING",
+                "治具迎锡前缘缺少防浮渣扰流撇渣槽",
+                "大型量产治具迎锡进板前缘未开设 8mm 宽撇渣切槽与横向排渣槽，"
+                "液面浮渣易直接推入沉板区通孔引脚导致焊锡桥连短路（Kurtz Ersa / SEHO 波峰焊标准）。",
+                "warning",
+                "Kurtz Ersa & SEHO Solder Dross Skimming Guidelines",
+            )
+        )
+
+    # ── V. 传送带 5.5° 爬坡倾角动态浸锡间隙检查 (IPC-A-610G §7.5) ──────
+    # 在 4°~7° 爬坡倾角下，治具尾端相对前缘具有 Δz = L * tan(θ) 的抬升高度，
+    # 若尾端避位开槽深度未充分补偿，易导致尾部元件离锡间隙不足 (<0.8mm) 或擦碰锡波。
+    if _poly_ok(sink):
+        s_len = sink.bounds[2] - sink.bounds[0]
+        incline_deg = getattr(sd, "conveyor_incline_deg", 5.5) if sd else 5.5
+        slope_rise = s_len * math.tan(math.radians(incline_deg))
+        if s_len >= 180.0 and getattr(r2, "check_incline_clearance", False):
+            issues.append(
+                _issue(
+                    "CONVEYOR_INCLINE_COLLISION_RISK",
+                    "传送带爬坡倾角下尾部元件离锡间隙不足",
+                    f"治具在 {incline_deg:.1f}° 传送带爬坡角下，尾部相对高度抬升 {slope_rise:.1f}mm；"
+                    "尾部深槽元件离锡动态安全间隙可能不足 0.8mm，存在擦碰锡波风险（IPC-A-610G §7.5）。",
+                    "warning",
+                    "IPC-A-610G §7.5 & SMTA Wave Solder Handbook Incline Dynamics",
+                    current=round(slope_rise, 1),
+                    required=0.8,
                 )
             )
 

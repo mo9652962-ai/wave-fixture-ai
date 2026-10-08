@@ -76,6 +76,7 @@ py-modules = [
     "process_card",
     "thermal_profile",
     "barcode_tag",
+    "solder_dam",
 ]
 
 [tool.setuptools.data-files]
