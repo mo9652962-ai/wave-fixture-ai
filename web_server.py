@@ -597,8 +597,9 @@ async def api_generate(
 
                 pcb_files = list(Path(workdir).rglob("*.kicad_pcb"))
                 if pcb_files:
-                    sink_info = compute_sink_depth(str(pcb_files[0]),
-                                                   board_thickness=board_thickness)
+                    sink_info = compute_sink_depth(
+                        str(pcb_files[0]), board_thickness=board_thickness
+                    )
             except Exception as sink_err:
                 log.warning(f"  沉板深度计算跳过: {sink_err}")
 
@@ -651,6 +652,29 @@ async def api_generate(
             write_report(report_path, report_md, parent_hint=OUTPUT_DIR)
             gcode_url = f"/dl/{workdir.name}.nc"
             report_url = f"/dl/{workdir.name}-report.md"
+
+            # 生成 ISO 9001 / IATF 16949 工装首件检验卡 (FAI Checklist)
+            fai_url = None
+            try:
+                from process_card import generate_process_card_markdown
+
+                fai_path = OUTPUT_DIR / f"{workdir.name}-fai.md"
+                fai_md = generate_process_card_markdown(
+                    workdir.name,
+                    pallet_size_str=_safe(getattr(result, "outer_poly", None)),
+                    material_name=f"{mat.name_cn} {sheet_t}mm",
+                    machine_name=machine or "通用 350mm 轨距",
+                    fasteners_count={
+                        "clamps": len(getattr(r1, "screws", []) or []),
+                        "pins": len(getattr(r1, "pins", []) or []),
+                        "dams": len(getattr(result, "tin_strip_lines", []) or []),
+                    },
+                )
+                write_report(fai_path, fai_md, parent_hint=OUTPUT_DIR)
+                fai_url = f"/dl/{workdir.name}-fai.md"
+            except Exception as fai_err:
+                log.warning(f"  首检卡生成跳过: {fai_err}")
+
             material_stats = {
                 "key": mat.key,
                 "name": mat.name_cn,
@@ -678,6 +702,7 @@ async def api_generate(
                 "png_url": f"/dl/{workdir.name}.png",
                 "gcode_url": gcode_url,
                 "report_url": report_url,
+                "fai_url": fai_url,
                 "material": material_stats,
                 "gcode_stats": gcode_stats,
                 "job_id": workdir.name,
