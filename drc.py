@@ -669,6 +669,54 @@ def run_drc(
         except Exception as e:
             log.debug("选择焊喷嘴避障校验跳过: %s", e)
 
+    # ── K. 大跨度重力热下垂变形风险检查 (AGICORP & MB-MFG 规范) ─────────
+    if _poly_ok(outer):
+        ox0, oy0, ox1, oy1 = outer.bounds
+        max_span = max(ox1 - ox0, oy1 - oy0)
+        stiffener_res = getattr(r2, "stiffener", None)
+        has_stiffener = bool(stiffener_res and getattr(stiffener_res, "needed", False))
+        if max_span >= 250.0 and not has_stiffener:
+            issues.append(
+                _issue(
+                    "FIXTURE_SAG_DEFLECTION_RISK",
+                    "大跨度治具存在热下垂变形风险",
+                    f"治具跨距 {max_span:.1f}mm ≥ 250mm 且未配置加强横梁，"
+                    "在 260°C 熔融锡锅上因自重和热应力易产生 >0.5mm 下垂形变，"
+                    "导致中心焊点吃锡深度失控；建议加装中支撑加强筋 (Center Stiffener Bar)。",
+                    "warning",
+                    "AGICORP / MB Manufacturing Wave Pallet Engineering Guidelines",
+                    current=round(max_span, 1),
+                    required=250.0,
+                    unit="mm",
+                )
+            )
+
+    # ── L. 上锡开孔深宽比毛细流动检查 (AGICORP & SMTA 规范) ─────────────
+    # 当开孔垂直深度与最小开口尺寸比例 > 1.2 时，表面张力易形成阻滞
+    for si, sp in enumerate(solders):
+        if not _poly_ok(sp):
+            continue
+        minx, miny, maxx, maxy = sp.bounds
+        min_dim = min(maxx - minx, maxy - miny)
+        # 治具厚度 - 沉板深 约为开孔深度 (典型 10mm - 2mm = 8mm)
+        hole_depth = max(float(pallet_thickness) - 2.1, 1.0)
+        ratio = hole_depth / min_dim if min_dim > 0 else 999.0
+        if ratio > 1.2:
+            issues.append(
+                _issue(
+                    "SOLDER_OPENING_ASPECT_RATIO",
+                    "上锡开孔深宽比过大导致透锡阻滞",
+                    f"上锡开孔 #{si + 1} 最小跨度 {min_dim:.2f}mm，"
+                    f"开孔深宽比 {ratio:.2f} > 1.2（深度 {hole_depth:.1f}mm）；"
+                    "熔融焊锡因毛细表面张力流动受阻，易导致透锡不良，建议外扩开孔或底部做 60° 倒角导流。",
+                    "warning",
+                    "AGICORP & SMTA Wave Soldering Cavity Aspect Ratio Guidelines",
+                    current=round(ratio, 2),
+                    required=1.2,
+                    object_id=f"solder-{si + 1}",
+                )
+            )
+
     return issues
 
 

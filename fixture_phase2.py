@@ -100,6 +100,8 @@ class Phase2Result:
     flow_arrow_lines: list = field(default_factory=list)  # 过板流向箭头 (AGICORP §2.1)
     top_hat: Any | None = None  # 铰链上盖结果 (top_hat.TopHatResult)
     dimensions: list = field(default_factory=list)  # 关键尺寸工程标尺图元
+    chamfers: list = field(default_factory=list)  # 底面 60°/45° 波峰导流倒角与脱锡槽
+    stiffener: Any | None = None  # 大跨度防下垂加强横梁 (stiffener_bar.StiffenerResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -402,6 +404,8 @@ LAYER_COLORS2 = {
     "锁扣位": 6,  # 紫
     "上盖压柱": 5,  # 蓝
     "工程尺寸": 7,  # 白/银 (工程尺寸标注)
+    "导流倒角": 14,  # 橄榄绿/金 (底面 60°/45° 导流斜面与脱锡槽)
+    "加强筋": 8,  # 灰 (大跨度防下垂加强横梁)
 }
 
 
@@ -508,6 +512,20 @@ def export_dxf2(
 
         export_dimensions_to_dxf(msp, dims)
 
+    # 导流斜面与脱锡槽 (AGICORP §1.0 & SMTA)
+    chamfers = getattr(result, "chamfers", [])
+    if chamfers:
+        from wave_chamfer import export_chamfers_to_dxf
+
+        export_chamfers_to_dxf(msp, chamfers)
+
+    # 大跨度防下垂加强横梁 (MB-MFG & AGICORP)
+    stiffener = getattr(result, "stiffener", None)
+    if stiffener and stiffener.needed:
+        from stiffener_bar import export_stiffeners_to_dxf
+
+        export_stiffeners_to_dxf(msp, stiffener)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -598,8 +616,12 @@ def run_phase2(
         tophat_res = generate_top_hat(outer.outer_poly, sink, board, caps)
 
     from fixture_dimensioning import generate_fixture_dimensions
+    from stiffener_bar import generate_stiffener_bars
+    from wave_chamfer import generate_wave_flow_chamfers
 
     dims = generate_fixture_dimensions(outer.outer_poly, sink_poly=sink, pins=pins)
+    chamfers = generate_wave_flow_chamfers(solder)
+    stiffener = generate_stiffener_bars(outer.outer_poly, sink_poly=sink)
 
     result2 = Phase2Result(
         avoid_polys=avoid,
@@ -616,6 +638,8 @@ def run_phase2(
         flow_arrow_lines=outer.flow_arrow_lines,
         top_hat=tophat_res,
         dimensions=dims,
+        chamfers=chamfers,
+        stiffener=stiffener,
     )
 
     if out_dxf:
