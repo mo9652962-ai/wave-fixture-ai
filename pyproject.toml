@@ -75,6 +75,7 @@ py-modules = [
     "lightening_pockets",
     "process_card",
     "thermal_profile",
+    "barcode_tag",
 ]
 
 [tool.setuptools.data-files]
