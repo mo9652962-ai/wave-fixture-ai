@@ -798,6 +798,37 @@ def run_drc(
             )
         )
 
+    # ── Q. 测温板热电偶孔道与量产曲线调校检查 (SMTA Thermal Profiling 规范) ──
+    # 当上锡区复杂 (>=3处) 且治具属于中大尺寸 (>=20000mm²)，若未设测温热电偶通道，
+    # 提示无法通过标准 KIC/ECD 测温仪进行量产首件温度曲线校准。
+    tp = getattr(r2, "thermal_profile", None)
+    has_tc_holes = bool(tp and getattr(tp, "tc_holes", []))
+    if _poly_ok(outer) and outer.area >= 20000.0 and len(solders) >= 3 and not has_tc_holes:
+        issues.append(
+            _issue(
+                "THERMAL_PROFILE_CHANNELS_MISSING",
+                "批量治具缺少热电偶测温孔道",
+                f"治具面积 {outer.area:.0f}mm² 且包含 {len(solders)} 处上锡区，未预留标准热电偶测温孔 (TC Channels)；"
+                "量产首件无法接入 KIC/M.O.L.E. 测温探头测定实测受热曲线，极易导致调机野蛮钻孔（SMTA 测温准则）。",
+                "warning",
+                "SMTA Thermal Profiling Guidelines & KIC Standards",
+            )
+        )
+
+    # ── R. 自动化产线光电传感器感应切角避让检查 (IPC-SMEMA-9851 规范) ──
+    # 检查导轨边与传感器感应倒角是否受阻
+    sensor_notches = getattr(tp, "sensor_notches", []) if tp else []
+    if _poly_ok(outer) and len(sensor_notches) < 2 and getattr(r2, "require_smema_notch", False):
+        issues.append(
+            _issue(
+                "PALLET_CONVEYOR_SENSOR_NOTCH",
+                "治具入板前缘缺少光电传感器感应缺口",
+                "自动化轨道进板侧缺少标准 45° 光电感应倒角/缺口，可能导致产线对射式传感器误检卡板（IPC-SMEMA-9851）。",
+                "warning",
+                "IPC-SMEMA-9851 Mechanical Interface Specification",
+            )
+        )
+
     return issues
 
 
