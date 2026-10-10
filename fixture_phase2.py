@@ -116,6 +116,7 @@ class Phase2Result:
     solder_dam: Any | None = None  # 波峰焊防浮渣扰流槽与倾角动态浸锡 (solder_dam.SolderDamResult)
     hold_down_clamps: Any | None = None  # PCB 弹簧旋转压扣压舌布局与浮力补偿 (hold_down_clamps.HoldDownClampsResult)
     titanium_inserts: Any | None = None  # 钛合金耐磨隔锡刀片嵌件与浸锡时间 (titanium_inserts.TitaniumInsertsResult)
+    cnc_toolpath_opt: Any | None = None  # CNC 刀路分组与最短空程优化 (cnc_toolpath_opt.ToolpathOptResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -427,6 +428,7 @@ LAYER_COLORS2 = {
     "防渣导流": 150,  # 蓝绿 (波峰焊防浮渣扰流槽与倾角导流)
     "压扣压舌": 31,  # 棕黄 (PCB 边缘旋转压扣与压舌重叠)
     "钛合金嵌件": 12,  # 红橙/钛金 (高温耐磨隔锡薄刀片嵌件)
+    "刀路序号": 32,  # 橙 (CNC 加工顺序引导标注)
 }
 
 
@@ -596,6 +598,13 @@ def export_dxf2(
 
         export_titanium_inserts_to_dxf(msp, ti)
 
+    # CNC 刀路分组与最短空程优化序号 (ISO 6983 / RS-274)
+    tpo = getattr(result, "cnc_toolpath_opt", None)
+    if tpo:
+        from cnc_toolpath_opt import export_toolpath_order_to_dxf
+
+        export_toolpath_order_to_dxf(msp, tpo)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -710,6 +719,44 @@ def run_phase2(
     finger_regs = detect_edge_connectors_and_fingers(board)
     gold_shields = generate_gold_finger_masks(board, finger_regs)
 
+    # CNC 刀路特征采集（孔/腔/轮廓/清角）与分组最短空程优化 (ISO 6983 / RS-274)
+    from cnc_toolpath_opt import CNCOp, optimize_cnc_toolpath
+
+    def _shape_ok(poly) -> bool:
+        try:
+            return poly is not None and (not poly.is_empty) and poly.is_valid
+        except Exception:
+            return False
+
+    _ops: list[CNCOp] = []
+    for hi, hole in enumerate(caps or []):
+        hx, hy = float(hole[0]), float(hole[1])
+        _ops.append(CNCOp(f"HOLE_{hi + 1}", "drill", 3.175, 12.0, (hx, hy)))
+    if _shape_ok(sink):
+        sb = sink.bounds
+        _ops.append(
+            CNCOp("SINK_POCKET", "pocket", 6.0, 2.0 * ((sb[2] - sb[0]) + (sb[3] - sb[1])), (float(sb[0]), float(sb[1])))
+        )
+    for vi, vent in enumerate(vents or []):
+        vx, vy = float(vent[0]), float(vent[1])
+        vr = float(vent[2]) if len(vent) >= 3 else 1.0
+        _ops.append(CNCOp(f"VENT_{vi + 1}", "pocket", max(1.0, vr * 2.0), 4.0 * math.pi * max(0.5, vr), (vx, vy)))
+    for di, db in enumerate(dogbone_corners or []):
+        dcx, dcy = float(db.center[0]), float(db.center[1])
+        _ops.append(CNCOp(f"DOGBONE_{di + 1}", "dogbone", float(db.cutter_r) * 2.0, 6.0, (dcx, dcy)))
+    if _shape_ok(outer.outer_poly):
+        ob = outer.outer_poly.bounds
+        _ops.append(
+            CNCOp(
+                "OUTER_PROFILE",
+                "profile",
+                6.0,
+                2.0 * ((ob[2] - ob[0]) + (ob[3] - ob[1])),
+                (float(ob[0]), float(ob[1])),
+            )
+        )
+    tpo_res = optimize_cnc_toolpath(_ops, origin=(0.0, 0.0)) if _ops else None
+
     lightening_res = None
     if getattr(params2, "enable_lightening", True):
         lightening_res = generate_lightening_pockets(
@@ -743,6 +790,7 @@ def run_phase2(
         solder_dam=sd_res,
         hold_down_clamps=hdc_res,
         titanium_inserts=ti_res,
+        cnc_toolpath_opt=tpo_res,
     )
 
     if out_dxf:

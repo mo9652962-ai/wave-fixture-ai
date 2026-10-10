@@ -994,6 +994,41 @@ def run_drc(
             )
         )
 
+    # ── AA. CNC 换刀次数经济性检查 (ISO 6983 / RS-274 加工惯例) ─────────
+    # 每次自动换刀 (ATC) 耗时 5~10s 且引入对刀误差累积；同直径刀具特征必须成组加工。
+    tpo = getattr(r2, "cnc_toolpath_opt", None)
+    tool_changes = getattr(tpo, "tool_change_count", 0) if tpo else 0
+    if tool_changes > 6:
+        issues.append(
+            _issue(
+                "CNC_TOOL_CHANGE_EXCESSIVE",
+                "CNC 换刀次数过多降低量产经济性",
+                f"刀路优化后仍需 {tool_changes} 次换刀 (> 6 次)；每次 ATC 耗时 5~10s 并累积对刀误差，"
+                "建议合并相近刀具直径或拆分治具加工工序（ISO 6983 / RS-274 加工惯例）。",
+                "warning",
+                "ISO 6983 & RS-274 CNC Programming Best Practices",
+                current=tool_changes,
+                required=6,
+            )
+        )
+
+    # ── AB. CNC 单件加工工时预算检查 (Macaos 报价工艺库工时基线) ────────
+    # 单件治具加工 > 45min 触发产能预警：影响批量交付节拍与设备摊销成本。
+    total_min = getattr(tpo, "total_time_min", 0.0) if tpo else 0.0
+    if total_min > 45.0:
+        issues.append(
+            _issue(
+                "CNC_MACHINING_TIME_BUDGET_EXCEEDED",
+                "单件治具 CNC 加工工时超预算",
+                f"估算单件加工总工时 {total_min:.1f}min > 45min 产能基线 (含切削/空程/换刀)；"
+                "将拖慢批量交付节拍，建议简化特征或提升进给参数（Macaos 报价工艺库工时基线）。",
+                "warning",
+                "Macaos Quoting Process Library Machining Time Baseline",
+                current=round(total_min, 1),
+                required=45.0,
+            )
+        )
+
     return issues
 
 
