@@ -79,6 +79,7 @@ py-modules = [
     "solder_dam",
     "hold_down_clamps",
     "titanium_inserts",
+    "cnc_toolpath_opt",
 ]
 
 [tool.setuptools.data-files]
