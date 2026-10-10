@@ -917,6 +917,47 @@ def run_drc(
                 )
             )
 
+    # ── W. 液态锡浮力与边缘压扣压紧力校核 (AGICORP §3.0 / Macaos) ──────
+    hdc = getattr(r2, "hold_down_clamps", None)
+    if (
+        _poly_ok(sink)
+        and getattr(r2, "require_hold_down_clamps", False)
+        and (not hdc or getattr(hdc, "actual_clamp_count", 0) < getattr(hdc, "recommended_clamp_count", 4))
+    ):
+        act_n = getattr(hdc, "actual_clamp_count", 0) if hdc else 0
+        rec_n = getattr(hdc, "recommended_clamp_count", 4) if hdc else 4
+        f_b = getattr(hdc, "buoyancy_force_n", 0.0) if hdc else 0.0
+        issues.append(
+            _issue(
+                "SOLDER_BUOYANCY_CLAMP_DEFICIT",
+                "PCB 边缘旋转压扣数量不足以抵抗锡液浮力",
+                f"PCB 在液态锡槽中受到 {f_b:.1f}N 向上浮力与动压，当前压扣数量 ({act_n}) "
+                f"低于推荐保持数量 ({rec_n})，PCB 易被锡波浮起导致正面漫锡短路（AGICORP §3.0）。",
+                "warning",
+                "AGICORP §3.0 Hold-Down Clamps & PCB Retention Standards",
+                current=act_n,
+                required=rec_n,
+            )
+        )
+
+    # ── X. 边缘压扣压舌与板边贴片器件干涉检查 (IPC-A-610G) ─────────────
+    clamp_polys = getattr(hdc, "clamp_polys", []) if hdc else []
+    for ci, c_poly in enumerate(clamp_polys):
+        if not _poly_ok(c_poly):
+            continue
+        for ai, av in enumerate(avoids):
+            if _poly_ok(av) and c_poly.intersects(av):
+                issues.append(
+                    _issue(
+                        "HOLD_DOWN_CLAMP_COMPONENT_INTERFERENCE",
+                        "旋转压扣压舌与板边贴片器件干涉",
+                        f"压扣压舌 #{ci + 1} 压入区与避位区器件 #{ai + 1} 发生干涉，压扣旋紧时可能压碎元件（IPC-A-610G）。",
+                        "error",
+                        "AGICORP §3.2 & IPC-A-610G Component Clearance Limits",
+                        object_id=f"clamp-{ci + 1}/avoid-{ai + 1}",
+                    )
+                )
+
     return issues
 
 

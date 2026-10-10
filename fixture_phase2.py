@@ -114,6 +114,7 @@ class Phase2Result:
     )
     barcode_tag: Any | None = None  # MES 追溯条码标牌槽与防呆特征 (barcode_tag.BarcodeTagResult)
     solder_dam: Any | None = None  # 波峰焊防浮渣扰流槽与倾角动态浸锡 (solder_dam.SolderDamResult)
+    hold_down_clamps: Any | None = None  # PCB 弹簧旋转压扣压舌布局与浮力补偿 (hold_down_clamps.HoldDownClampsResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -423,6 +424,7 @@ LAYER_COLORS2 = {
     "测温孔": 140,  # 浅蓝 (K型热电偶测温通道与走线槽)
     "追溯标识": 20,  # 浅紫/洋红 (MES 二维码标牌沉槽与防呆标记)
     "防渣导流": 150,  # 蓝绿 (波峰焊防浮渣扰流槽与倾角导流)
+    "压扣压舌": 31,  # 棕黄 (PCB 边缘旋转压扣与压舌重叠)
 }
 
 
@@ -578,6 +580,13 @@ def export_dxf2(
 
         export_solder_dam_to_dxf(msp, sd)
 
+    # PCB 弹簧旋转压扣压舌布局与浮力补偿 (AGICORP & Macaos Hold-Down Clamps)
+    hdc = getattr(result, "hold_down_clamps", None)
+    if hdc:
+        from hold_down_clamps import export_hold_down_clamps_to_dxf
+
+        export_hold_down_clamps_to_dxf(msp, hdc)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -670,6 +679,7 @@ def run_phase2(
     from barcode_tag import generate_traceability_and_poka_yoke
     from fixture_dimensioning import generate_fixture_dimensions
     from gold_finger_mask import detect_edge_connectors_and_fingers, generate_gold_finger_masks
+    from hold_down_clamps import generate_hold_down_clamps
     from lightening_pockets import generate_lightening_pockets
     from solder_dam import generate_solder_dam_and_incline
     from stiffener_bar import generate_stiffener_bars
@@ -684,6 +694,7 @@ def run_phase2(
         outer.outer_poly, sink_poly=sink, job_name=Path(gerber_dir).name
     )
     sd_res = generate_solder_dam_and_incline(outer.outer_poly, sink_poly=sink)
+    hdc_res = generate_hold_down_clamps(sink, outer.outer_poly)
 
     finger_regs = detect_edge_connectors_and_fingers(board)
     gold_shields = generate_gold_finger_masks(board, finger_regs)
@@ -719,6 +730,7 @@ def run_phase2(
         thermal_profile=tp_res,
         barcode_tag=bt_res,
         solder_dam=sd_res,
+        hold_down_clamps=hdc_res,
     )
 
     if out_dxf:
