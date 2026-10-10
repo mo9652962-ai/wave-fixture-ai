@@ -115,6 +115,7 @@ class Phase2Result:
     barcode_tag: Any | None = None  # MES 追溯条码标牌槽与防呆特征 (barcode_tag.BarcodeTagResult)
     solder_dam: Any | None = None  # 波峰焊防浮渣扰流槽与倾角动态浸锡 (solder_dam.SolderDamResult)
     hold_down_clamps: Any | None = None  # PCB 弹簧旋转压扣压舌布局与浮力补偿 (hold_down_clamps.HoldDownClampsResult)
+    titanium_inserts: Any | None = None  # 钛合金耐磨隔锡刀片嵌件与浸锡时间 (titanium_inserts.TitaniumInsertsResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -425,6 +426,7 @@ LAYER_COLORS2 = {
     "追溯标识": 20,  # 浅紫/洋红 (MES 二维码标牌沉槽与防呆标记)
     "防渣导流": 150,  # 蓝绿 (波峰焊防浮渣扰流槽与倾角导流)
     "压扣压舌": 31,  # 棕黄 (PCB 边缘旋转压扣与压舌重叠)
+    "钛合金嵌件": 12,  # 红橙/钛金 (高温耐磨隔锡薄刀片嵌件)
 }
 
 
@@ -587,6 +589,13 @@ def export_dxf2(
 
         export_hold_down_clamps_to_dxf(msp, hdc)
 
+    # 钛合金耐磨挡锡刀片嵌件 (AGICORP §5.0 Titanium Inserts)
+    ti = getattr(result, "titanium_inserts", None)
+    if ti:
+        from titanium_inserts import export_titanium_inserts_to_dxf
+
+        export_titanium_inserts_to_dxf(msp, ti)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -684,6 +693,7 @@ def run_phase2(
     from solder_dam import generate_solder_dam_and_incline
     from stiffener_bar import generate_stiffener_bars
     from thermal_profile import generate_thermocouple_channels
+    from titanium_inserts import detect_knife_edge_walls_and_inserts
     from wave_chamfer import generate_wave_flow_chamfers
 
     dims = generate_fixture_dimensions(outer.outer_poly, sink_poly=sink, pins=pins)
@@ -695,6 +705,7 @@ def run_phase2(
     )
     sd_res = generate_solder_dam_and_incline(outer.outer_poly, sink_poly=sink)
     hdc_res = generate_hold_down_clamps(sink, outer.outer_poly)
+    ti_res = detect_knife_edge_walls_and_inserts(solder)
 
     finger_regs = detect_edge_connectors_and_fingers(board)
     gold_shields = generate_gold_finger_masks(board, finger_regs)
@@ -731,6 +742,7 @@ def run_phase2(
         barcode_tag=bt_res,
         solder_dam=sd_res,
         hold_down_clamps=hdc_res,
+        titanium_inserts=ti_res,
     )
 
     if out_dxf:
