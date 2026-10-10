@@ -25,9 +25,9 @@
   <p>
     <a href="https://github.com/mo9652962-ai/wave-fixture-ai/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/mo9652962-ai/wave-fixture-ai/ci.yml?style=flat-square&label=CI" alt="CI"></a>
     <img src="https://img.shields.io/badge/features-21%20automations-2563EB?style=flat-square" alt="features">
-    <img src="https://img.shields.io/badge/DRC-47_Rules-059669?style=flat-square" alt="47 DRC rules">
+    <img src="https://img.shields.io/badge/DRC-49_Rules-059669?style=flat-square" alt="49 DRC rules">
     <img src="https://img.shields.io/badge/KiCad-10%20compatible-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
-    <img src="https://img.shields.io/badge/tests-296%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/tests-300%20passed-success?style=flat-square" alt="tests">
     <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
     <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
@@ -56,7 +56,7 @@
 | 11 | **3D preview** (STL/GLB export + in-browser viewer) | ✅ |
 | 12 | **Interference analysis** (2D coverage + 3D boolean dual test) | ✅ |
 | 13 | **Natural-language adjustment** (29 parameters) | ✅ |
-| 14 | **DRC manufacturing safety gate** (47 rules · 4 severities · cited) | ✅ |
+| 14 | **DRC manufacturing safety gate** (49 rules · 4 severities · cited) | ✅ |
 | 15 | **Golden sample regression** (IoU≥0.9 · Hausdorff≤0.5mm · circle best-match) | ✅ |
 | 16 | **Human review loop** (missing-data gating → operator audit log) | ✅ |
 | 17 | **Locating pin scoring** (diameter window / NPTH / edge distance) | ✅ |

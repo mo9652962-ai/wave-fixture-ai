@@ -958,6 +958,42 @@ def run_drc(
                     )
                 )
 
+    # ── Y. 波峰焊接触时间窗口合规性校核 (SMTA / IPC J-STD-001) ─────────
+    ti = getattr(r2, "titanium_inserts", None)
+    dwell_win = getattr(ti, "dwell_window", None) if ti else None
+    if dwell_win and not dwell_win.is_compliant and getattr(r2, "check_dwell_time", False):
+        issues.append(
+            _issue(
+                "WAVE_DWELL_TIME_OUT_OF_WINDOW",
+                "上锡开口走板浸锡接触时间偏离工艺窗口",
+                f"在传送带速度 {dwell_win.conveyor_speed_m_per_min:.1f}m/min 下，"
+                f"上锡开口有效接触时间 {dwell_win.dwell_time_sec:.2f}s 偏离无铅波峰焊工艺窗口 "
+                f"({dwell_win.min_compliant_dwell_sec:.1f}s ~ {dwell_win.max_compliant_dwell_sec:.1f}s)，"
+                f"{dwell_win.status_summary}（SMTA & IPC J-STD-001）。",
+                "warning",
+                "SMTA Wave Soldering Handbook & IPC J-STD-001 Solder Dwell Limits",
+                current=dwell_win.dwell_time_sec,
+                required=dwell_win.min_compliant_dwell_sec,
+            )
+        )
+
+    # ── Z. 上锡开孔薄壁/刀刃隔墙钛合金嵌件检查 (AGICORP §5.0) ───────────
+    thin_walls = getattr(ti, "thin_walls_detected", 0) if ti else 0
+    blades = getattr(ti, "blades", []) if ti else []
+    if thin_walls > 0 and len(blades) == 0 and getattr(r2, "require_titanium_inserts", False):
+        issues.append(
+            _issue(
+                "KNIFE_EDGE_WALL_TITANIUM_INSERT_MISSING",
+                "上锡开孔隔锡薄壁缺少钛合金耐磨嵌件",
+                f"检测到 {thin_walls} 处相邻上锡开孔隔锡壁厚 < 1.8mm；"
+                "高量产治具在 260°C 高速锡流冲刷下极易碳化断裂，需镶嵌 0.8mm 钛合金加固刀片（AGICORP §5.0）。",
+                "warning",
+                "AGICORP §5.0 Titanium Solder Baffle Wear Inserts Specification",
+                current=thin_walls,
+                required=0,
+            )
+        )
+
     return issues
 
 

@@ -78,6 +78,7 @@ py-modules = [
     "barcode_tag",
     "solder_dam",
     "hold_down_clamps",
+    "titanium_inserts",
 ]
 
 [tool.setuptools.data-files]
