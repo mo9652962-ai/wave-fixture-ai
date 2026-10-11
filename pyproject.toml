@@ -87,6 +87,7 @@ py-modules = [
     "thermal_expansion",
     "thread_inserts",
     "outgoing_qc",
+    "solder_scuppers",
 ]
 
 [tool.setuptools.data-files]
