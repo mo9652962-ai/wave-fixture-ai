@@ -1146,6 +1146,27 @@ def run_drc(
                     )
                 )
 
+    # ── AH. 合成石螺纹孔黄铜埋植嵌件检查 (紧固寿命惯例) ─────────────────
+    # 合成石/FR-4 直接攻丝的螺纹 ~50 次装拆即滑丝；盖板/铰链/压扣反复装拆
+    # 必须压入黄铜埋植嵌件 (>500 次装拆寿命)。
+    ti_plan = getattr(r2, "thread_inserts", None)
+    n_screws = len(screws or [])
+    has_inserts = bool(ti_plan and getattr(ti_plan, "inserts", []))
+    if n_screws > 0 and not has_inserts and getattr(r2, "require_thread_inserts", False):
+        issues.append(
+            _issue(
+                "THREAD_INSERTS_MISSING",
+                "合成石螺纹孔缺少黄铜埋植嵌件",
+                f"治具有 {n_screws} 处螺纹紧固孔但未规划黄铜埋植嵌件；"
+                "合成石/FR-4 基材直接攻丝 ~50 次装拆即滑丝，反复换型后盖板/铰链将无法锁紧，"
+                "应压入 M3/M4 黄铜嵌件 (>500 次装拆寿命)。",
+                "warning",
+                "Brass Threaded Insert Fastening Practice for Composite Pallets",
+                current=0,
+                required=n_screws,
+            )
+        )
+
     return issues
 
 
