@@ -120,6 +120,7 @@ class Phase2Result:
     cnc_setup_sheet: Any | None = None  # CNC 加工准备单：毛料/G54/刀具表 (cnc_setup_sheet.SetupSheetResult)
     pallet_keying: Any | None = None  # 治具防反向装载非对称方向键切角 (pallet_keying.PalletKeyingResult)
     thread_inserts: Any | None = None  # 螺纹孔黄铜埋植嵌件规划 (thread_inserts.ThreadInsertPlan)
+    solder_scuppers: Any | None = None  # 出板尾梁沥锡引流缺口与斜坡 (solder_scuppers.SolderScuppersResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -434,6 +435,7 @@ LAYER_COLORS2 = {
     "刀路序号": 32,  # 橙 (CNC 加工顺序引导标注)
     "防呆切角": 33,  # 红棕 (治具防反向装载方向键切角)
     "嵌件螺母": 34,  # 金黄 (黄铜埋植嵌件外径轮廓)
+    "沥锡导流": 42,  # 灰绿 (出板尾端沥锡引流缺口与斜坡)
 }
 
 
@@ -624,6 +626,13 @@ def export_dxf2(
 
         export_thread_inserts_to_dxf(msp, tins)
 
+    # 出板尾梁沥锡引流缺口与斜坡 (AGICORP §4.4 Solder Scuppers)
+    ss = getattr(result, "solder_scuppers", None)
+    if ss:
+        from solder_scuppers import export_solder_scuppers_to_dxf
+
+        export_solder_scuppers_to_dxf(msp, ss)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -803,6 +812,11 @@ def run_phase2(
 
     ti_plan = plan_thread_inserts(screw_holes=list(screws)) if screws else None
 
+    # 出板尾梁沥锡引流缺口与斜坡 (AGICORP §4.4)
+    from solder_scuppers import generate_trailing_solder_scuppers
+
+    ss_res = generate_trailing_solder_scuppers(outer.outer_poly, sink_poly=sink) if _shape_ok(outer.outer_poly) else None
+
     lightening_res = None
     if getattr(params2, "enable_lightening", True):
         lightening_res = generate_lightening_pockets(
@@ -840,6 +854,7 @@ def run_phase2(
         cnc_setup_sheet=sheet_res,
         pallet_keying=pk_res,
         thread_inserts=ti_plan,
+        solder_scuppers=ss_res,
     )
 
     if out_dxf:

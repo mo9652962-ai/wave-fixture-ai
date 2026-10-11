@@ -1167,6 +1167,44 @@ def run_drc(
             )
         )
 
+    # ── AI. 出板尾端沥锡引流槽与防拖锡回流校核 (AGICORP §4.4) ────────────
+    # 传送方向跨度 >= 180mm 的量产治具，出板尾梁若无沥锡泄锡槽，
+    # 滞留锡液将污染出板风道滚轮，并引发尾端引脚拖锡拉尖与桥连。
+    ss = getattr(r2, "solder_scuppers", None)
+    if _poly_ok(outer):
+        flow_span = outer.bounds[2] - outer.bounds[0]
+        has_scuppers = bool(ss and getattr(ss, "scupper_count", 0) > 0)
+        if flow_span >= 180.0 and getattr(r2, "require_solder_scuppers", False) and not has_scuppers:
+            issues.append(
+                _issue(
+                    "TRAILING_SOLDER_SCUPPER_MISSING",
+                    "出板尾梁缺少沥锡引流槽与回流斜坡",
+                    f"治具传送跨度 {flow_span:.0f}mm ≥ 180mm，出板尾梁未设置沥锡引流槽与 30° 回流斜坡；"
+                    "脱锡区滞留锡液无法顺流回落锡炉，将污染出板滚轮并引发尾端引脚拖锡拉尖（AGICORP §4.4）。",
+                    "warning",
+                    "AGICORP §4.4 Trailing Edge Solder Scuppers & Run-Off Ramps",
+                    current=0,
+                    required=">=1 scuppers",
+                )
+            )
+
+    # 沥锡槽距沉板区密封边距校核 (防止锡波反灌)
+    if ss and getattr(ss, "scupper_count", 0) > 0 and _poly_ok(sink):
+        min_clr = getattr(ss, "min_clearance_found_mm", 999.0)
+        if 0.0 < min_clr < 4.0:
+            issues.append(
+                _issue(
+                    "SCUPPER_CLEARANCE_TO_BOARD_INSUFFICIENT",
+                    "沥锡槽距沉板区密封边距不足反灌风险",
+                    f"沥锡槽边缘距沉板区最小密封台阶 {min_clr:.2f}mm < 4.0mm；"
+                    "过板冲力下液态锡极易沿沥锡凹槽反灌进入沉板区造成顶面漫锡（AGICORP §4.4 密封台阶规范）。",
+                    "warning",
+                    "AGICORP §4.4 Solder Scupper Seal Land Clearance",
+                    current=round(min_clr, 2),
+                    required=4.0,
+                )
+            )
+
     return issues
 
 
