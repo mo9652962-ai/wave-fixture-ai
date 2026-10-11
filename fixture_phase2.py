@@ -121,6 +121,7 @@ class Phase2Result:
     pallet_keying: Any | None = None  # 治具防反向装载非对称方向键切角 (pallet_keying.PalletKeyingResult)
     thread_inserts: Any | None = None  # 螺纹孔黄铜埋植嵌件规划 (thread_inserts.ThreadInsertPlan)
     solder_scuppers: Any | None = None  # 出板尾梁沥锡引流缺口与斜坡 (solder_scuppers.SolderScuppersResult)
+    red_glue_stencil: Any | None = None  # 底面贴片波峰焊红胶点胶模板 (red_glue_stencil.RedGlueStencilResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -436,6 +437,7 @@ LAYER_COLORS2 = {
     "防呆切角": 33,  # 红棕 (治具防反向装载方向键切角)
     "嵌件螺母": 34,  # 金黄 (黄铜埋植嵌件外径轮廓)
     "沥锡导流": 42,  # 灰绿 (出板尾端沥锡引流缺口与斜坡)
+    "红胶点胶": 50,  # 红橙 (底面贴片波峰焊红胶胶点)
 }
 
 
@@ -632,6 +634,13 @@ def export_dxf2(
         from solder_scuppers import export_solder_scuppers_to_dxf
 
         export_solder_scuppers_to_dxf(msp, ss)
+
+    # 底面波峰焊红胶点胶模板 (IPC-SM-782 & IPC-A-610G)
+    rgs = getattr(result, "red_glue_stencil", None)
+    if rgs:
+        from red_glue_stencil import export_red_glue_to_dxf
+
+        export_red_glue_to_dxf(msp, rgs)
 
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
