@@ -118,6 +118,7 @@ class Phase2Result:
     titanium_inserts: Any | None = None  # 钛合金耐磨隔锡刀片嵌件与浸锡时间 (titanium_inserts.TitaniumInsertsResult)
     cnc_toolpath_opt: Any | None = None  # CNC 刀路分组与最短空程优化 (cnc_toolpath_opt.ToolpathOptResult)
     cnc_setup_sheet: Any | None = None  # CNC 加工准备单：毛料/G54/刀具表 (cnc_setup_sheet.SetupSheetResult)
+    pallet_keying: Any | None = None  # 治具防反向装载非对称方向键切角 (pallet_keying.PalletKeyingResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -430,6 +431,7 @@ LAYER_COLORS2 = {
     "压扣压舌": 31,  # 棕黄 (PCB 边缘旋转压扣与压舌重叠)
     "钛合金嵌件": 12,  # 红橙/钛金 (高温耐磨隔锡薄刀片嵌件)
     "刀路序号": 32,  # 橙 (CNC 加工顺序引导标注)
+    "防呆切角": 33,  # 红棕 (治具防反向装载方向键切角)
 }
 
 
@@ -606,6 +608,13 @@ def export_dxf2(
 
         export_toolpath_order_to_dxf(msp, tpo)
 
+    # 治具防反向装载方向键切角 (Poka-Yoke Orientation Key)
+    pk = getattr(result, "pallet_keying", None)
+    if pk:
+        from pallet_keying import export_pallet_keying_to_dxf
+
+        export_pallet_keying_to_dxf(msp, pk)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -770,6 +779,16 @@ def run_phase2(
             job_name=Path(gerber_dir).name,
         )
 
+    # 治具防反向装载方向键切角 (Poka-Yoke Orientation Key)
+    from pallet_keying import generate_pallet_keying
+
+    pk_res = None
+    if _shape_ok(outer.outer_poly):
+        ob = outer.outer_poly.bounds
+        aspect = (ob[2] - ob[0]) / max(1e-6, ob[3] - ob[1])
+        if 0.85 <= aspect <= 1.15:
+            pk_res = generate_pallet_keying(outer.outer_poly)
+
     lightening_res = None
     if getattr(params2, "enable_lightening", True):
         lightening_res = generate_lightening_pockets(
@@ -805,6 +824,7 @@ def run_phase2(
         titanium_inserts=ti_res,
         cnc_toolpath_opt=tpo_res,
         cnc_setup_sheet=sheet_res,
+        pallet_keying=pk_res,
     )
 
     if out_dxf:
