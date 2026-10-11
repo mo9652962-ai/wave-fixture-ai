@@ -119,6 +119,7 @@ class Phase2Result:
     cnc_toolpath_opt: Any | None = None  # CNC 刀路分组与最短空程优化 (cnc_toolpath_opt.ToolpathOptResult)
     cnc_setup_sheet: Any | None = None  # CNC 加工准备单：毛料/G54/刀具表 (cnc_setup_sheet.SetupSheetResult)
     pallet_keying: Any | None = None  # 治具防反向装载非对称方向键切角 (pallet_keying.PalletKeyingResult)
+    thread_inserts: Any | None = None  # 螺纹孔黄铜埋植嵌件规划 (thread_inserts.ThreadInsertPlan)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -432,6 +433,7 @@ LAYER_COLORS2 = {
     "钛合金嵌件": 12,  # 红橙/钛金 (高温耐磨隔锡薄刀片嵌件)
     "刀路序号": 32,  # 橙 (CNC 加工顺序引导标注)
     "防呆切角": 33,  # 红棕 (治具防反向装载方向键切角)
+    "嵌件螺母": 34,  # 金黄 (黄铜埋植嵌件外径轮廓)
 }
 
 
@@ -615,6 +617,13 @@ def export_dxf2(
 
         export_pallet_keying_to_dxf(msp, pk)
 
+    # 螺纹孔黄铜埋植嵌件 (Brass Threaded Inserts)
+    tins = getattr(result, "thread_inserts", None)
+    if tins:
+        from thread_inserts import export_thread_inserts_to_dxf
+
+        export_thread_inserts_to_dxf(msp, tins)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -789,6 +798,11 @@ def run_phase2(
         if 0.85 <= aspect <= 1.15:
             pk_res = generate_pallet_keying(outer.outer_poly)
 
+    # 螺纹孔黄铜埋植嵌件规划 (压扣 M3 + 铰链 M4)
+    from thread_inserts import plan_thread_inserts
+
+    ti_plan = plan_thread_inserts(screw_holes=list(screws)) if screws else None
+
     lightening_res = None
     if getattr(params2, "enable_lightening", True):
         lightening_res = generate_lightening_pockets(
@@ -825,6 +839,7 @@ def run_phase2(
         cnc_toolpath_opt=tpo_res,
         cnc_setup_sheet=sheet_res,
         pallet_keying=pk_res,
+        thread_inserts=ti_plan,
     )
 
     if out_dxf:

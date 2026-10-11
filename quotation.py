@@ -39,6 +39,7 @@ HARDWARE_UNIT_PRICES_CNY: dict[str, float] = {
     "turn_lock_clamp": 4.20,  # 弹簧旋转压扣
     "hinge_m4": 6.50,  # M4 铰链
     "titanium_blade_per_cm": 1.20,  # 钛合金隔锡刀片 (每 cm 长度)
+    "brass_insert_m3": 0.45,  # 黄铜埋植嵌件 M3 (螺纹强化, >500 次装拆)
 }
 
 
@@ -164,20 +165,19 @@ def estimate_quotation(
     # 2. CNC 加工成本
     cnc_total = (machining_time_min / 60.0) * machine_hourly_rate_cny * q
 
-    # 3. 五金 BOM 成本
+    # 3. 五金 BOM 成本 (单件数量 × 单价 × 数量)
     cost_lines: list[CostLine] = [
         CostLine(f"材料-{mat.name_cn}({pallet_w_mm:g}×{pallet_h_mm:g}×{pallet_thickness_mm:g}mm)", q, material_total / q, material_total),
         CostLine(f"CNC 加工({machining_time_min:.0f}min × ¥{machine_hourly_rate_cny:g}/h)", q, cnc_total / q, cnc_total),
     ]
     hardware_total = 0.0
     for item, price in HARDWARE_UNIT_PRICES_CNY.items():
-        n = float(hw.get(item, 0.0))
+        n = float(hw.get(item, 0.0))  # 单件用量
         if n <= 0:
             continue
-        # titanium_blade_per_cm 以 cm 计价，其余以件计价
-        sub = n * price
+        sub = n * price * q
         hardware_total += sub
-        cost_lines.append(CostLine(item, n, price, sub))
+        cost_lines.append(CostLine(item, n * q, price, sub))
 
     total_cost = material_total + cnc_total + hardware_total
     cost_per_pc = total_cost / q

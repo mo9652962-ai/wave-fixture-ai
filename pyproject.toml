@@ -85,6 +85,7 @@ py-modules = [
     "maintenance",
     "pallet_keying",
     "thermal_expansion",
+    "thread_inserts",
 ]
 
 [tool.setuptools.data-files]
