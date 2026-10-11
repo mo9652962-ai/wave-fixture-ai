@@ -1072,6 +1072,28 @@ def run_drc(
                 )
             )
 
+    # ── AE. 大型治具密封面平面度规范检查 (AGICORP §6.0) ─────────────────
+    # 对角线 >= 300mm 的治具，沉板密封面必须标注平面度公差 <= 0.2mm；
+    # 超差将导致治具与 PCB 间产生缝隙，液态锡沿缝上爬漫顶短路。
+    if _poly_ok(outer):
+        diag = math.hypot(outer.bounds[2] - outer.bounds[0], outer.bounds[3] - outer.bounds[1])
+        flat_spec = getattr(r2, "flatness_spec_mm", None)
+        has_valid_spec = flat_spec is not None and float(flat_spec) <= 0.2
+        if diag >= 300.0 and not has_valid_spec:
+            shown = f"{float(flat_spec):g}mm" if flat_spec is not None else "未标注"
+            issues.append(
+                _issue(
+                    "PALLET_SEALING_FLATNESS_SPEC_MISSING",
+                    "大型治具密封面平面度规范缺失",
+                    f"治具对角线 {diag:.0f}mm ≥ 300mm，密封面平面度要求 ≤ 0.2mm，当前：{shown}；"
+                    "超差缝隙将导致液态锡沿沉板密封面上爬漫顶短路（AGICORP §6.0 Flatness Specification）。",
+                    "warning",
+                    "AGICORP §6.0 Pallet Sealing Surface Flatness Specification",
+                    current=shown,
+                    required="<=0.2mm",
+                )
+            )
+
     return issues
 
 

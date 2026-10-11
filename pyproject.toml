@@ -82,6 +82,7 @@ py-modules = [
     "cnc_toolpath_opt",
     "cnc_setup_sheet",
     "quotation",
+    "maintenance",
 ]
 
 [tool.setuptools.data-files]
