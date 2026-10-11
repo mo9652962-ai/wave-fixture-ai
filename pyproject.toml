@@ -86,6 +86,7 @@ py-modules = [
     "pallet_keying",
     "thermal_expansion",
     "thread_inserts",
+    "outgoing_qc",
 ]
 
 [tool.setuptools.data-files]
