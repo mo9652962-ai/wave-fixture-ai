@@ -1094,6 +1094,30 @@ def run_drc(
                 )
             )
 
+    # ── AF. 近对称治具防反向装载方向键检查 (Ersa / SEHO 上下板防错) ─────
+    # 长宽比 0.85~1.15 的近对称治具若无非对称方向键切角，装板工/上板机
+    # 180° 反向推入轨道将使波峰流向反转、上锡开孔整板镜像。
+    if _poly_ok(outer):
+        ow = outer.bounds[2] - outer.bounds[0]
+        oh = outer.bounds[3] - outer.bounds[1]
+        aspect = ow / max(1e-6, oh)
+        pk = getattr(r2, "pallet_keying", None)
+        has_key = bool(pk and getattr(pk, "chamfer_lines", []))
+        if 0.85 <= aspect <= 1.15 and not has_key:
+            issues.append(
+                _issue(
+                    "PALLET_ORIENTATION_KEYING_MISSING",
+                    "近对称治具缺少防反向装载方向键",
+                    f"治具长宽比 {aspect:.2f} 接近对称且无非对称方向键切角；"
+                    "装板工/上板机 180° 反向推入轨道将使波峰流向反转、上锡开孔整板镜像，"
+                    "建议在出板侧切除 15×15mm 45° 方向键（Ersa / SEHO 上下板防错惯例）。",
+                    "warning",
+                    "Ersa & SEHO Pallet Loading Poka-Yoke Orientation Key Practice",
+                    current=round(aspect, 2),
+                    required="keying chamfer",
+                )
+            )
+
     return issues
 
 
