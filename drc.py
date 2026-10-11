@@ -1029,6 +1029,49 @@ def run_drc(
             )
         )
 
+    # ── AC. 非标准刀具直径检查 (标准刀具梯采购惯例) ─────────────────────
+    # 使用标准梯 {1.0,1.5,2.0,2.5,3.175,3.5,4.0,5.0,6.0} 之外的刀径需定制采购，
+    # 交期 2~4 周且单价 2~3 倍，量产治具应强制归梯。
+    from cnc_setup_sheet import STANDARD_TOOL_LADDER
+
+    tool_dias = getattr(tpo, "tool_order", []) if tpo else []
+    off_ladder = [d for d in tool_dias if not any(abs(d - s) < 1e-6 for s in STANDARD_TOOL_LADDER)]
+    if off_ladder:
+        issues.append(
+            _issue(
+                "CNC_NONSTANDARD_TOOL_DIAMETER",
+                "刀具直径偏离标准刀具梯",
+                f"刀路使用非标准直径 {', '.join(f'{d:g}' for d in off_ladder)}mm；"
+                "定制刀具交期 2~4 周且单价 2~3 倍，建议设计归梯至标准直径"
+                "（标准刀具梯采购惯例：1.0/1.5/2.0/2.5/3.175/3.5/4.0/5.0/6.0mm）。",
+                "warning",
+                "Standard Tool Ladder Procurement Practice (End Mill & Drill Inventory)",
+                current=round(off_ladder[0], 3),
+                required="standard ladder",
+            )
+        )
+
+    # ── AD. 毛料下料尺寸装夹校核 (机加工车间装夹规范) ───────────────────
+    # 毛料边长必须 >= 治具外形 + 四周 10mm 夹持余量，否则虎钳/压板无处可夹。
+    sw = getattr(r2, "stock_width_mm", None)
+    sh = getattr(r2, "stock_height_mm", None)
+    if _poly_ok(outer) and sw is not None and sh is not None:
+        need_w = (outer.bounds[2] - outer.bounds[0]) + 2.0 * 10.0
+        need_h = (outer.bounds[3] - outer.bounds[1]) + 2.0 * 10.0
+        if float(sw) < need_w or float(sh) < need_h:
+            issues.append(
+                _issue(
+                    "CNC_STOCK_SIZE_INSUFFICIENT",
+                    "毛料下料尺寸不足无法装夹",
+                    f"毛料 {float(sw):g}×{float(sh):g}mm 小于装夹需求 {need_w:.1f}×{need_h:.1f}mm "
+                    "(治具外形 + 四周 10mm 夹持余量)；虎钳/压板将压伤治具型面或无法固定。",
+                    "error",
+                    "CNC Machining Workholding Practice (Vise & Clamp Margin)",
+                    current=f"{float(sw):g}x{float(sh):g}",
+                    required=f"{need_w:.1f}x{need_h:.1f}",
+                )
+            )
+
     return issues
 
 

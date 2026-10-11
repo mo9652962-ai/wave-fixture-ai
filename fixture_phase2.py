@@ -117,6 +117,7 @@ class Phase2Result:
     hold_down_clamps: Any | None = None  # PCB 弹簧旋转压扣压舌布局与浮力补偿 (hold_down_clamps.HoldDownClampsResult)
     titanium_inserts: Any | None = None  # 钛合金耐磨隔锡刀片嵌件与浸锡时间 (titanium_inserts.TitaniumInsertsResult)
     cnc_toolpath_opt: Any | None = None  # CNC 刀路分组与最短空程优化 (cnc_toolpath_opt.ToolpathOptResult)
+    cnc_setup_sheet: Any | None = None  # CNC 加工准备单：毛料/G54/刀具表 (cnc_setup_sheet.SetupSheetResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -757,6 +758,18 @@ def run_phase2(
         )
     tpo_res = optimize_cnc_toolpath(_ops, origin=(0.0, 0.0)) if _ops else None
 
+    sheet_res = None
+    if tpo_res and _shape_ok(outer.outer_poly):
+        from cnc_setup_sheet import generate_cnc_setup_sheet
+
+        ob = outer.outer_poly.bounds
+        sheet_res = generate_cnc_setup_sheet(
+            tpo_res,
+            outer_width_mm=float(ob[2] - ob[0]),
+            outer_height_mm=float(ob[3] - ob[1]),
+            job_name=Path(gerber_dir).name,
+        )
+
     lightening_res = None
     if getattr(params2, "enable_lightening", True):
         lightening_res = generate_lightening_pockets(
@@ -791,6 +804,7 @@ def run_phase2(
         hold_down_clamps=hdc_res,
         titanium_inserts=ti_res,
         cnc_toolpath_opt=tpo_res,
+        cnc_setup_sheet=sheet_res,
     )
 
     if out_dxf:

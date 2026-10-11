@@ -80,6 +80,7 @@ py-modules = [
     "hold_down_clamps",
     "titanium_inserts",
     "cnc_toolpath_opt",
+    "cnc_setup_sheet",
 ]
 
 [tool.setuptools.data-files]
