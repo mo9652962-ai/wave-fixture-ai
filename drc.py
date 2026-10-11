@@ -1205,6 +1205,38 @@ def run_drc(
                 )
             )
 
+    # ── AJ. 底面贴片波峰焊红胶点胶与防污染门禁 (IPC-A-610G §7.1.3) ──────
+    rgs = getattr(r2, "red_glue_stencil", None)
+    has_bottom_smd = getattr(r2, "has_bottom_smd_components", False)
+    if has_bottom_smd and (not rgs or getattr(rgs, "total_dots", 0) == 0) and getattr(r2, "require_red_glue", False):
+        issues.append(
+            _issue(
+                "BOTTOM_SMD_RED_GLUE_MISSING",
+                "底面贴片器件波峰焊缺少红胶点胶规划",
+                "沉板开孔露锡区存在底面 SMD 元件但未规划红胶胶点；"
+                "过波峰时元件在 260°C 液态锡浮力与动压下极易冲脱掉入锡锅（IPC-A-610G §7.1.3 表面贴装胶水工艺）。",
+                "warning",
+                "IPC-SM-782 & IPC-A-610G Section 7.1.3 SMD Adhesive Dispensing",
+                current=0,
+                required=">=1 dots",
+            )
+        )
+
+    if rgs and getattr(rgs, "contaminated_dots_count", 0) > 0:
+        bad_n = rgs.contaminated_dots_count
+        issues.append(
+            _issue(
+                "RED_GLUE_PAD_CONTAMINATION_RISK",
+                "红胶胶点距焊盘间距不足溢胶污染开路风险",
+                f"检测到 {bad_n} 处红胶胶点距焊盘边缘间距 < 0.30mm；"
+                "贴片挤压溢胶沾染焊盘将导致引脚彻底绝缘无法上锡，引发严重虚焊/开路缺陷（IPC-A-610G §7.1.3）。",
+                "warning",
+                "IPC-A-610G Section 7.1.3 Adhesive-to-Pad Clearance Limit",
+                current=bad_n,
+                required=0,
+            )
+        )
+
     return issues
 
 

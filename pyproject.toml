@@ -88,6 +88,7 @@ py-modules = [
     "thread_inserts",
     "outgoing_qc",
     "solder_scuppers",
+    "red_glue_stencil",
 ]
 
 [tool.setuptools.data-files]
