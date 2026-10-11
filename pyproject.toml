@@ -84,6 +84,7 @@ py-modules = [
     "quotation",
     "maintenance",
     "pallet_keying",
+    "thermal_expansion",
 ]
 
 [tool.setuptools.data-files]

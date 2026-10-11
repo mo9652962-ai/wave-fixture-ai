@@ -1118,6 +1118,34 @@ def run_drc(
                 )
             )
 
+    # ── AG. 治具-PCB 热膨胀失配间隙校核 (Röchling CTE datasheet) ────────
+    # 波峰温度下治具与 PCB 线膨胀差 ΔL = L × ΔCTE × ΔT；差值超过常温沉板
+    # 设计间隙 0.2mm 时，PCB 高温被槽壁顶死 → 拱起渗锡、冷却卡板。
+    if _poly_ok(sink):
+        s_w = sink.bounds[2] - sink.bounds[0]
+        s_h = sink.bounds[3] - sink.bounds[1]
+        s_len = max(s_w, s_h)
+        if s_len >= 120.0:
+            from thermal_expansion import compute_expansion_gap
+
+            mat_key = material_key or "durostone"
+            gap = compute_expansion_gap(pallet_len_mm=s_len, pcb_len_mm=s_len * 0.98, material_key=mat_key)
+            if gap.at_risk and getattr(r2, "check_cte_gap", True):
+                issues.append(
+                    _issue(
+                        "SINK_CTE_CLEARANCE_INSUFFICIENT",
+                        "波峰温度下沉板间隙将被热膨胀差吃掉",
+                        f"{s_len:.0f}mm 沉板跨度在 ΔT≈235K 下治具-PCB 线膨胀差 "
+                        f"{gap.differential_mm:.2f}mm 超过常温设计间隙 {gap.design_clearance_mm}mm；"
+                        "PCB 高温被槽壁顶死将拱起渗锡、冷却卡板。建议常温沉板间隙外扩至 "
+                        f"{gap.differential_mm + 0.1:.2f}mm（Röchling Durostone CTE datasheet）。",
+                        "warning",
+                        "Röchling Durostone CTE Datasheet & IPC-2141A Thermal Mechanics",
+                        current=gap.differential_mm,
+                        required=gap.design_clearance_mm,
+                    )
+                )
+
     return issues
 
 
