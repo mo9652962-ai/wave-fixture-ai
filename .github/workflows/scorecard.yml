@@ -26,7 +26,7 @@ jobs:
       # Pinned to the *commit* the v2.4.2 tag points at. Pinning the annotated
       # tag object's own SHA instead makes Scorecard reject its own upload as an
       # "imposter commit" (the tag object is not part of the action's history).
-      - uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+      - uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
         with:
           results_file: results.sarif
           results_format: sarif
