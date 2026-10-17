@@ -1275,6 +1275,41 @@ def run_drc(
             )
         )
 
+    # ── AM. 大尺寸沉板 CAM 热补偿各向异性缩放校核 (Macaos & Röchling) ────
+    # 沉板跨度 >= 200mm 的合成石治具，若未在 CAM 阶段施加热补偿各向异性缩放 (k ≈ 1.0016)，
+    # 260°C 高温下膨胀量可达 330μm，常温加工槽型在热态下将顶死卡板 (Macaos 工业标准)。
+    if _poly_ok(sink):
+        s_span = max(sink.bounds[2] - sink.bounds[0], sink.bounds[3] - sink.bounds[1])
+        scaled_applied = getattr(r2, "thermal_scaling_applied", False)
+        if s_span >= 200.0 and not scaled_applied and getattr(r2, "require_thermal_scaling", False):
+            issues.append(
+                _issue(
+                    "THERMAL_CAM_SCALING_REQUIRED",
+                    "大跨度沉板槽缺少 CAM 热补偿各向异性缩放",
+                    f"沉板跨度 {s_span:.0f}mm ≥ 200mm 且未启用 CAM 热膨胀各向异性缩放 (k ≈ 1.0016)；"
+                    "260°C 波峰热态下膨胀差将吃尽设计间隙导致顶死卡板，需在 CAM 阶段预先补偿缩放（Macaos CAM 规范）。",
+                    "warning",
+                    "Macaos Solder Pallet Designer & Röchling Durostone CAM Model",
+                    current=round(s_span, 1),
+                    required=200.0,
+                )
+            )
+
+    # ── AN. 工厂制造交付包密码学防篡改校验清单检查 (IATF 16949 / ISO 9001) ──
+    # 送厂量产交付必须随附包含全文件 SHA-256 哈希的 MANIFEST.sha256 账本，确保车间数控加工与质检无误。
+    manifest_verified = getattr(r2, "manifest_sha256_verified", True)
+    if not manifest_verified:
+        issues.append(
+            _issue(
+                "FACTORY_RELEASE_MANIFEST_UNVERIFIED",
+                "工厂制造交付包缺少密码学防篡改校验清单",
+                "量产工程交付包中未发现合规的 MANIFEST.sha256 密码学校验文件；"
+                "无法满足 IATF 16949 / ISO 9001 质量追溯与 CAM 文件防篡改审计要求。",
+                "warning",
+                "IATF 16949 & ISO 9001 Manufacturing Release Traceability",
+            )
+        )
+
     return issues
 
 
