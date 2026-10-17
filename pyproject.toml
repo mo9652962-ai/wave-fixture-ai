@@ -90,6 +90,8 @@ py-modules = [
     "solder_scuppers",
     "red_glue_stencil",
     "flux_drainage",
+    "thermal_scaling",
+    "headless_factory_pipeline",
 ]
 
 [tool.setuptools.data-files]
