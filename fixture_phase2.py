@@ -123,6 +123,8 @@ class Phase2Result:
     solder_scuppers: Any | None = None  # 出板尾梁沥锡引流缺口与斜坡 (solder_scuppers.SolderScuppersResult)
     red_glue_stencil: Any | None = None  # 底面贴片波峰焊红胶点胶模板 (red_glue_stencil.RedGlueStencilResult)
     flux_drainage: Any | None = None  # 助焊剂防积液排液槽与泄压排气孔 (flux_drainage.FluxDrainageResult)
+    conveyor_wear_rails: Any | None = None  # 传送带链爪耐磨导轨规划 (conveyor_wear_rails.ConveyorWearRailsResult)
+    esd_grounding: Any | None = None  # 工业防静电 ESD 接地端子规划 (esd_grounding.ESDGroundingResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -440,6 +442,8 @@ LAYER_COLORS2 = {
     "沥锡导流": 42,  # 灰绿 (出板尾端沥锡引流缺口与斜坡)
     "红胶点胶": 50,  # 红橙 (底面贴片波峰焊红胶胶点)
     "助焊剂排液": 142,  # 浅青绿 (助焊剂防积液排液槽与排气孔)
+    "耐磨导轨": 4,  # 青 (传送带链爪耐磨导轨与螺孔)
+    "防静电接地": 6,  # 紫 (ESD 金属接地触钉)
 }
 
 
@@ -651,6 +655,20 @@ def export_dxf2(
 
         export_flux_drainage_to_dxf(msp, fd)
 
+    # 传送带链爪耐磨导轨 (AGICORP §3.2)
+    cwr = getattr(result, "conveyor_wear_rails", None)
+    if cwr:
+        from conveyor_wear_rails import export_conveyor_wear_rails_to_dxf
+
+        export_conveyor_wear_rails_to_dxf(msp, cwr)
+
+    # 工业防静电 ESD 接地触钉 (ANSI/ESD S20.20 & IEC 61340-5-1)
+    esd = getattr(result, "esd_grounding", None)
+    if esd:
+        from esd_grounding import export_esd_grounding_to_dxf
+
+        export_esd_grounding_to_dxf(msp, esd)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -840,6 +858,16 @@ def run_phase2(
 
     fd_res = generate_flux_drainage_and_vapor_ports(avoid, outer_poly=outer.outer_poly) if avoid else None
 
+    # 传送带链爪耐磨导轨 (AGICORP §3.2)
+    from conveyor_wear_rails import plan_conveyor_wear_rails
+
+    cwr_res = plan_conveyor_wear_rails(outer.outer_poly, sink_poly=sink) if _shape_ok(outer.outer_poly) else None
+
+    # 工业防静电 ESD 接地触钉 (ANSI/ESD S20.20 & IEC 61340-5-1)
+    from esd_grounding import plan_esd_grounding
+
+    esd_res = plan_esd_grounding(outer.outer_poly) if _shape_ok(outer.outer_poly) else None
+
     lightening_res = None
     if getattr(params2, "enable_lightening", True):
         lightening_res = generate_lightening_pockets(
@@ -879,6 +907,8 @@ def run_phase2(
         thread_inserts=ti_plan,
         solder_scuppers=ss_res,
         flux_drainage=fd_res,
+        conveyor_wear_rails=cwr_res,
+        esd_grounding=esd_res,
     )
 
     if out_dxf:
