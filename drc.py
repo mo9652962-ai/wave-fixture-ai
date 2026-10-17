@@ -1237,6 +1237,44 @@ def run_drc(
             )
         )
 
+    # ── AK. 助焊剂防积液排液槽检查 (AGICORP §4.3 & SMTA 规范) ───────────
+    # 面积 >= 50mm² 的深避位腔，若未开凿 45° 倒坡排液泄槽，
+    # 积聚的液体助焊剂在预热/浸锡时瞬间沸腾炸锡，产生大面积飞溅锡珠 (IPC-A-610G §5.2.7.1)。
+    fd = getattr(r2, "flux_drainage", None)
+    req_drain = getattr(fd, "pockets_requiring_drainage", 0) if fd else 0
+    actual_weeps = len(getattr(fd, "weep_channels", [])) if fd else 0
+    if req_drain > 0 and actual_weeps == 0 and getattr(r2, "require_flux_drainage", False):
+        issues.append(
+            _issue(
+                "FLUX_PUDDLING_DRAINAGE_MISSING",
+                "避位腔死角缺少助焊剂排液导流泄槽",
+                f"检测到 {req_drain} 处大面积避位腔体未规划 45° 倒坡排液泄槽；"
+                "喷雾残留助焊剂积液在 260°C 高温下剧烈沸腾炸锡，产生飞溅锡珠短路缺陷（AGICORP §4.3 & IPC-A-610G）。",
+                "warning",
+                "AGICORP §4.3 Flux Drainage Weep Channel Guidelines & IPC-A-610G",
+                current=0,
+                required=req_drain,
+            )
+        )
+
+    # ── AL. 高温密闭气腔泄压排气呼吸孔检查 (SMTA 气体膨胀防爆) ─────────
+    # 封闭或半封闭避位腔室未开通大气的呼吸排气孔 (Φ2.0~2.5mm)，
+    # 260°C 熔锡高温下腔内气体急剧膨胀 (~79%) 将把锡波吹散吹空导致大面积虚焊。
+    actual_ports = len(getattr(fd, "vapor_ports", [])) if fd else 0
+    if req_drain > 0 and actual_ports == 0 and getattr(r2, "check_vapor_ports", False):
+        issues.append(
+            _issue(
+                "FLUX_EXPANSION_VAPOR_TRAP_RISK",
+                "避位腔室缺少防气爆泄压排气孔",
+                f"存在 {req_drain} 处避位腔未设 Φ2.5mm 泄压排气呼吸孔；"
+                "260°C 高温波峰下腔内空气急剧热膨胀（膨胀率达 79%），高压气流喷出将吹散锡波造成虚焊空洞（SMTA 规范）。",
+                "warning",
+                "SMTA Thermal Vapor Expansion & Pressure Relief Hole Standard",
+                current=0,
+                required=req_drain,
+            )
+        )
+
     return issues
 
 

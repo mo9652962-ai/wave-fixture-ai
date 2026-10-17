@@ -122,6 +122,7 @@ class Phase2Result:
     thread_inserts: Any | None = None  # 螺纹孔黄铜埋植嵌件规划 (thread_inserts.ThreadInsertPlan)
     solder_scuppers: Any | None = None  # 出板尾梁沥锡引流缺口与斜坡 (solder_scuppers.SolderScuppersResult)
     red_glue_stencil: Any | None = None  # 底面贴片波峰焊红胶点胶模板 (red_glue_stencil.RedGlueStencilResult)
+    flux_drainage: Any | None = None  # 助焊剂防积液排液槽与泄压排气孔 (flux_drainage.FluxDrainageResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -438,6 +439,7 @@ LAYER_COLORS2 = {
     "嵌件螺母": 34,  # 金黄 (黄铜埋植嵌件外径轮廓)
     "沥锡导流": 42,  # 灰绿 (出板尾端沥锡引流缺口与斜坡)
     "红胶点胶": 50,  # 红橙 (底面贴片波峰焊红胶胶点)
+    "助焊剂排液": 142,  # 浅青绿 (助焊剂防积液排液槽与排气孔)
 }
 
 
@@ -642,6 +644,13 @@ def export_dxf2(
 
         export_red_glue_to_dxf(msp, rgs)
 
+    # 助焊剂防积液排液槽与泄压排气孔 (AGICORP §4.3 & SMTA)
+    fd = getattr(result, "flux_drainage", None)
+    if fd:
+        from flux_drainage import export_flux_drainage_to_dxf
+
+        export_flux_drainage_to_dxf(msp, fd)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -826,6 +835,11 @@ def run_phase2(
 
     ss_res = generate_trailing_solder_scuppers(outer.outer_poly, sink_poly=sink) if _shape_ok(outer.outer_poly) else None
 
+    # 助焊剂防积液排液槽与泄压排气孔 (AGICORP §4.3 & SMTA)
+    from flux_drainage import generate_flux_drainage_and_vapor_ports
+
+    fd_res = generate_flux_drainage_and_vapor_ports(avoid, outer_poly=outer.outer_poly) if avoid else None
+
     lightening_res = None
     if getattr(params2, "enable_lightening", True):
         lightening_res = generate_lightening_pockets(
@@ -864,6 +878,7 @@ def run_phase2(
         pallet_keying=pk_res,
         thread_inserts=ti_plan,
         solder_scuppers=ss_res,
+        flux_drainage=fd_res,
     )
 
     if out_dxf:
