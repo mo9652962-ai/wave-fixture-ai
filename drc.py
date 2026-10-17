@@ -1310,6 +1310,47 @@ def run_drc(
             )
         )
 
+    # ── AO. 传送带链爪耐磨导轨与沉板避位安全净距检查 (AGICORP §3.2) ──────
+    # 耐磨导轨条与链爪咬合区必须与沉板边缘保持 ≥ 8.0mm 安全绝缘与机械间隙，严防链爪刮碰 PCB。
+    cwr = getattr(r2, "conveyor_wear_rails", None)
+    if cwr and _poly_ok(sink):
+        clr = getattr(cwr, "min_clearance_to_sink_mm", 999.0)
+        if 0.0 <= clr < 8.0:
+            issues.append(
+                _issue(
+                    "CONVEYOR_WEAR_RAIL_CLEARANCE_INSUFFICIENT",
+                    "传送带耐磨导轨距沉板区安全净距不足",
+                    f"传送带耐磨导轨边缘距沉板区最小间隙 {clr:.2f}mm < 8.0mm；"
+                    "波峰焊链爪或链指在传送啮合时可能擦碰治具沉板台阶或压伤 PCB 板边（AGICORP §3.2）。",
+                    "warning",
+                    "AGICORP §3.2 Conveyor Edge Wear Rail & Finger Clearance Standards",
+                    current=round(clr, 2),
+                    required=8.0,
+                )
+            )
+
+    # ── AP. 工业防静电 ESD 接地端子与对地回路检查 (ANSI/ESD S20.20-2021) ─
+    # 电子制造车间对静电放电敏感器件强制要求对地电阻 Rg < 1.0×10⁹ Ω 且具有首尾冗余接地触点。
+    esd = getattr(r2, "esd_grounding", None)
+    req_esd = getattr(r2, "require_esd_compliance", False)
+    if req_esd:
+        pt_cnt = getattr(esd, "total_point_count", 0) if esd else 0
+        is_comp = getattr(esd, "is_compliant", False) if esd else False
+        if pt_cnt < 2 or not is_comp:
+            issues.append(
+                _issue(
+                    "ESD_GROUND_PATH_MISSING",
+                    "工业防静电 ESD 接地回路或触点缺失",
+                    f"治具未规划符合 ANSI/ESD S20.20-2021 的冗余金属接地触钉 (当前触点数: {pt_cnt} < 2)；"
+                    "高温热风与链条摩擦产生的静电荷无法有效泄放到传送带接地导轨，"
+                    "存在击穿板载静电敏感半导体器件的高危风险（IEC 61340-5-1）。",
+                    "warning",
+                    "ANSI/ESD S20.20-2021 & IEC 61340-5-1 Electrostatic Protection",
+                    current=pt_cnt,
+                    required=2,
+                )
+            )
+
     return issues
 
 
