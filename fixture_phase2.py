@@ -125,6 +125,8 @@ class Phase2Result:
     flux_drainage: Any | None = None  # 助焊剂防积液排液槽与泄压排气孔 (flux_drainage.FluxDrainageResult)
     conveyor_wear_rails: Any | None = None  # 传送带链爪耐磨导轨规划 (conveyor_wear_rails.ConveyorWearRailsResult)
     esd_grounding: Any | None = None  # 工业防静电 ESD 接地端子规划 (esd_grounding.ESDGroundingResult)
+    nitrogen_shroud: Any | None = None  # 氮气保护微环境导流罩 (nitrogen_shroud.NitrogenShroudResult)
+    ergonomic_handling: Any | None = None  # 人机工程学重量与把手评估 (ergonomic_handling.ErgonomicHandlingResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -444,6 +446,8 @@ LAYER_COLORS2 = {
     "助焊剂排液": 142,  # 浅青绿 (助焊剂防积液排液槽与排气孔)
     "耐磨导轨": 4,  # 青 (传送带链爪耐磨导轨与螺孔)
     "防静电接地": 6,  # 紫 (ESD 金属接地触钉)
+    "氮气保护": 130,  # 青蓝 (氮气保护导流罩与均流缝)
+    "人机工程手柄": 3,  # 绿 (ISO 11228-1 双手握持把手开孔)
 }
 
 
@@ -669,6 +673,20 @@ def export_dxf2(
 
         export_esd_grounding_to_dxf(msp, esd)
 
+    # 氮气保护微环境导流罩 (SMTA & Ersa N2 Guidelines)
+    ns = getattr(result, "nitrogen_shroud", None)
+    if ns:
+        from nitrogen_shroud import export_nitrogen_shroud_to_dxf
+
+        export_nitrogen_shroud_to_dxf(msp, ns)
+
+    # 人机工程学握持把手开孔 (ISO 11228-1)
+    eh = getattr(result, "ergonomic_handling", None)
+    if eh:
+        from ergonomic_handling import export_ergonomic_handling_to_dxf
+
+        export_ergonomic_handling_to_dxf(msp, eh)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -868,6 +886,27 @@ def run_phase2(
 
     esd_res = plan_esd_grounding(outer.outer_poly) if _shape_ok(outer.outer_poly) else None
 
+    # 氮气保护微环境导流罩 (SMTA & Ersa N2 Guidelines)
+    from nitrogen_shroud import generate_nitrogen_shroud
+
+    ns_res = generate_nitrogen_shroud(solder, outer.outer_poly) if solder and _shape_ok(outer.outer_poly) else None
+
+    # 人机工程学重量与把手评估 (ISO 11228-1)
+    from ergonomic_handling import evaluate_ergonomic_handling
+
+    eh_res = (
+        evaluate_ergonomic_handling(
+            outer.outer_poly,
+            sink_poly=sink,
+            top_hat_enabled=bool(tophat_res),
+            clamp_count=len(getattr(hdc_res, "clamp_polys", [])) if hdc_res else 0,
+            stiffener_enabled=bool(stiffener and getattr(stiffener, "needed", False)),
+            wear_rail_count=len(getattr(cwr_res, "rails", [])) if cwr_res else 0,
+        )
+        if _shape_ok(outer.outer_poly)
+        else None
+    )
+
     lightening_res = None
     if getattr(params2, "enable_lightening", True):
         lightening_res = generate_lightening_pockets(
@@ -909,6 +948,8 @@ def run_phase2(
         flux_drainage=fd_res,
         conveyor_wear_rails=cwr_res,
         esd_grounding=esd_res,
+        nitrogen_shroud=ns_res,
+        ergonomic_handling=eh_res,
     )
 
     if out_dxf:
