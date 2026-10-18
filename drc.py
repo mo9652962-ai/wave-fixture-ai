@@ -1351,6 +1351,59 @@ def run_drc(
                 )
             )
 
+    # ── AQ. 氮气保护微环境导流罩边框气密性检查 (SMTA & Ersa N2 Guidelines) ─
+    # 氮气保护气罩外围距治具边框与导轨陆地宽度必须 >= 5.0mm，防止高纯氮气泄漏逸散。
+    ns = getattr(r2, "nitrogen_shroud", None)
+    req_n2 = getattr(r2, "require_nitrogen_inerting", False)
+    if ns and req_n2 and not getattr(ns, "is_seal_compliant", True):
+        clr = getattr(ns, "min_seal_clearance_mm", 0.0)
+        issues.append(
+            _issue(
+                "NITROGEN_SHROUD_SEAL_CLEARANCE_INSUFFICIENT",
+                "氮气保护导流罩边框密封间隙不足",
+                f"氮气气罩边缘距治具边框密封陆地宽度 {clr:.2f}mm < 5.0mm；"
+                "氮气将沿导轨与边框缝隙泄漏逸散，导致上锡区残氧量超标 (>500ppm) 无法实现惰性保护（SMTA 规范）。",
+                "warning",
+                "SMTA Wave Soldering Handbook & Ersa PowerFlow N2 Guidelines",
+                current=round(clr, 2),
+                required=5.0,
+            )
+        )
+
+    # ── AR. 人机工程学重量与双手舒适握把门禁 (ISO 11228-1 & OSHA 1910) ─────
+    # 治具装配整备质量 > 5.0kg 时必须配置双侧人体工学握持把手；> 8.0kg 严禁单人搬运。
+    eh = getattr(r2, "ergonomic_handling", None)
+    if eh:
+        tot_m = getattr(eh, "total_mass_kg", 0.0)
+        has_hp = getattr(eh, "handles_provided", False)
+        exceeds_abs = getattr(eh, "exceeds_manual_limit", False)
+        if exceeds_abs:
+            issues.append(
+                _issue(
+                    "PALLET_ERGONOMIC_WEIGHT_EXCEEDED",
+                    "治具整备质量超标超出单人搬运工效学极限",
+                    f"治具装配整备总质量达 {tot_m:.2f}kg > 8.0kg；"
+                    "严重超出 OSHA 与 ISO 11228-1 电子车间单人安全搬运极限，必须配置机械吊臂或双人搬运。",
+                    "error",
+                    "ISO 11228-1 & OSHA Section VII Repetitive Manual Lifting Limits",
+                    current=round(tot_m, 2),
+                    required=8.0,
+                )
+            )
+        elif tot_m > 5.0 and not has_hp:
+            issues.append(
+                _issue(
+                    "PALLET_ERGONOMIC_WEIGHT_EXCEEDED",
+                    "治具整备质量较重缺少人机工程抓握把手",
+                    f"治具整备总质量达 {tot_m:.2f}kg > 5.0kg 且未配置人机工程舒适手柄；"
+                    "高频反复搬运将导致操作员掌心疲劳滑脱跌落碎板，需开设 ≥100×35mm R8 握持开孔（ISO 11228-1）。",
+                    "warning",
+                    "ISO 11228-1 Ergonomic Manual Handling Standards",
+                    current=round(tot_m, 2),
+                    required=5.0,
+                )
+            )
+
     return issues
 
 
