@@ -1,0 +1,452 @@
+{
+  "case_id": "case_003",
+  "title": "STM32 工业四层板 (旗舰展示)",
+  "description": "4层高密度板，含多种贴片与插装元件、沉板清角与 3D 实体干涉高亮",
+  "generate": {
+    "ok": true,
+    "job_id": "case_003",
+    "dxf_url": "demo/case_003/fixture.dxf",
+    "png_url": "demo/case_003/fixture.png",
+    "gcode_url": "demo/case_003/fixture.nc",
+    "report_url": "demo/case_003/report.md",
+    "fai_url": "demo/case_003/fai.md",
+    "stl_url": "demo/case_003/fixture.stl",
+    "glb_url": "demo/case_003/fixture.glb",
+    "material": {
+      "key": "durostone",
+      "name": "Durostone 合成石",
+      "sheet_thickness": 10.0,
+      "weight_kg": 0.249,
+      "cost": {
+        "material_cost": 104.6,
+        "machining_cost": 63.0,
+        "total": 167.6,
+        "currency": "CNY",
+        "note": "按参考价与工时估算，仅作报价参考；实际以采购价与机台费率校准。"
+      },
+      "sink_depth": {
+        "sink_depth_mm": 2.1,
+        "board_thickness": 1.6,
+        "max_bottom_standoff_mm": 0.0,
+        "has_bottom_components": false,
+        "bottom_components": [],
+        "rule_source": "Macaos (0.5mm 离板气隙)"
+      }
+    },
+    "gcode_stats": {
+      "gcode_path": "C:\\Users\\31954\\dev\\repo-review\\wave-fixture-ai\\web\\demo\\case_003\\fixture.nc",
+      "material": "durostone",
+      "pallet_thickness": 10.0,
+      "board_pocket_depth": 2.1,
+      "pocket_ops": 498,
+      "profile_passes": 8,
+      "drill_groups": 2,
+      "tools": [
+        {
+          "number": 1,
+          "kind": "drill",
+          "dia_mm": 2.0,
+          "rpm": 18000.0
+        },
+        {
+          "number": 2,
+          "kind": "drill",
+          "dia_mm": 3.0,
+          "rpm": 18000.0
+        },
+        {
+          "number": 3,
+          "kind": "endmill",
+          "dia_mm": 3.7,
+          "rpm": 18000.0
+        }
+      ],
+      "line_count": 2674,
+      "cut_len_mm": 13030.2,
+      "rapid_len_mm": 24377.3,
+      "machining_minutes": 31.5,
+      "thickness": 10.0
+    },
+    "stats": {
+      "board_size": "85.0 × 105.0 mm",
+      "avoid_count": 1,
+      "solder_count": 5,
+      "cap_hole_count": 0,
+      "vent_count": 1,
+      "dogbone_count": 4
+    },
+    "drc": {
+      "allowed": true,
+      "counts": {
+        "info": 0,
+        "warning": 16,
+        "error": 0,
+        "blocking": 0
+      },
+      "worst": "warning",
+      "total": 16,
+      "issues": [
+        {
+          "code": "MIN_OPENING_WIDTH",
+          "title": "开口宽度过窄",
+          "detail": "solder 开口 #1 最小尺寸 1.98mm < 3.8mm（Macaos 指南），易挂锡且铣刀加工困难。",
+          "severity": "warning",
+          "object_id": "solder-1",
+          "current": 1.98,
+          "required": 3.8,
+          "unit": "mm",
+          "source": "Macaos / AGICORP / APTPCB DFM 指南"
+        },
+        {
+          "code": "MIN_OPENING_WIDTH",
+          "title": "开口宽度过窄",
+          "detail": "solder 开口 #2 最小尺寸 1.99mm < 3.8mm（Macaos 指南），易挂锡且铣刀加工困难。",
+          "severity": "warning",
+          "object_id": "solder-2",
+          "current": 1.99,
+          "required": 3.8,
+          "unit": "mm",
+          "source": "Macaos / AGICORP / APTPCB DFM 指南"
+        },
+        {
+          "code": "MIN_OPENING_WIDTH",
+          "title": "开口宽度过窄",
+          "detail": "solder 开口 #3 最小尺寸 1.98mm < 3.8mm（Macaos 指南），易挂锡且铣刀加工困难。",
+          "severity": "warning",
+          "object_id": "solder-3",
+          "current": 1.98,
+          "required": 3.8,
+          "unit": "mm",
+          "source": "Macaos / AGICORP / APTPCB DFM 指南"
+        },
+        {
+          "code": "MIN_OPENING_WIDTH",
+          "title": "开口宽度过窄",
+          "detail": "solder 开口 #4 最小尺寸 2.00mm < 3.8mm（Macaos 指南），易挂锡且铣刀加工困难。",
+          "severity": "warning",
+          "object_id": "solder-4",
+          "current": 2.0,
+          "required": 3.8,
+          "unit": "mm",
+          "source": "Macaos / AGICORP / APTPCB DFM 指南"
+        },
+        {
+          "code": "MIN_OPENING_WIDTH",
+          "title": "开口宽度过窄",
+          "detail": "solder 开口 #5 最小尺寸 1.98mm < 3.8mm（Macaos 指南），易挂锡且铣刀加工困难。",
+          "severity": "warning",
+          "object_id": "solder-5",
+          "current": 1.98,
+          "required": 3.8,
+          "unit": "mm",
+          "source": "Macaos / AGICORP / APTPCB DFM 指南"
+        },
+        {
+          "code": "SELECTIVE_NOZZLE_COLLISION",
+          "title": "选择焊喷嘴避障间隙不足",
+          "detail": "上锡开孔 #1 最小跨度 1.98mm < 所需安全间隙 15.00mm (Kurtz Ersa Versaflow 6mm Standard Nozzle 外径 9.0mm + 双侧避让 3.0mm)，喷嘴移动时存在碰撞治具侧壁风险。",
+          "severity": "warning",
+          "object_id": "solder-1",
+          "current": 1.98,
+          "required": 15.0,
+          "unit": "mm",
+          "source": "Ersa Versaflow Standard Selective Soldering Nozzles"
+        },
+        {
+          "code": "SELECTIVE_NOZZLE_COLLISION",
+          "title": "选择焊喷嘴避障间隙不足",
+          "detail": "上锡开孔 #2 最小跨度 1.99mm < 所需安全间隙 15.00mm (Kurtz Ersa Versaflow 6mm Standard Nozzle 外径 9.0mm + 双侧避让 3.0mm)，喷嘴移动时存在碰撞治具侧壁风险。",
+          "severity": "warning",
+          "object_id": "solder-2",
+          "current": 1.99,
+          "required": 15.0,
+          "unit": "mm",
+          "source": "Ersa Versaflow Standard Selective Soldering Nozzles"
+        },
+        {
+          "code": "SELECTIVE_NOZZLE_COLLISION",
+          "title": "选择焊喷嘴避障间隙不足",
+          "detail": "上锡开孔 #3 最小跨度 1.98mm < 所需安全间隙 15.00mm (Kurtz Ersa Versaflow 6mm Standard Nozzle 外径 9.0mm + 双侧避让 3.0mm)，喷嘴移动时存在碰撞治具侧壁风险。",
+          "severity": "warning",
+          "object_id": "solder-3",
+          "current": 1.98,
+          "required": 15.0,
+          "unit": "mm",
+          "source": "Ersa Versaflow Standard Selective Soldering Nozzles"
+        },
+        {
+          "code": "SELECTIVE_NOZZLE_COLLISION",
+          "title": "选择焊喷嘴避障间隙不足",
+          "detail": "上锡开孔 #4 最小跨度 2.00mm < 所需安全间隙 15.00mm (Kurtz Ersa Versaflow 6mm Standard Nozzle 外径 9.0mm + 双侧避让 3.0mm)，喷嘴移动时存在碰撞治具侧壁风险。",
+          "severity": "warning",
+          "object_id": "solder-4",
+          "current": 2.0,
+          "required": 15.0,
+          "unit": "mm",
+          "source": "Ersa Versaflow Standard Selective Soldering Nozzles"
+        },
+        {
+          "code": "SELECTIVE_NOZZLE_COLLISION",
+          "title": "选择焊喷嘴避障间隙不足",
+          "detail": "上锡开孔 #5 最小跨度 1.98mm < 所需安全间隙 15.00mm (Kurtz Ersa Versaflow 6mm Standard Nozzle 外径 9.0mm + 双侧避让 3.0mm)，喷嘴移动时存在碰撞治具侧壁风险。",
+          "severity": "warning",
+          "object_id": "solder-5",
+          "current": 1.98,
+          "required": 15.0,
+          "unit": "mm",
+          "source": "Ersa Versaflow Standard Selective Soldering Nozzles"
+        },
+        {
+          "code": "SOLDER_OPENING_ASPECT_RATIO",
+          "title": "上锡开孔深宽比过大导致透锡阻滞",
+          "detail": "上锡开孔 #1 最小跨度 1.98mm，开孔深宽比 3.99 > 1.2（深度 7.9mm）；熔融焊锡因毛细表面张力流动受阻，易导致透锡不良，建议外扩开孔或底部做 60° 倒角导流。",
+          "severity": "warning",
+          "object_id": "solder-1",
+          "current": 3.99,
+          "required": 1.2,
+          "unit": null,
+          "source": "AGICORP & SMTA Wave Soldering Cavity Aspect Ratio Guidelines"
+        },
+        {
+          "code": "SOLDER_OPENING_ASPECT_RATIO",
+          "title": "上锡开孔深宽比过大导致透锡阻滞",
+          "detail": "上锡开孔 #2 最小跨度 1.99mm，开孔深宽比 3.97 > 1.2（深度 7.9mm）；熔融焊锡因毛细表面张力流动受阻，易导致透锡不良，建议外扩开孔或底部做 60° 倒角导流。",
+          "severity": "warning",
+          "object_id": "solder-2",
+          "current": 3.97,
+          "required": 1.2,
+          "unit": null,
+          "source": "AGICORP & SMTA Wave Soldering Cavity Aspect Ratio Guidelines"
+        },
+        {
+          "code": "SOLDER_OPENING_ASPECT_RATIO",
+          "title": "上锡开孔深宽比过大导致透锡阻滞",
+          "detail": "上锡开孔 #3 最小跨度 1.98mm，开孔深宽比 3.99 > 1.2（深度 7.9mm）；熔融焊锡因毛细表面张力流动受阻，易导致透锡不良，建议外扩开孔或底部做 60° 倒角导流。",
+          "severity": "warning",
+          "object_id": "solder-3",
+          "current": 3.99,
+          "required": 1.2,
+          "unit": null,
+          "source": "AGICORP & SMTA Wave Soldering Cavity Aspect Ratio Guidelines"
+        },
+        {
+          "code": "SOLDER_OPENING_ASPECT_RATIO",
+          "title": "上锡开孔深宽比过大导致透锡阻滞",
+          "detail": "上锡开孔 #4 最小跨度 2.00mm，开孔深宽比 3.96 > 1.2（深度 7.9mm）；熔融焊锡因毛细表面张力流动受阻，易导致透锡不良，建议外扩开孔或底部做 60° 倒角导流。",
+          "severity": "warning",
+          "object_id": "solder-4",
+          "current": 3.96,
+          "required": 1.2,
+          "unit": null,
+          "source": "AGICORP & SMTA Wave Soldering Cavity Aspect Ratio Guidelines"
+        },
+        {
+          "code": "SOLDER_OPENING_ASPECT_RATIO",
+          "title": "上锡开孔深宽比过大导致透锡阻滞",
+          "detail": "上锡开孔 #5 最小跨度 1.98mm，开孔深宽比 3.99 > 1.2（深度 7.9mm）；熔融焊锡因毛细表面张力流动受阻，易导致透锡不良，建议外扩开孔或底部做 60° 倒角导流。",
+          "severity": "warning",
+          "object_id": "solder-5",
+          "current": 3.99,
+          "required": 1.2,
+          "unit": null,
+          "source": "AGICORP & SMTA Wave Soldering Cavity Aspect Ratio Guidelines"
+        },
+        {
+          "code": "CNC_NONSTANDARD_TOOL_DIAMETER",
+          "title": "刀具直径偏离标准刀具梯",
+          "detail": "刀路使用非标准直径 3.7mm；定制刀具交期 2~4 周且单价 2~3 倍，建议设计归梯至标准直径（标准刀具梯采购惯例：1.0/1.5/2.0/2.5/3.175/3.5/4.0/5.0/6.0mm）。",
+          "severity": "warning",
+          "object_id": null,
+          "current": 3.7,
+          "required": "standard ladder",
+          "unit": null,
+          "source": "Standard Tool Ladder Procurement Practice (End Mill & Drill Inventory)"
+        }
+      ]
+    },
+    "message": "治具生成成功"
+  },
+  "interference": {
+    "ok": true,
+    "job_id": "case_003",
+    "has_kicad": true,
+    "component_count": 17,
+    "interference_count": 2,
+    "interferences": [
+      {
+        "name": "L_0603_1608Metric",
+        "ref": "FB1",
+        "x": 23.035,
+        "y": -21.075,
+        "w": 24.32,
+        "h": 23.0,
+        "height": 1.5,
+        "default_height": 1.5,
+        "side": "FSide",
+        "fp_key": "unknown",
+        "source": "estimated",
+        "is_suspicious": true,
+        "suspicious_reason": "未知封装估算高度 (1.5mm)",
+        "interfering": true,
+        "overlap_mm3": 528.82,
+        "overlap_ratio": 0.6303,
+        "cover_ratio": 0.37,
+        "avoid_covered": false
+      },
+      {
+        "name": "QFN-56-1EP_7x7mm_P0.4mm_EP3.2x3.2mm",
+        "ref": "U1",
+        "x": 16.62,
+        "y": -10.655,
+        "w": 20.56,
+        "h": 15.98,
+        "height": 1.5,
+        "default_height": 1.5,
+        "side": "FSide",
+        "fp_key": "unknown",
+        "source": "estimated",
+        "is_suspicious": true,
+        "suspicious_reason": "未知封装估算高度 (1.5mm)",
+        "interfering": true,
+        "overlap_mm3": 202.32,
+        "overlap_ratio": 0.4105,
+        "cover_ratio": 0.57,
+        "avoid_covered": false
+      }
+    ],
+    "interference_boxes": [
+      {
+        "ref": "FB1",
+        "name": "L_0603_1608Metric",
+        "x": 23.035,
+        "y": -21.075,
+        "w": 24.32,
+        "h": 23.0,
+        "height": 1.5,
+        "overlap_mm3": 528.82,
+        "interfering": true
+      },
+      {
+        "ref": "U1",
+        "name": "QFN-56-1EP_7x7mm_P0.4mm_EP3.2x3.2mm",
+        "x": 16.62,
+        "y": -10.655,
+        "w": 20.56,
+        "h": 15.98,
+        "height": 1.5,
+        "overlap_mm3": 202.32,
+        "interfering": true
+      }
+    ],
+    "suspicious_components": [
+      {
+        "name": "L_0603_1608Metric",
+        "ref": "FB1",
+        "x": 23.035,
+        "y": -21.075,
+        "w": 24.32,
+        "h": 23.0,
+        "height": 1.5,
+        "default_height": 1.5,
+        "side": "FSide",
+        "fp_key": "unknown",
+        "source": "estimated",
+        "is_suspicious": true,
+        "suspicious_reason": "未知封装估算高度 (1.5mm)",
+        "interfering": true,
+        "overlap_mm3": 528.82,
+        "overlap_ratio": 0.6303,
+        "avoid_covered": false
+      },
+      {
+        "name": "QFN-56-1EP_7x7mm_P0.4mm_EP3.2x3.2mm",
+        "ref": "U1",
+        "x": 16.62,
+        "y": -10.655,
+        "w": 20.56,
+        "h": 15.98,
+        "height": 1.5,
+        "default_height": 1.5,
+        "side": "FSide",
+        "fp_key": "unknown",
+        "source": "estimated",
+        "is_suspicious": true,
+        "suspicious_reason": "未知封装估算高度 (1.5mm)",
+        "interfering": true,
+        "overlap_mm3": 202.32,
+        "overlap_ratio": 0.4105,
+        "avoid_covered": false
+      },
+      {
+        "name": "MountingHole_3.2mm_M3",
+        "ref": "H2",
+        "x": 33.5,
+        "y": -3.5,
+        "w": 34.0,
+        "h": 8.8,
+        "height": 1.5,
+        "default_height": 1.5,
+        "side": "FSide",
+        "fp_key": "unknown",
+        "source": "estimated",
+        "is_suspicious": true,
+        "suspicious_reason": "未知封装估算高度 (1.5mm)",
+        "interfering": false,
+        "overlap_mm3": 0.0
+      },
+      {
+        "name": "MountingHole_3.2mm_M3",
+        "ref": "H1",
+        "x": 3.5,
+        "y": -3.5,
+        "w": 4.0,
+        "h": 8.8,
+        "height": 1.5,
+        "default_height": 1.5,
+        "side": "FSide",
+        "fp_key": "unknown",
+        "source": "estimated",
+        "is_suspicious": true,
+        "suspicious_reason": "未知封装估算高度 (1.5mm)",
+        "interfering": false,
+        "overlap_mm3": 0.0
+      },
+      {
+        "name": "MountingHole_3.2mm_M3",
+        "ref": "H4",
+        "x": 33.5,
+        "y": -33.5,
+        "w": 34.0,
+        "h": 38.15,
+        "height": 1.5,
+        "default_height": 1.5,
+        "side": "FSide",
+        "fp_key": "unknown",
+        "source": "estimated",
+        "is_suspicious": true,
+        "suspicious_reason": "未知封装估算高度 (1.5mm)",
+        "interfering": false,
+        "overlap_mm3": 0.0
+      },
+      {
+        "name": "MountingHole_3.2mm_M3",
+        "ref": "H3",
+        "x": 3.5,
+        "y": -33.5,
+        "w": 4.0,
+        "h": 38.15,
+        "height": 1.5,
+        "default_height": 1.5,
+        "side": "FSide",
+        "fp_key": "unknown",
+        "source": "estimated",
+        "is_suspicious": true,
+        "suspicious_reason": "未知封装估算高度 (1.5mm)",
+        "interfering": false,
+        "overlap_mm3": 0.0
+      }
+    ],
+    "glb_url": "demo/case_003/fixture.glb",
+    "message": "分析完成：17 个元件，2 个干涉"
+  }
+}

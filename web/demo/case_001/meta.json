@@ -1,0 +1,125 @@
+{
+  "case_id": "case_001",
+  "title": "ESP32 物联网模块 (微型板)",
+  "description": "紧凑型外形，R1.85 狗骨头自动清角与高密度 DRC 生产安全门禁验证",
+  "generate": {
+    "ok": true,
+    "job_id": "case_001",
+    "dxf_url": "demo/case_001/fixture.dxf",
+    "png_url": "demo/case_001/fixture.png",
+    "gcode_url": "demo/case_001/fixture.nc",
+    "report_url": "demo/case_001/report.md",
+    "fai_url": "demo/case_001/fai.md",
+    "stl_url": "demo/case_001/fixture.stl",
+    "glb_url": "demo/case_001/fixture.glb",
+    "material": {
+      "key": "durostone",
+      "name": "Durostone 合成石",
+      "sheet_thickness": 10.0,
+      "weight_kg": 0.253,
+      "cost": {
+        "material_cost": 106.3,
+        "machining_cost": 57.2,
+        "total": 163.5,
+        "currency": "CNY",
+        "note": "按参考价与工时估算，仅作报价参考；实际以采购价与机台费率校准。"
+      },
+      "sink_depth": {}
+    },
+    "gcode_stats": {
+      "gcode_path": "C:\\Users\\31954\\dev\\repo-review\\wave-fixture-ai\\web\\demo\\case_001\\fixture.nc",
+      "material": "durostone",
+      "pallet_thickness": 10.0,
+      "board_pocket_depth": 1.9,
+      "pocket_ops": 424,
+      "profile_passes": 8,
+      "drill_groups": 1,
+      "tools": [
+        {
+          "number": 1,
+          "kind": "drill",
+          "dia_mm": 1.0,
+          "rpm": 18000.0
+        },
+        {
+          "number": 2,
+          "kind": "endmill",
+          "dia_mm": 3.7,
+          "rpm": 18000.0
+        }
+      ],
+      "line_count": 2289,
+      "cut_len_mm": 12176.8,
+      "rapid_len_mm": 20873.3,
+      "machining_minutes": 28.6,
+      "thickness": 10.0
+    },
+    "stats": {
+      "board_size": "75.0 × 120.0 mm",
+      "avoid_count": 0,
+      "solder_count": 0,
+      "cap_hole_count": 0,
+      "vent_count": 0,
+      "dogbone_count": 4
+    },
+    "drc": {
+      "allowed": true,
+      "counts": {
+        "info": 0,
+        "warning": 3,
+        "error": 0,
+        "blocking": 0
+      },
+      "worst": "warning",
+      "total": 3,
+      "issues": [
+        {
+          "code": "PIN_DIAMETER_TOO_SMALL",
+          "title": "定位销直径过小",
+          "detail": "定位销 #1 直径 1.00mm < 1.5mm，高温下强度不足且定位精度差；建议选 2.5-4.5mm 安装孔。",
+          "severity": "warning",
+          "object_id": null,
+          "current": 1.0,
+          "required": 1.5,
+          "unit": "mm",
+          "source": "Macaos / AGICORP / APTPCB DFM 指南"
+        },
+        {
+          "code": "PIN_DIAMETER_TOO_SMALL",
+          "title": "定位销直径过小",
+          "detail": "定位销 #2 直径 1.00mm < 1.5mm，高温下强度不足且定位精度差；建议选 2.5-4.5mm 安装孔。",
+          "severity": "warning",
+          "object_id": null,
+          "current": 1.0,
+          "required": 1.5,
+          "unit": "mm",
+          "source": "Macaos / AGICORP / APTPCB DFM 指南"
+        },
+        {
+          "code": "CNC_NONSTANDARD_TOOL_DIAMETER",
+          "title": "刀具直径偏离标准刀具梯",
+          "detail": "刀路使用非标准直径 3.7mm；定制刀具交期 2~4 周且单价 2~3 倍，建议设计归梯至标准直径（标准刀具梯采购惯例：1.0/1.5/2.0/2.5/3.175/3.5/4.0/5.0/6.0mm）。",
+          "severity": "warning",
+          "object_id": null,
+          "current": 3.7,
+          "required": "standard ladder",
+          "unit": null,
+          "source": "Standard Tool Ladder Procurement Practice (End Mill & Drill Inventory)"
+        }
+      ]
+    },
+    "message": "治具生成成功"
+  },
+  "interference": {
+    "ok": true,
+    "job_id": "case_001",
+    "has_kicad": false,
+    "component_count": 0,
+    "interference_count": 0,
+    "interferences": [],
+    "interference_boxes": [],
+    "suspicious_components": [],
+    "glb_url": "demo/case_001/fixture.glb",
+    "message": "纯 Gerber 模式，仅展示 3D 几何"
+  }
+}

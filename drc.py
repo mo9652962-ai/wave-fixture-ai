@@ -1404,6 +1404,50 @@ def run_drc(
                 )
             )
 
+    # ── AS. 超声波清洗重力自排液死角防炸锡检查 (AGICORP §4.5) ─────────────
+    # 深度 >= 4.0mm 且面积 >= 80mm² 的深避位死腔若无自流排液斜槽与贯通泄水孔，
+    # 清洗水剂残留遇 260°C 熔锡将瞬间剧烈汽化爆炸导致猛烈溅锡。
+    cd = getattr(r2, "cleaning_drainage", None)
+    req_cd = getattr(r2, "require_cleaning_drainage", False)
+    if req_cd:
+        deep_pockets = [a for a in avoids if _poly_ok(a) and a.area >= 80.0]
+        has_drain = bool(cd and getattr(cd, "total_drain_holes", 0) > 0)
+        if deep_pockets and not has_drain:
+            issues.append(
+                _issue(
+                    "CLEANING_DRAINAGE_DEAD_ZONE_RISK",
+                    "深避位腔死角缺少超声波清洗自排液槽与泄水孔",
+                    f"存在 {len(deep_pockets)} 处大面积深避位腔未规划 30°~45° 重力自排液斜槽与 Φ3.0mm 泄液通孔；"
+                    "超声波水基清洗残水无法在 10s 内自然排净，遇 260°C 液态锡将瞬间汽化炸锡飞溅（AGICORP §4.5）。",
+                    "warning",
+                    "AGICORP §4.5 Ultrasonic & Aqueous Wash Self-Draining Standards",
+                    current=0,
+                    required=len(deep_pockets),
+                )
+            )
+
+    # ── AT. 上盖浮动弹簧顶针微弹性缓冲压紧检查 (AGICORP §2.3 & SMTA) ─────
+    # 在上盖对元器件压紧时，若存在刚性机械压柱固定且缺少不锈钢浮动弹簧微弹性缓冲，
+    # 由于 PCB 热变形与器件装配公差，极易压爆铝电解电容外壳或压断焊接引脚。
+    spa = getattr(r2, "spring_plunger_array", None)
+    has_tophat = bool(getattr(r2, "top_hat", None))
+    req_plungers = getattr(r2, "require_spring_plungers", False)
+    if has_tophat and req_plungers:
+        p_cnt = getattr(spa, "total_plunger_count", 0) if spa else 0
+        if p_cnt == 0:
+            issues.append(
+                _issue(
+                    "RIGID_PLUNGER_COMPONENT_CRUSH_RISK",
+                    "上盖压紧缺少浮动弹簧微弹性顶针压碎元件风险",
+                    "铰链防翘曲上盖未规划不锈钢浮动弹簧顶针阵列 (Spring Plungers)；"
+                    "刚性固定压柱在 PCB 热翘曲与元器件高度公差下易压爆铝电解电容或压断引脚（AGICORP §2.3）。",
+                    "warning",
+                    "AGICORP §2.3 Spring Plunger Floating Pressure Standards",
+                    current=0,
+                    required=">=2 spring plungers",
+                )
+            )
+
     return issues
 
 
