@@ -127,6 +127,8 @@ class Phase2Result:
     esd_grounding: Any | None = None  # 工业防静电 ESD 接地端子规划 (esd_grounding.ESDGroundingResult)
     nitrogen_shroud: Any | None = None  # 氮气保护微环境导流罩 (nitrogen_shroud.NitrogenShroudResult)
     ergonomic_handling: Any | None = None  # 人机工程学重量与把手评估 (ergonomic_handling.ErgonomicHandlingResult)
+    cleaning_drainage: Any | None = None  # 超声波清洗重力自排液导流槽 (cleaning_drainage.CleaningDrainageResult)
+    spring_plunger_array: Any | None = None  # 上盖浮动弹簧顶针微弹性压紧阵列 (spring_plunger_array.SpringPlungerArrayResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -448,6 +450,8 @@ LAYER_COLORS2 = {
     "防静电接地": 6,  # 紫 (ESD 金属接地触钉)
     "氮气保护": 130,  # 青蓝 (氮气保护导流罩与均流缝)
     "人机工程手柄": 3,  # 绿 (ISO 11228-1 双手握持把手开孔)
+    "清洗排液": 141,  # 蓝绿 (超声波清洗自排液槽与泄水孔)
+    "弹簧压针": 21,  # 亮洋红 (浮动弹簧顶针微弹性压紧触点)
 }
 
 
@@ -687,6 +691,20 @@ def export_dxf2(
 
         export_ergonomic_handling_to_dxf(msp, eh)
 
+    # 超声波清洗重力自排液导流槽 (AGICORP §4.5)
+    cd = getattr(result, "cleaning_drainage", None)
+    if cd:
+        from cleaning_drainage import export_cleaning_drainage_to_dxf
+
+        export_cleaning_drainage_to_dxf(msp, cd)
+
+    # 浮动弹簧顶针微弹性压紧阵列 (AGICORP §2.3)
+    spa = getattr(result, "spring_plunger_array", None)
+    if spa:
+        from spring_plunger_array import export_spring_plunger_array_to_dxf
+
+        export_spring_plunger_array_to_dxf(msp, spa)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -907,6 +925,16 @@ def run_phase2(
         else None
     )
 
+    # 超声波清洗重力自排液导流槽 (AGICORP §4.5)
+    from cleaning_drainage import plan_cleaning_drainage
+
+    cd_res = plan_cleaning_drainage(avoid, sink_poly=sink) if avoid else None
+
+    # 上盖浮动弹簧顶针微弹性压紧阵列 (AGICORP §2.3)
+    from spring_plunger_array import plan_spring_plunger_array
+
+    spa_res = plan_spring_plunger_array(sink, solder_polys=solder) if _shape_ok(sink) else None
+
     lightening_res = None
     if getattr(params2, "enable_lightening", True):
         lightening_res = generate_lightening_pockets(
@@ -950,6 +978,8 @@ def run_phase2(
         esd_grounding=esd_res,
         nitrogen_shroud=ns_res,
         ergonomic_handling=eh_res,
+        cleaning_drainage=cd_res,
+        spring_plunger_array=spa_res,
     )
 
     if out_dxf:

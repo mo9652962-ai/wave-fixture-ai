@@ -907,6 +907,207 @@ summary:focus-visible {
     width: calc(100vw - 16px);
   }
 }
+
+/* ============================================================
+   零摩擦 1-Click 在线 3D 体验案例条 (GitHub Pages & 本地静态演示)
+   ============================================================ */
+.demo-showcase-bar {
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 0 15px rgba(37, 99, 235, 0.12);
+  backdrop-filter: blur(10px);
+}
+.demo-showcase-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.demo-showcase-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.demo-badge {
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
+}
+.demo-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.demo-mode-tag {
+  font-size: 12px;
+  padding: 3px 8px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #10b981;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+.demo-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .demo-chips-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.demo-case-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-primary);
+  position: relative;
+  overflow: hidden;
+}
+.demo-case-btn:hover {
+  background: var(--bg-card);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+.demo-case-btn.active {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: #3b82f6;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+}
+.demo-case-btn.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #3b82f6;
+}
+.case-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.case-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.case-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.case-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 离线安全隐私弹窗 */
+.privacy-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-normal);
+}
+.privacy-modal-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.privacy-modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  max-width: 580px;
+  width: 100%;
+  padding: 24px;
+  box-shadow: var(--shadow-lg), 0 0 30px rgba(37, 99, 235, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.privacy-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.privacy-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fff;
+}
+.privacy-modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+}
+.privacy-modal-close:hover {
+  color: #fff;
+}
+.privacy-modal-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.code-block-banner {
+  background: #0b0d14;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: #60a5fa;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 0;
+}
+.privacy-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
 </style>
   <!-- three.js 用于 3D 预览（ES module 方式，GLTFLoader 非模块版 r150+ 已移除）-->
   <script type="importmap">
@@ -923,20 +1124,55 @@ summary:focus-visible {
 <div class="container">
   <header>
     <div class="header-brand">
-      <div class="logo">⚙️ 波峰焊治具 <span>AI 设计助手</span><span class="version-badge">v0.3.2</span></div>
+      <div class="logo">⚙️ 波峰焊治具 <span>AI 设计助手</span><span class="version-badge">v0.5.1</span></div>
       <div class="subtitle">拖入 Gerber 文件 → 自动生成治具 DXF 工程图与 CNC 刀路（工业级 CAM 避位）</div>
     </div>
     <div class="header-actions">
       <nav class="header-nav" aria-label="主要功能导航">
+        <a href="#demoShowcaseBar" class="nav-link">3D 演示</a>
         <a href="#dropzone" class="nav-link">上传</a>
         <a href="#result" class="nav-link">2D 预览</a>
         <a href="#preview3dPanel" class="nav-link">3D 治具</a>
         <a href="#interfBtn" class="nav-link">干涉分析</a>
         <a href="#adjustInput" class="nav-link">微调</a>
       </nav>
-      <a href="https://github.com/mo9652962-ai" target="_blank" rel="noopener noreferrer" class="btn btn-ghost" aria-label="访问 GitHub 仓库">GitHub</a>
+      <a href="https://github.com/mo9652962-ai/wave-fixture-ai" target="_blank" rel="noopener noreferrer" class="btn btn-ghost" aria-label="访问 GitHub 仓库">GitHub</a>
     </div>
   </header>
+
+  <!-- 免安装 1-Click 在线 3D 体验案例条 -->
+  <div class="demo-showcase-bar" id="demoShowcaseBar">
+    <div class="demo-showcase-header">
+      <div class="demo-showcase-title">
+        <span class="demo-badge">🚀 免安装 3D 快速体验</span>
+        <span class="demo-subtitle">无需本地环境 · 1-Click 体验全自动治具生成、3D 避位与元件干涉分析</span>
+      </div>
+      <div class="demo-mode-tag" id="demoModeTag">✨ 纯前端零摩擦演示</div>
+    </div>
+    <div class="demo-chips-grid">
+      <button type="button" class="demo-case-btn active" id="btnCase003" data-case="case_003" title="点击加载 STM32 工业四层板案例">
+        <span class="case-icon">💎</span>
+        <div class="case-info">
+          <span class="case-name">Case 003 · STM32 工业四层板</span>
+          <span class="case-desc">贴片+插件混装 · 3D干涉分析高亮 · 71条DRC通过</span>
+        </div>
+      </button>
+      <button type="button" class="demo-case-btn" id="btnCase002" data-case="case_002" title="点击加载空调主控电源板案例">
+        <span class="case-icon">🏭</span>
+        <div class="case-info">
+          <span class="case-name">Case 002 · 空调主控电源板</span>
+          <span class="case-desc">大跨度混装板 · 波峰焊防渣导流槽 · 钛合金嵌件</span>
+        </div>
+      </button>
+      <button type="button" class="demo-case-btn" id="btnCase001" data-case="case_001" title="点击加载 ESP32 微型物联网模块案例">
+        <span class="case-icon">⚡</span>
+        <div class="case-info">
+          <span class="case-name">Case 001 · ESP32 物联网模块</span>
+          <span class="case-desc">微型板卡 · R1.85 自动清角 · 生产安全门禁</span>
+        </div>
+      </button>
+    </div>
+  </div>
 
   <!-- 拖拽上传 -->
   <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="拖拽或点击上传 Gerber 文件">
@@ -1326,6 +1562,10 @@ fileInput.addEventListener('change', () => {
 
 // 生成
 generateBtn.addEventListener('click', async () => {
+  if (IS_STATIC_DEMO) {
+    showPrivacyModal();
+    return;
+  }
   if (!files.length) { showStatus('请先拖入文件', 'error'); return; }
   generateBtn.disabled = true;
   generateBtn.innerHTML = '<span class="spinner"></span>生成中...';
@@ -1356,7 +1596,11 @@ generateBtn.addEventListener('click', async () => {
       showResult(data);
     }
   } catch (e) {
-    showStatus('❌ ' + e.message, 'error', e.stack || e.message);
+    if (e.message && (e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch') || IS_STATIC_DEMO)) {
+      showPrivacyModal();
+    } else {
+      showStatus('❌ ' + e.message, 'error', e.stack || e.message);
+    }
   } finally {
     generateBtn.disabled = false;
     generateBtn.innerHTML = '🚀 生成治具';
@@ -1369,6 +1613,14 @@ function showResult(data) {
   document.getElementById('previewImg').src = data.png_url;
   document.getElementById('downloadDxf').href = data.dxf_url;
   document.getElementById('downloadPng').href = data.png_url;
+  if (data.stl_url) {
+    const stlBtn = document.getElementById('downloadStl');
+    if (stlBtn) { stlBtn.href = data.stl_url; stlBtn.style.display = ''; }
+  }
+  if (data.glb_url) {
+    const glbBtn = document.getElementById('downloadGlb');
+    if (glbBtn) { glbBtn.href = data.glb_url; glbBtn.style.display = ''; }
+  }
   // 企业级交付按钮（G 代码 / 生产报告，按可用性显隐）
   const gcodeBtn = document.getElementById('downloadGcode');
   const reportBtn = document.getElementById('downloadReport');
@@ -2267,6 +2519,158 @@ async function loadGLB(url) {
 // 初始化可疑元件交互表筛选器与按钮状态
 initSuspFilterChips();
 updateApplyButtonState();
+
+// ============================================================
+// 零摩擦 1-Click 在线 3D 体验案例加载器 (GitHub Pages & 本地环境通用)
+// ============================================================
+const IS_STATIC_DEMO = window.location.hostname.endsWith('github.io') || window.location.protocol === 'file:';
+
+if (IS_STATIC_DEMO) {
+  const tag = document.getElementById('demoModeTag');
+  if (tag) tag.textContent = '🌐 在线 3D 快速体验站 (免后端)';
+}
+
+function showPrivacyModal() {
+  const modal = document.getElementById('privacyModal');
+  if (modal) modal.classList.add('show');
+}
+
+function hidePrivacyModal() {
+  const modal = document.getElementById('privacyModal');
+  if (modal) modal.classList.remove('show');
+}
+
+document.getElementById('closePrivacyModal')?.addEventListener('click', hidePrivacyModal);
+document.getElementById('dismissPrivacyBtn')?.addEventListener('click', hidePrivacyModal);
+document.getElementById('privacyModal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'privacyModal') hidePrivacyModal();
+});
+document.getElementById('copyCmdBtn')?.addEventListener('click', () => {
+  const txt = document.getElementById('offlineCmdText')?.textContent || 'uvx wave-fixture-ai';
+  navigator.clipboard.writeText(txt).then(() => {
+    showStatus('📋 本地离线启动命令已复制到剪贴板', 'success');
+  }).catch(() => {
+    showStatus('复制失败，请手动选中复制', 'warn');
+  });
+});
+document.getElementById('viewDemoBtn')?.addEventListener('click', () => {
+  hidePrivacyModal();
+  loadDemoCase('case_003');
+});
+
+async function loadDemoCase(caseId) {
+  try {
+    startTopProgress();
+    showStatus(`🚀 正在载入 3D 案例 [${caseId}]...`, 'info');
+
+    // 切换按钮高亮
+    document.querySelectorAll('.demo-case-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.case === caseId);
+    });
+
+    const metaUrl = `demo/${caseId}/meta.json`;
+    const resp = await fetch(metaUrl);
+    if (!resp.ok) {
+      throw new Error(`无法获取案例数据 (${resp.status})`);
+    }
+    const meta = await resp.json();
+
+    if (meta.generate) {
+      currentJobId = meta.generate.job_id || caseId;
+      showResult(meta.generate);
+    }
+
+    if (meta.interference) {
+      const interf = meta.interference;
+      const resultEl = document.getElementById('interfResult');
+      const n = interf.interference_count || 0;
+      const totalComps = interf.component_count || 0;
+      currentSuspiciousList = interf.suspicious_components || [];
+
+      if (resultEl) {
+        if (n > 0) {
+          resultEl.innerHTML = `<span style="color:var(--error)">⚠️ ${escapeHtml(interf.message)}</span><br><small>${(interf.interferences || []).map(r => r.ref + ' ' + r.name + ' 重叠' + r.overlap_mm3 + 'mm³').join('；')}</small>`;
+        } else {
+          resultEl.innerHTML = `<span style="color:var(--success)">✅ ${escapeHtml(interf.message)}</span>`;
+        }
+      }
+
+      const badgeEl = document.getElementById('interfStatsBadge');
+      if (badgeEl) {
+        badgeEl.innerHTML = `<span style="color:${n > 0 ? 'var(--error)' : 'var(--success)'}">● ${n > 0 ? n + ' 处干涉' : '0 干涉'}</span> · ${totalComps} 个元件`;
+      }
+
+      if (interf.glb_url) {
+        const p3d = document.getElementById('interf3dPanel');
+        if (p3d) {
+          p3d.style.display = 'block';
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            renderInterference3D(interf.glb_url, interf.interference_boxes || [], currentSuspiciousList);
+          }));
+        }
+      }
+
+      const suspPanel = document.getElementById('suspTableContainer');
+      if (suspPanel) {
+        if (currentSuspiciousList.length > 0) {
+          suspPanel.style.display = 'block';
+          renderSuspiciousTable(currentSuspiciousList);
+        } else {
+          suspPanel.style.display = 'none';
+        }
+      }
+    }
+
+    showStatus(`✅ 案例 ${meta.title || caseId} 加载成功！可旋转 3D 查看治具沉板与元件干涉`, 'success');
+  } catch (err) {
+    console.error('loadDemoCase failed:', err);
+    showStatus(`❌ 加载演示案例失败: ${err.message}`, 'error');
+  } finally {
+    finishTopProgress();
+  }
+}
+
+// 绑定演示案例按钮
+document.querySelectorAll('.demo-case-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    loadDemoCase(btn.dataset.case);
+  });
+});
+
+// 默认延迟载入 Case 003（旗舰工业四层板）
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    loadDemoCase('case_003');
+  }, 120);
+});
 </script>
+
+<!-- 离线隐私保护与安全提示弹窗 -->
+<div class="privacy-modal-overlay" id="privacyModal" role="dialog" aria-modal="true" aria-labelledby="privacyTitle">
+  <div class="privacy-modal-card">
+    <div class="privacy-modal-header">
+      <div class="privacy-modal-title" id="privacyTitle">
+        <span>🛡️ 企业级硬件设计安全防护 · 离线使用建议</span>
+      </div>
+      <button class="privacy-modal-close" id="closePrivacyModal" aria-label="关闭">&times;</button>
+    </div>
+    <div class="privacy-modal-body">
+      <p>为严格保障企业硬件资产与涉密 PCB 图纸绝对安全，<strong>在线演示站不向公有云服务器上传处理您的私有工程文件</strong>。</p>
+      <p style="margin-top:8px;">wave-fixture-ai 是 100% 离线运行的开源工业工具，推荐在您的本地开发机或车间工控机直接运行：</p>
+      <div class="code-block-banner">
+        <span id="offlineCmdText">uvx wave-fixture-ai</span>
+        <button class="btn btn-ghost" id="copyCmdBtn" style="padding:4px 10px;font-size:12px;">📋 复制</button>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:6px;">
+        亦可通过 <code>pip install wave-fixture-ai && wave-fixture-ai</code> 启动本地服务，支持完整 21 项自动化与 71 项 DRC 门禁。
+      </p>
+    </div>
+    <div class="privacy-modal-actions">
+      <button class="btn btn-ghost" id="dismissPrivacyBtn">了解并关闭</button>
+      <button class="btn btn-primary" id="viewDemoBtn">✨ 查看预置工业案例</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "case_003",
+    "title": "STM32 工业四层板 (旗舰展示)",
+    "description": "4层高密度板，含多种贴片与插装元件、沉板清角与 3D 实体干涉高亮",
+    "path": "demo/case_003/meta.json"
+  },
+  {
+    "id": "case_002",
+    "title": "空调主控电源板 (混装大板)",
+    "description": "大跨度混装板，高电解电容与继电器避位，波峰焊防渣导流与钛合金嵌件",
+    "path": "demo/case_002/meta.json"
+  },
+  {
+    "id": "case_001",
+    "title": "ESP32 物联网模块 (微型板)",
+    "description": "紧凑型外形，R1.85 狗骨头自动清角与高密度 DRC 生产安全门禁验证",
+    "path": "demo/case_001/meta.json"
+  }
+]

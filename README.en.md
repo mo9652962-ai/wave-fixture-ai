@@ -9,6 +9,8 @@
   **wave-fixture-ai turns wave-soldering fixture design from manual CAD drafting into one command: drop in PCB Gerber files and it auto-generates sink regions, handles, avoid zones, solder areas, screw holes, locating pins and the fixture outline — exporting DXF/STL/GLB with 3D preview, component interference analysis, and natural-language parameter adjustment.**
 
   <p>
+    <a href="https://mo9652962-ai.github.io/wave-fixture-ai/"><strong>🌐 Live 3D Demo</strong></a>
+    ·
     <a href="README.md">🇨🇳 中文</a>
     ·
     <a href="#-use-in-ci-github-action">🤖 GitHub Action</a>
@@ -23,11 +25,12 @@
   </p>
 
   <p>
+    <a href="https://mo9652962-ai.github.io/wave-fixture-ai/"><img src="https://img.shields.io/badge/Demo-Live%203D%20Showcase-success?style=flat-square&logo=googlechrome&logoColor=white" alt="Live Demo"></a>
     <a href="https://github.com/mo9652962-ai/wave-fixture-ai/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/mo9652962-ai/wave-fixture-ai/ci.yml?style=flat-square&label=CI" alt="CI"></a>
     <img src="https://img.shields.io/badge/features-21%20automations-2563EB?style=flat-square" alt="features">
-    <img src="https://img.shields.io/badge/DRC-69_Rules-059669?style=flat-square" alt="69 DRC rules">
+    <img src="https://img.shields.io/badge/DRC-71_Rules-059669?style=flat-square" alt="71 DRC rules">
     <img src="https://img.shields.io/badge/KiCad-10%20compatible-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
-    <img src="https://img.shields.io/badge/tests-362%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/tests-367%20passed-success?style=flat-square" alt="tests">
     <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
     <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
@@ -37,6 +40,11 @@
 
 <div align="center">
   <img src="docs/images/banner-1200x630.png" alt="WAVE FIXTURE AI" width="100%">
+</div>
+
+<div align="center">
+  <img src="docs/images/demo.gif" alt="wave-fixture-ai: Gerber in · Fixture CAM out · 3D Preview · Interference Analysis" width="92%">
+  <p><sub>▲ 21 automations · DXF / STL / GLB / CNC G-code / Production report deliverables · Web UI or CLI</sub></p>
 </div>
 
 ## The 21 automations
@@ -56,7 +64,7 @@
 | 11 | **3D preview** (STL/GLB export + in-browser viewer) | ✅ |
 | 12 | **Interference analysis** (2D coverage + 3D boolean dual test) | ✅ |
 | 13 | **Natural-language adjustment** (29 parameters) | ✅ |
-| 14 | **DRC manufacturing safety gate** (69 rules · 4 severities · cited) | ✅ |
+| 14 | **DRC manufacturing safety gate** (71 rules · 4 severities · cited) | ✅ |
 | 15 | **Golden sample regression** (IoU≥0.9 · Hausdorff≤0.5mm · circle best-match) | ✅ |
 | 16 | **Human review loop** (missing-data gating → operator audit log) | ✅ |
 | 17 | **Locating pin scoring** (diameter window / NPTH / edge distance) | ✅ |
