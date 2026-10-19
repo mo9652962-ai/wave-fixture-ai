@@ -59,9 +59,19 @@ def test_pcm_plugin_files_and_icon_integrity():
 
 
 def test_pcm_zip_archive_integrity():
-    meta = json.loads(METADATA_FILE.read_text(encoding="utf-8"))
+    import sys
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from build_kicad_pcm_package import build_pcm_package, validate_source_files
+
+    meta = validate_source_files()
     version = meta["versions"][0]["version"]
     zip_path = DIST_DIR / f"wave-fixture-ai-kicad-pcm-v{version}.zip"
+
+    # If not yet built on fresh CI checkout, run builder to verify end-to-end build
+    if not zip_path.is_file():
+        zip_path = build_pcm_package(meta)
 
     assert zip_path.is_file(), f"Distribution zip missing at {zip_path}"
 
@@ -72,7 +82,9 @@ def test_pcm_zip_archive_integrity():
             h.update(chunk)
     actual_sha = h.hexdigest().lower()
 
-    claimed_sha = meta["versions"][0]["download_sha256"].lower()
+    # Re-read metadata after possible build
+    updated_meta = json.loads(METADATA_FILE.read_text(encoding="utf-8"))
+    claimed_sha = updated_meta["versions"][0]["download_sha256"].lower()
     assert actual_sha == claimed_sha, f"SHA256 mismatch: claimed={claimed_sha}, actual={actual_sha}"
 
     # Verify file contents inside zip
