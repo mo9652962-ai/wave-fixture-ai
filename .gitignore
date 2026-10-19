@@ -15,3 +15,4 @@ coverage.xml
 # Local build output
 dist/
 build/
+community/kicad-pcm/dist/
