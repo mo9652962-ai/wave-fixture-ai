@@ -129,6 +129,8 @@ class Phase2Result:
     ergonomic_handling: Any | None = None  # 人机工程学重量与把手评估 (ergonomic_handling.ErgonomicHandlingResult)
     cleaning_drainage: Any | None = None  # 超声波清洗重力自排液导流槽 (cleaning_drainage.CleaningDrainageResult)
     spring_plunger_array: Any | None = None  # 上盖浮动弹簧顶针微弹性压紧阵列 (spring_plunger_array.SpringPlungerArrayResult)
+    thermal_sag_support: Any | None = None  # 中跨防热塌陷支承托块 (thermal_sag_support.ThermalSagSupportResult)
+    rfid_cavity: Any | None = None  # 耐高温 UHF RFID 嵌入沉腔 (rfid_cavity.RFIDCavityResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -452,6 +454,8 @@ LAYER_COLORS2 = {
     "人机工程手柄": 3,  # 绿 (ISO 11228-1 双手握持把手开孔)
     "清洗排液": 141,  # 蓝绿 (超声波清洗自排液槽与泄水孔)
     "弹簧压针": 21,  # 亮洋红 (浮动弹簧顶针微弹性压紧触点)
+    "防热塌托块": 14,  # 橄榄金 (中跨防热塌陷支承托块)
+    "RFID追溯": 5,  # 蓝 (耐高温陶瓷 UHF RFID 沉腔)
 }
 
 
@@ -705,6 +709,20 @@ def export_dxf2(
 
         export_spring_plunger_array_to_dxf(msp, spa)
 
+    # 防热塌陷支承托块 (SMTA & Ersa)
+    tss = getattr(result, "thermal_sag_support", None)
+    if tss:
+        from thermal_sag_support import export_thermal_sag_supports_to_dxf
+
+        export_thermal_sag_supports_to_dxf(msp, tss)
+
+    # 耐高温 UHF RFID 嵌入沉腔 (IPC-1782A)
+    rfid = getattr(result, "rfid_cavity", None)
+    if rfid:
+        from rfid_cavity import export_rfid_cavity_to_dxf
+
+        export_rfid_cavity_to_dxf(msp, rfid)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -935,6 +953,35 @@ def run_phase2(
 
     spa_res = plan_spring_plunger_array(sink, solder_polys=solder) if _shape_ok(sink) else None
 
+    # 防热塌陷支承托块 (SMTA & Ersa)
+    from thermal_sag_support import plan_thermal_sag_supports
+
+    tss_res = (
+        plan_thermal_sag_supports(
+            sink,
+            solder_polys=solder,
+            avoid_polys=avoid,
+            pcb_thickness_mm=float(getattr(params1, "pcb_thickness_mm", 1.6) or 1.6),
+        )
+        if _shape_ok(sink)
+        else None
+    )
+
+    # 耐高温陶瓷 UHF RFID 嵌入沉腔 (IPC-1782A & ISO 18000-6C)
+    from rfid_cavity import plan_rfid_embedded_cavity
+
+    metal_blocks: list[Any] = []
+    if stiffener and getattr(stiffener, "poly", None):
+        metal_blocks.append(stiffener.poly)
+    if ti_res and getattr(ti_res, "blade_polys", None):
+        metal_blocks.extend(ti_res.blade_polys)
+
+    rfid_res = (
+        plan_rfid_embedded_cavity(outer.outer_poly, metal_keepouts=metal_blocks)
+        if _shape_ok(outer.outer_poly)
+        else None
+    )
+
     lightening_res = None
     if getattr(params2, "enable_lightening", True):
         lightening_res = generate_lightening_pockets(
@@ -980,6 +1027,8 @@ def run_phase2(
         ergonomic_handling=eh_res,
         cleaning_drainage=cd_res,
         spring_plunger_array=spa_res,
+        thermal_sag_support=tss_res,
+        rfid_cavity=rfid_res,
     )
 
     if out_dxf:

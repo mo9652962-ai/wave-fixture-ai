@@ -34,7 +34,7 @@
       "status": "stable",
       "kicad_version": ">=8.0.0",
       "download_url": "https://github.com/mo9652962-ai/wave-fixture-ai/releases/download/v0.5.1/wave-fixture-ai-kicad-pcm-v0.5.1.zip",
-      "download_sha256": "c775a2feaf2c8b2e3a384834cb2701061a4720549c4b373ed2f25f49c2e9cd49",
+      "download_sha256": "44bae9c7a3233392ab9b010c851abe3b796186d93869342e616ecd430793b419",
       "download_size": 6484,
       "install_size": 8982
     }

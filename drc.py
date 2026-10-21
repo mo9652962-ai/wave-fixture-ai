@@ -1448,6 +1448,47 @@ def run_drc(
                 )
             )
 
+    # ── AU. 薄板与大跨度 PCB 防热塌陷托块检查 (SMTA & Ersa Anti-Sag) ─────
+    # PCB 跨度 >= 160mm 或板厚 <= 1.2mm 时，若未在中跨规划防塌陷支承托块，
+    # 260°C 高温下 FR-4 弹性模量跌落导致热塌下垂 (>1.5mm)，引发正面漫锡短路。
+    tss = getattr(r2, "thermal_sag_support", None)
+    if _poly_ok(sink):
+        s_span = max(sink.bounds[2] - sink.bounds[0], sink.bounds[3] - sink.bounds[1])
+        has_pillars = bool(tss and getattr(tss, "total_pillar_count", 0) > 0)
+        req_sag = getattr(r2, "require_anti_sag_support", False)
+        if s_span >= 160.0 and req_sag and not has_pillars:
+            issues.append(
+                _issue(
+                    "PCB_THERMAL_SAG_SUPPORT_MISSING",
+                    "大跨度板卡沉板区缺少防热塌陷支承托块",
+                    f"沉板中跨跨度达 {s_span:.0f}mm ≥ 160mm 且未规划中跨支承托块 (Support Pillars)；"
+                    "过 260°C 波峰时 FR-4 热态刚度丧失引发板心严重下垂 (>1.5mm)，极易导致熔锡漫入顶面（SMTA 规范）。",
+                    "warning",
+                    "SMTA Wave Soldering Handbook & Ersa Carrier Anti-Sag Guidelines",
+                    current=round(s_span, 1),
+                    required=160.0,
+                )
+            )
+
+    # ── AV. 工业 RFID 电子标签金属抗失谐间隙检查 (IPC-1782A & ISO 18000-6C)
+    # 陶瓷超高频 RFID 标签沉腔与金属构件间距必须 >= 8.0mm，防止涡流失谐导致读距归零。
+    rfid = getattr(r2, "rfid_cavity", None)
+    if rfid and getattr(rfid, "cavity_poly", None):
+        clr = getattr(rfid, "min_clearance_to_metal_mm", 999.0)
+        if 0.0 <= clr < 8.0:
+            issues.append(
+                _issue(
+                    "RFID_TAG_METAL_DETUNING_RISK",
+                    "RFID 电子标签距金属构件过近射频涡流失谐风险",
+                    f"RFID 嵌入沉腔边缘距金属加强件/导轨最小间距 {clr:.2f}mm < 8.0mm；"
+                    "金属反射电磁场诱发反向涡流产生严重失谐，导致扫码读距骤降甚至无法识读（IPC-1782A）。",
+                    "warning",
+                    "IPC-1782A & ISO/IEC 18000-6C Anti-Metal UHF RFID Standards",
+                    current=round(clr, 2),
+                    required=8.0,
+                )
+            )
+
     return issues
 
 

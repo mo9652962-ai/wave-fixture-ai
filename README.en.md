@@ -28,9 +28,9 @@
     <a href="https://mo9652962-ai.github.io/wave-fixture-ai/"><img src="https://img.shields.io/badge/Demo-Live%203D%20Showcase-success?style=flat-square&logo=googlechrome&logoColor=white" alt="Live Demo"></a>
     <a href="https://github.com/mo9652962-ai/wave-fixture-ai/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/mo9652962-ai/wave-fixture-ai/ci.yml?style=flat-square&label=CI" alt="CI"></a>
     <img src="https://img.shields.io/badge/features-21%20automations-2563EB?style=flat-square" alt="features">
-    <img src="https://img.shields.io/badge/DRC-71_Rules-059669?style=flat-square" alt="71 DRC rules">
+    <img src="https://img.shields.io/badge/DRC-73_Rules-059669?style=flat-square" alt="73 DRC rules">
     <img src="https://img.shields.io/badge/KiCad-10%20compatible-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
-    <img src="https://img.shields.io/badge/tests-371%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/tests-377%20passed-success?style=flat-square" alt="tests">
     <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
     <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
@@ -64,7 +64,7 @@
 | 11 | **3D preview** (STL/GLB export + in-browser viewer) | ✅ |
 | 12 | **Interference analysis** (2D coverage + 3D boolean dual test) | ✅ |
 | 13 | **Natural-language adjustment** (29 parameters) | ✅ |
-| 14 | **DRC manufacturing safety gate** (71 rules · 4 severities · cited) | ✅ |
+| 14 | **DRC manufacturing safety gate** (73 rules · 4 severities · cited) | ✅ |
 | 15 | **Golden sample regression** (IoU≥0.9 · Hausdorff≤0.5mm · circle best-match) | ✅ |
 | 16 | **Human review loop** (missing-data gating → operator audit log) | ✅ |
 | 17 | **Locating pin scoring** (diameter window / NPTH / edge distance) | ✅ |
