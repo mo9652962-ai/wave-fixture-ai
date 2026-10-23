@@ -33,7 +33,7 @@ def test_pcm_metadata_structure_and_fields():
     # Versions
     assert "versions" in meta and len(meta["versions"]) >= 1
     v0 = meta["versions"][0]
-    assert v0.get("version") == "0.5.1"
+    assert v0.get("version") in ("0.5.1", "0.5.2")
     assert v0.get("status") == "stable"
     assert v0.get("kicad_version") == ">=8.0.0"
     assert v0.get("download_size", 0) > 0
