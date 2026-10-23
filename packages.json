@@ -1,0 +1,48 @@
+{
+  "$schema": "https://go.kicad.org/pcm/schemas/v1",
+  "packages": [
+    {
+      "$schema": "https://go.kicad.org/pcm/schemas/v1",
+      "identifier": "com.github.mo9652962-ai.wave-fixture-ai",
+      "type": "plugin",
+      "name": "Wave Fixture AI",
+      "description": "Automated Wave Soldering Pallet & Selective Solder Fixture CAM Engine",
+      "description_full": "Wave Fixture AI turns your KiCad board into production-grade wave soldering pallet CAD drawings, watertight 3D models, and CNC G-code in seconds. Features 21 CAM automations, 3D component collision detection, 73 DRC manufacturing rules, and direct RS-274 G-code toolpath generation.",
+      "category": "plugin",
+      "author": {
+        "name": "mo9652962-ai",
+        "contact": {
+          "github": "https://github.com/mo9652962-ai"
+        }
+      },
+      "license": "MIT",
+      "resources": {
+        "homepage": "https://github.com/mo9652962-ai/wave-fixture-ai",
+        "repository": "https://github.com/mo9652962-ai/wave-fixture-ai",
+        "demo": "https://mo9652962-ai.github.io/wave-fixture-ai/"
+      },
+      "tags": [
+        "wave-soldering",
+        "fixture",
+        "pallet",
+        "manufacturing",
+        "cam",
+        "drc",
+        "cnc",
+        "gcode",
+        "3d"
+      ],
+      "versions": [
+        {
+          "version": "0.5.2",
+          "status": "stable",
+          "kicad_version": ">=8.0.0",
+          "download_url": "https://github.com/mo9652962-ai/wave-fixture-ai/releases/download/v0.5.2/wave-fixture-ai-kicad-pcm-v0.5.2.zip",
+          "download_sha256": "7eaa563b852f6ca9824305ceacb811a9bb50fb4f42f582c3203003050f8d4798",
+          "download_size": 6491,
+          "install_size": 8959
+        }
+      ]
+    }
+  ]
+}
