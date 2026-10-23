@@ -131,6 +131,8 @@ class Phase2Result:
     spring_plunger_array: Any | None = None  # 上盖浮动弹簧顶针微弹性压紧阵列 (spring_plunger_array.SpringPlungerArrayResult)
     thermal_sag_support: Any | None = None  # 中跨防热塌陷支承托块 (thermal_sag_support.ThermalSagSupportResult)
     rfid_cavity: Any | None = None  # 耐高温 UHF RFID 嵌入沉腔 (rfid_cavity.RFIDCavityResult)
+    solder_pot_health: Any | None = None  # 锡炉熔锡杂质健康监控 (solder_pot_health.SolderPotHealthResult)
+    flux_coating_control: Any | None = None  # 助焊剂喷雾涂覆量与比重控制 (flux_coating_control.FluxCoatingResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -991,6 +993,41 @@ def run_phase2(
             pocket_depth_mm=getattr(params2, "lightening_depth_mm", 5.0),
         )
 
+    # 锡炉熔锡杂质健康监控 (IPC J-STD-001 §5.2)——按化验参数覆盖可选挂载
+    from solder_pot_health import SolderPotHealthParams, monitor_solder_pot_health
+
+    pot_assay = getattr(params2, "solder_pot_assay_wt_pct", None)
+    sph_res = (
+        monitor_solder_pot_health(
+            impurity_wt_pct=dict(pot_assay),
+            copper_accumulation_rate_wt_pct_per_day=float(
+                getattr(params2, "copper_accumulation_rate_wt_pct_per_day", 0.0) or 0.0
+            ),
+            params=SolderPotHealthParams(
+                pot_capacity_kg=float(getattr(params2, "solder_pot_capacity_kg", 300.0)),
+                boards_per_day=int(getattr(params2, "boards_per_day", 800)),
+            ),
+        )
+        if isinstance(pot_assay, dict) and pot_assay
+        else None
+    )
+
+    # 助焊剂喷雾涂覆量与比重控制 (SMTA 工艺窗口)——按产线参数可选挂载
+    from flux_coating_control import control_flux_coating
+
+    flux_rate = getattr(params2, "flux_spray_rate_ml_per_min", None)
+    fcc_res = (
+        control_flux_coating(
+            spray_rate_ml_per_min=float(flux_rate),
+            conveyor_speed_m_per_min=float(getattr(params2, "conveyor_speed_m_per_min", 1.20)),
+            spray_width_mm=float(getattr(params2, "flux_spray_width_mm", 350.0)),
+            flux_solids_content_pct=float(getattr(params2, "flux_solids_content_pct", 2.5)),
+            flux_specific_gravity=float(getattr(params2, "flux_specific_gravity", 1.005)),
+        )
+        if flux_rate is not None
+        else None
+    )
+
     result2 = Phase2Result(
         avoid_polys=avoid,
         solder_polys=solder,
@@ -1029,6 +1066,8 @@ def run_phase2(
         spring_plunger_array=spa_res,
         thermal_sag_support=tss_res,
         rfid_cavity=rfid_res,
+        solder_pot_health=sph_res,
+        flux_coating_control=fcc_res,
     )
 
     if out_dxf:

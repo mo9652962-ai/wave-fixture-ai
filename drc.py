@@ -1489,6 +1489,73 @@ def run_drc(
                 )
             )
 
+    # ── AW. 锡炉熔锡杂质超标与维护节拍失控检查 (IPC J-STD-001 §5.2) ────────
+    # 无铅 SAC305 锡炉铜含量 > 0.85 wt% 或铁/锌/镉超标时，焊料润湿特性劣化，
+    # 产生灰暗颗粒焊点与桥连拉尖；捞渣/化验节拍失控将放大氧化夹渣虚焊。
+    sph = getattr(r2, "solder_pot_health", None)
+    if sph:
+        for vio in getattr(sph, "violations", []) or []:
+            issues.append(
+                _issue(
+                    "SOLDER_POT_CONTAMINATION_EXCEEDED",
+                    "锡炉熔锡杂质含量超出 J-STD-001 上限",
+                    f"锡炉 {vio['element']} 实测 {vio['measured_wt_pct']:.3f} wt% > 上限 {vio['limit_wt_pct']:.3f} wt%；"
+                    "焊料液相线与润湿性已漂移，焊点将呈颗粒灰暗并批量桥连/拉尖，须立即排旧锡补纯锭稀释"
+                    "并复核光谱化验（IPC J-STD-001 §5.2）。",
+                    "warning",
+                    "IPC J-STD-001 §5.2 Solder Pot Purity Limits & SMTA Pot Maintenance",
+                    current=round(vio["measured_wt_pct"], 4),
+                    required=round(vio["limit_wt_pct"], 4),
+                    unit="wt%",
+                )
+            )
+    elif getattr(r2, "require_solder_pot_monitoring", False):
+        issues.append(
+            _issue(
+                "SOLDER_POT_CONTAMINATION_EXCEEDED",
+                "量产线锡炉杂质监控数据缺失",
+                "产线声明需要锡炉健康监控（require_solder_pot_monitoring）但未挂载最新光谱化验结果；"
+                "铜含量无数据时无法排除 0.85 wt% 超限风险，灰暗焊点与桥连缺陷不可控（IPC J-STD-001 §5.2）。",
+                "warning",
+                "IPC J-STD-001 §5.2 Solder Pot Purity & Assay Scheduling",
+            )
+        )
+
+    # ── AX. 助焊剂喷雾涂覆量与比重窗口检查 (SMTA & Flux Vendor Window) ─────
+    # 涂覆量须处于 300~1200 μg/cm² 窗口：不足则顶端爬锡不良批量虚焊，
+    # 过量则免清洗残留推高离子污染并爆沸飞溅污染预热器。
+    fcc = getattr(r2, "flux_coating_control", None)
+    if fcc:
+        cw = getattr(fcc, "coating_weight_ug_cm2", 0.0)
+        if not getattr(fcc, "is_within_window", True):
+            issues.append(
+                _issue(
+                    "FLUX_COATING_WEIGHT_OUT_OF_WINDOW",
+                    "助焊剂喷雾涂覆量偏离 300~1200 μg/cm² 工艺窗口",
+                    f"板面实测涂覆量 {cw:.0f} μg/cm² 偏离工艺窗口；"
+                    + ("活化剂不足以破除氧化膜，通孔顶端爬锡不足将批量虚焊（SMTA）。" if cw < 300.0
+                       else "残留活化剂将推高板面离子污染且预热爆沸飞溅污染加热管（SMTA）。"),
+                    "warning",
+                    "SMTA Wave Soldering Handbook Flux Coating Window (300~1200 μg/cm²)",
+                    current=round(cw, 1),
+                    required="300~1200 μg/cm²",
+                )
+            )
+        if not getattr(fcc, "is_sg_within_window", True):
+            sg = getattr(fcc, "flux_specific_gravity", 1.005)
+            issues.append(
+                _issue(
+                    "FLUX_COATING_WEIGHT_OUT_OF_WINDOW",
+                    "助焊剂比重偏离 0.995~1.015 g/cm³ 控制窗口",
+                    f"助焊剂比重实测 {sg:.4f} g/cm³ 偏离窗口，固含量漂移使涂覆量标定失效；"
+                    "须按折光仪 °Bx 补水稀释或补充原液，重标定后方可继续生产（SMTA/Vendor 规范）。",
+                    "warning",
+                    "SMTA Flux Specific Gravity Control Window (0.995~1.015 g/cm³ @ 25°C)",
+                    current=round(sg, 4),
+                    required="0.995~1.015 g/cm³",
+                )
+            )
+
     return issues
 
 
