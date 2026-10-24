@@ -1556,6 +1556,81 @@ def run_drc(
                 )
             )
 
+    # ── AY. 预热区升温斜率/出口温度/浸润时间窗口检查 (J-STD-001E §4.4) ──────
+    # 斜率 1~4°C/s、出口 100~130°C (水基 105~125°C)、浸润 60~120s、板-波温差 <=130°C。
+    php = getattr(r2, "preheat_profile", None)
+    if php:
+        if not getattr(php, "is_ramp_compliant", True):
+            issues.append(
+                _issue(
+                    "PREHEAT_PROFILE_OUT_OF_WINDOW",
+                    "预热区升温斜率偏离 1~4°C/s 工艺窗口",
+                    f"升温斜率 {php.ramp_rate_c_per_s:.2f}°C/s 超窗；过快致 FR-4 芯吸分层与元件体"
+                    "热冲击微裂，过慢致产线节拍浪费（IPC J-STD-001E §4.4 / SMTA）。",
+                    "warning",
+                    "IPC J-STD-001E §4.4 Preheat Ramp Rate Window (1~4 °C/s)",
+                    current=round(php.ramp_rate_c_per_s, 2),
+                    required="1.0~4.0 °C/s",
+                )
+            )
+        if not getattr(php, "is_exit_temp_compliant", True):
+            issues.append(
+                _issue(
+                    "PREHEAT_PROFILE_OUT_OF_WINDOW",
+                    "预热出口板温偏离助焊剂活化窗口",
+                    f"出口板温 {php.exit_temp_c:.0f}°C 偏离窗口（{php.flux_type}）；"
+                    "低温入波炸锡锡珠飞溅，高温活化剂提前耗尽通孔虚焊（J-STD-001E §4.4）。",
+                    "warning",
+                    "IPC J-STD-001E §4.4 Preheat Exit Temperature Window (100~130 °C)",
+                    current=round(php.exit_temp_c, 1),
+                    required="100~130 °C",
+                )
+            )
+        if not getattr(php, "is_thermal_shock_ok", True):
+            issues.append(
+                _issue(
+                    "PREHEAT_PROFILE_OUT_OF_WINDOW",
+                    "板温与锡波温差超 155°C 热冲击风险",
+                    f"入波瞬间温差 {php.thermal_shock_delta_c:.0f}°C > 155°C：骤热冲击将引发板翘"
+                    "与金属化孔应力裂纹，须延长预热压差（IPC J-STD-001E §4.4）。",
+                    "warning",
+                    "IPC J-STD-001E §4.4 Thermal Shock Limit (ΔT <= 155 °C)",
+                    current=round(php.thermal_shock_delta_c, 1),
+                    required=155.0,
+                )
+            )
+
+    # ── AZ. 出板冷却速率与冷却区长度检查 (J-STD-001E §4.5) ─────────────────
+    # 冷却速率 <=4°C/s 防枝晶粗化冻结与板翘；冷却区须使出板 <=60°C 安全下板。
+    cdc = getattr(r2, "cooldown_control", None)
+    if cdc:
+        if not getattr(cdc, "is_rate_compliant", True):
+            issues.append(
+                _issue(
+                    "COOLDOWN_RATE_EXCESSIVE",
+                    "出板冷却速率超 4°C/s 上限",
+                    f"实测/模型冷却速率 {cdc.measured_cooling_rate_c_per_s:.2f}°C/s > 4.0°C/s："
+                    "焊点枝晶粗化冻结降疲劳寿命 30~50%，板体 z 向应力翘曲超 0.75% 限值（J-STD-001E §4.5）。",
+                    "warning",
+                    "IPC J-STD-001E §4.5 Cooling Rate Limit (<= 4.0 °C/s)",
+                    current=round(cdc.measured_cooling_rate_c_per_s, 2),
+                    required=4.0,
+                )
+            )
+        if not getattr(cdc, "is_length_sufficient", True):
+            issues.append(
+                _issue(
+                    "COOLDOWN_RATE_EXCESSIVE",
+                    "冷却区长度不足以降温至安全下板温度",
+                    f"冷却区 {cdc.available_cooling_length_m:.2f}m < 所需 {cdc.required_cooling_length_m:.2f}m，"
+                    f"出板 {cdc.exit_handle_temp_c:.0f}°C > 60°C：堆叠烫伤板面且焊点受压变形（SMTA 冷却规范）。",
+                    "warning",
+                    "SMTA Post-Wave Cooling Zone Sizing (exit <= 60 °C)",
+                    current=round(cdc.available_cooling_length_m, 2),
+                    required=round(cdc.required_cooling_length_m, 2),
+                )
+            )
+
     return issues
 
 

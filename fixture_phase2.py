@@ -133,6 +133,8 @@ class Phase2Result:
     rfid_cavity: Any | None = None  # 耐高温 UHF RFID 嵌入沉腔 (rfid_cavity.RFIDCavityResult)
     solder_pot_health: Any | None = None  # 锡炉熔锡杂质健康监控 (solder_pot_health.SolderPotHealthResult)
     flux_coating_control: Any | None = None  # 助焊剂喷雾涂覆量与比重控制 (flux_coating_control.FluxCoatingResult)
+    preheat_profile: Any | None = None  # 预热区升温斜率与活化窗口检查 (preheat_profile.PreheatProfileResult)
+    cooldown_control: Any | None = None  # 出板冷却速率与冷却区长度控制 (cooldown_control.CooldownControlResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1028,6 +1030,48 @@ def run_phase2(
         else None
     )
 
+    # 预热区升温斜率与助焊剂活化窗口检查 (J-STD-001E §4.4)——按炉温参数可选挂载
+    from preheat_profile import check_preheat_profile
+
+    preheat_len = getattr(params2, "preheat_length_m", None)
+    php_res = (
+        check_preheat_profile(
+            preheat_length_m=float(preheat_len),
+            conveyor_speed_m_per_min=float(getattr(params2, "conveyor_speed_m_per_min", 1.2)),
+            preheat_zone1_temp_c=float(getattr(params2, "preheat_zone1_temp_c", 110.0)),
+            preheat_zone2_temp_c=float(getattr(params2, "preheat_zone2_temp_c", 140.0)),
+            measured_exit_temp_c=(
+                float(params2.measured_preheat_exit_temp_c)
+                if hasattr(params2, "measured_preheat_exit_temp_c")
+                and params2.measured_preheat_exit_temp_c is not None
+                else None
+            ),
+            flux_type=str(getattr(params2, "flux_type", "no_clean")),
+        )
+        if preheat_len is not None
+        else None
+    )
+
+    # 出板冷却速率与冷却区长度控制 (J-STD-001E §4.5)——按冷却参数可选挂载
+    from cooldown_control import check_cooldown_control
+
+    cooling_len = getattr(params2, "cooling_zone_length_m", None)
+    cdc_res = (
+        check_cooldown_control(
+            conveyor_speed_m_per_min=float(getattr(params2, "conveyor_speed_m_per_min", 1.2)),
+            cooling_zone_length_m=float(cooling_len),
+            fan_speed_pct=float(getattr(params2, "cooling_fan_speed_pct", 60.0)),
+            measured_cooling_rate_c_per_s=(
+                float(params2.measured_cooling_rate_c_per_s)
+                if hasattr(params2, "measured_cooling_rate_c_per_s")
+                and params2.measured_cooling_rate_c_per_s is not None
+                else None
+            ),
+        )
+        if cooling_len is not None
+        else None
+    )
+
     result2 = Phase2Result(
         avoid_polys=avoid,
         solder_polys=solder,
@@ -1068,6 +1112,8 @@ def run_phase2(
         rfid_cavity=rfid_res,
         solder_pot_health=sph_res,
         flux_coating_control=fcc_res,
+        preheat_profile=php_res,
+        cooldown_control=cdc_res,
     )
 
     if out_dxf:
