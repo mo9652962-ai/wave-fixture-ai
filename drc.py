@@ -1631,6 +1631,50 @@ def run_drc(
                 )
             )
 
+    # ── BA. 库房存储堆叠与防静电环境检查 (AGICORP §6.2 & ESD S20.20) ────────
+    # 堆叠超限压坏密封面、无隔垫互磨、非 EPA 区静电、温湿度超限受潮。
+    srk = getattr(r2, "pallet_storage_rack", None)
+    if srk:
+        for v_text in getattr(srk, "violations", []) or []:
+            issues.append(
+                _issue(
+                    "PALLET_STORAGE_STACKING_VIOLATION",
+                    "治具库房存储堆叠/环境规范违规",
+                    f"{v_text} 需按整改清单处置后再入库/投产（AGICORP §6.2 & ANSI/ESD S20.20）。",
+                    "warning",
+                    "AGICORP §6.2 Storage & ANSI/ESD S20.20 EPA Requirements",
+                )
+            )
+        if getattr(srk, "bake_required", False):
+            issues.append(
+                _issue(
+                    "PALLET_STORAGE_STACKING_VIOLATION",
+                    "受潮治具投产前缺少烘干除潮",
+                    "治具暴露 >48h 后直接过 260°C 波峰将蒸汽炸裂分层；"
+                    "须 80°C/4h 烘干并复测表面电阻后投产（AGICORP §6.2）。",
+                    "warning",
+                    "AGICORP §6.2 Storage Moisture Bake-out Requirements",
+                )
+            )
+
+    # ── BB. SMED 快速换型套件架构检查 (Shingo SMED) ─────────────────────────
+    # 混线 >=3 品种仍用整具换型 (无通用基板) 时，每次换型损失 25~45min 纯产能。
+    ck = getattr(r2, "changeover_kit", None)
+    if ck and not getattr(ck, "uses_common_base", True):
+        issues.append(
+            _issue(
+                "SMED_CHANGEOVER_KIT_MISSING",
+                "混线产线缺少通用基板+嵌件 SMED 快换架构",
+                f"{getattr(ck, 'product_families', 0)} 产品族仍采用整具换型 (25~45min/次)："
+                "迁移到通用基板+防呆编码嵌件架构可将换型压至 <10min，混线日产可挽回 2~3h 产能（Shingo SMED）。",
+                "warning",
+                "Shingo SMED & Lean Production Changeover Standards",
+                current=round(getattr(ck, "estimated_changeover_min", 30.0), 1),
+                required=10.0,
+                unit="min",
+            )
+        )
+
     return issues
 
 
