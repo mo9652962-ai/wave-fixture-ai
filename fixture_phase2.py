@@ -137,6 +137,8 @@ class Phase2Result:
     cooldown_control: Any | None = None  # 出板冷却速率与冷却区长度控制 (cooldown_control.CooldownControlResult)
     pallet_storage_rack: Any | None = None  # 库房存储堆叠与环境合规 (pallet_storage_rack.StorageRackResult)
     changeover_kit: Any | None = None  # SMED 快速换型套件规划 (changeover_kit.ChangeoverKitResult)
+    selective_nozzle_profile: Any | None = None  # 选焊喷嘴浸润/驻留窗口 (selective_nozzle_profile.NozzleProfileResult)
+    dross_bridging_predictor: Any | None = None  # 锡渣桥连/冰柱预测 (dross_bridging_predictor.DrossBridgingResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1110,6 +1112,35 @@ def run_phase2(
         else None
     )
 
+    # 选择焊喷嘴浸润/驻留窗口 (AllPCB & ERSA/SEHO)——按喷嘴参数可选挂载
+    from selective_nozzle_profile import optimize_selective_nozzle_profile
+
+    snp_res = None
+    if getattr(params2, "selective_nozzle_dia_mm", None):
+        snp_res = optimize_selective_nozzle_profile(
+            nozzle_inner_dia_mm=float(params2.selective_nozzle_dia_mm),
+            pump_speed_pct=float(getattr(params2, "selective_pump_speed_pct", 60.0)),
+            pcb_thickness_mm=float(getattr(params1, "pcb_thickness_mm", 1.6) or 1.6),
+            plated_hole_dia_mm=float(getattr(params2, "selective_hole_dia_mm", 0.9)),
+            measured_dwell_s=getattr(params2, "selective_measured_dwell_s", None),
+            nozzle_age_cycles=int(getattr(params2, "selective_nozzle_cycles", 0)),
+            has_nitrogen=bool(getattr(params2, "enable_nitrogen", True)),
+        )
+
+    # 锡渣桥连/冰柱预测 (Macaos & Sierra Circuits)——按上锡开孔统计
+    from dross_bridging_predictor import predict_dross_bridging
+
+    dbp_res = None
+    if solder and _shape_ok(sink):
+        dbp_res = predict_dross_bridging(
+            sink_area_mm2=sink.area,
+            solder_openings_area_mm2=sum(p.area for p in solder),
+            min_pin_gap_mm=float(getattr(params2, "min_pin_gap_mm", 1.2)),
+            peel_off_angle_deg=float(getattr(params2, "peel_off_angle_deg", 4.5)),
+            has_nitrogen=bool(getattr(params2, "enable_nitrogen", True)),
+            wave_type=str(getattr(params2, "wave_type", "laminar")),
+        )
+
     result2 = Phase2Result(
         avoid_polys=avoid,
         solder_polys=solder,
@@ -1154,6 +1185,8 @@ def run_phase2(
         cooldown_control=cdc_res,
         pallet_storage_rack=srk_res,
         changeover_kit=ck_res,
+        selective_nozzle_profile=snp_res,
+        dross_bridging_predictor=dbp_res,
     )
 
     if out_dxf:

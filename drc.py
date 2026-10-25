@@ -1675,6 +1675,94 @@ def run_drc(
             )
         )
 
+    # ── BC. 选择焊喷嘴浸润深度/驻留时间窗口检查 (AllPCB 2026 & ERSA/SEHO) ────
+    # 浸润深度 <60% 板厚孔填充不足；驻留 <1s/>5s 分别虚焊与锡渣拉尖。
+    snp = getattr(r2, "selective_nozzle_profile", None)
+    if snp:
+        if not getattr(snp, "is_immersion_ok", True):
+            issues.append(
+                _issue(
+                    "SELECTIVE_NOZZLE_WINDOW_VIOLATION",
+                    "选择焊喷嘴浸润深度偏离板厚 60~80% 窗口",
+                    f"浸润深度 {snp.immersion_depth_mm:.2f}mm 仅板厚 {snp.immersion_fraction:.0%}；"
+                    "波高不足致通孔填充与上锡不良，过深致锡珠飞溅顶面漫锡（AllPCB 2026 / SEHO MWS 2300）。",
+                    "warning",
+                    "AllPCB Selective Soldering Process Windows & SEHO Nozzle Z-Height",
+                    current=round(snp.immersion_fraction, 2),
+                    required="0.6~1.3 板厚",
+                )
+            )
+        if not getattr(snp, "is_dwell_ok", True):
+            issues.append(
+                _issue(
+                    "SELECTIVE_NOZZLE_WINDOW_VIOLATION",
+                    "选择焊驻留时间偏离 1~5s 工艺窗口",
+                    f"实测驻留 {snp.dwell_time_s:.2f}s 超窗：不足则孔填充率 {snp.est_hole_fill_pct:.0f}% "
+                    "虚焊，超时则喷嘴锡渣积聚与助焊剂挥发殆尽拉尖桥连（Rayming/Chuxin 基线 1~3s）。",
+                    "warning",
+                    "Rayming & Chuxin Selective Dwell Baseline (1~3s, ≤5s hard limit)",
+                    current=round(snp.dwell_time_s, 2),
+                    required="1.0~5.0 s",
+                )
+            )
+        if getattr(snp, "retinning_recommended", False):
+            issues.append(
+                _issue(
+                    "SELECTIVE_NOZZLE_WINDOW_VIOLATION",
+                    "浸润式喷嘴磨损超限需重新镀锡活化",
+                    f"喷嘴累计 {getattr(snp, 'nozzle_wear_factor', 1.0):.2f}× 磨损因子：有效浸润深度漂移，"
+                    "按 ERSA/SEHO 规范执行 re-tinning 活化并复测波高（ERSA Accessory Catalogue）。",
+                    "warning",
+                    "ERSA Select Wave Nozzle Re-Tinning Procedure",
+                )
+            )
+
+    # ── BD. 锡渣桥连/拖锡冰柱预测检查 (Macaos §2 & Sierra Circuits) ─────────
+    # 开孔暴露比 >60% 放大拖锡；引脚间距 <0.8mm 桥连；离波角 <4° 冰柱。
+    dbp = getattr(r2, "dross_bridging_predictor", None)
+    if dbp:
+        if not getattr(dbp, "is_exposure_ok", True):
+            issues.append(
+                _issue(
+                    "DROSS_BRIDGING_ICICLE_RISK",
+                    "治具开孔暴露比超限放大拖锡与锡渣",
+                    f"上锡开孔暴露比 {dbp.exposed_ratio:.0%} > 60%：拖锡面积与锡渣生成面积同步放大，"
+                    "桥连/锡珠概率陡增（Macaos §2：开孔须贴近板外形）。",
+                    "warning",
+                    "Macaos Selective Wave Guidelines §2 Opening Sizing",
+                    current=round(dbp.exposed_ratio, 2),
+                    required=0.6,
+                )
+            )
+        if getattr(dbp, "bridge_risk_pins", None):
+            issues.append(
+                _issue(
+                    "DROSS_BRIDGING_ICICLE_RISK",
+                    "细间距引脚群离波桥连高危",
+                    f"最小引脚间距 {dbp.min_pin_gap_mm:.2f}mm < 0.8mm，高危位号 "
+                    f"{', '.join(dbp.bridge_risk_pins[:4])}：离波拖锡尖峰将搭接短路（Sierra Circuits）。",
+                    "warning",
+                    "Sierra Circuits Wave Peel-off & Bridging Criteria",
+                    current=round(dbp.min_pin_gap_mm, 2),
+                    required=0.8,
+                    unit="mm",
+                )
+            )
+        if getattr(dbp, "icicle_risk", False):
+            issues.append(
+                _issue(
+                    "DROSS_BRIDGING_ICICLE_RISK",
+                    "离波角不足将拖出冰柱",
+                    f"离波角 {dbp.peel_off_angle_deg:.1f}° < 4°：表面张力无法自然缩颈，"
+                    "引脚末端拖锡成冰柱并污染出板滚轮（Sierra Circuits / Bob Willis）。",
+                    "warning",
+                    "Sierra Circuits Controlled Board Separation from the Wave",
+                    current=round(dbp.peel_off_angle_deg, 1),
+                    required=4.0,
+                    unit="°",
+                )
+            )
+
     return issues
 
 
