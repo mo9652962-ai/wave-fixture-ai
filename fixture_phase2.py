@@ -135,6 +135,8 @@ class Phase2Result:
     flux_coating_control: Any | None = None  # 助焊剂喷雾涂覆量与比重控制 (flux_coating_control.FluxCoatingResult)
     preheat_profile: Any | None = None  # 预热区升温斜率与活化窗口检查 (preheat_profile.PreheatProfileResult)
     cooldown_control: Any | None = None  # 出板冷却速率与冷却区长度控制 (cooldown_control.CooldownControlResult)
+    pallet_storage_rack: Any | None = None  # 库房存储堆叠与环境合规 (pallet_storage_rack.StorageRackResult)
+    changeover_kit: Any | None = None  # SMED 快速换型套件规划 (changeover_kit.ChangeoverKitResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1072,6 +1074,42 @@ def run_phase2(
         else None
     )
 
+    # 库房存储堆叠与环境合规 (AGICORP §6.2)——按存储参数可选挂载
+    from pallet_storage_rack import check_storage_rack
+
+    store_stack = getattr(params2, "storage_actual_stack", None)
+    srk_res = (
+        check_storage_rack(
+            pallet_mass_kg=float(getattr(eh_res, "total_mass_kg", 6.0) if eh_res else 6.0),
+            footprint_w_mm=float(getattr(params2, "storage_footprint_w_mm", 350.0)),
+            footprint_h_mm=float(getattr(params2, "storage_footprint_h_mm", 300.0)),
+            actual_stack=int(store_stack),
+            has_interlayer_pads=bool(getattr(params2, "storage_has_pads", False)),
+            is_epa_grounded=bool(getattr(params2, "storage_is_epa", False)),
+            storage_temp_c=float(getattr(params2, "storage_temp_c", 25.0)),
+            storage_rh_pct=float(getattr(params2, "storage_rh_pct", 50.0)),
+            exposure_h_since_last_run=float(getattr(params2, "storage_exposure_h", 24.0)),
+        )
+        if store_stack is not None
+        else None
+    )
+
+    # SMED 快速换型套件规划 (Shingo SMED)——按混线参数可选挂载
+    from changeover_kit import plan_changeover_kit
+
+    fam_count = getattr(params2, "product_families", None)
+    ck_res = (
+        plan_changeover_kit(
+            product_families=int(fam_count),
+            daily_changeovers=int(getattr(params2, "daily_changeovers", 4)),
+            uses_common_base=bool(getattr(params2, "uses_common_base", True)),
+            has_poka_yoke_pins=bool(getattr(params2, "has_poka_yoke_pins", True)),
+            externalization_rate=float(getattr(params2, "externalization_rate", 0.7)),
+        )
+        if fam_count is not None
+        else None
+    )
+
     result2 = Phase2Result(
         avoid_polys=avoid,
         solder_polys=solder,
@@ -1114,6 +1152,8 @@ def run_phase2(
         flux_coating_control=fcc_res,
         preheat_profile=php_res,
         cooldown_control=cdc_res,
+        pallet_storage_rack=srk_res,
+        changeover_kit=ck_res,
     )
 
     if out_dxf:
