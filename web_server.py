@@ -689,12 +689,32 @@ async def api_generate(
                 f"{traceback.format_exc()}"
             )
 
+        # 一键打包完整交付包 (ZIP)
+        bundle_url = None
+        try:
+            bundle_zip = OUTPUT_DIR / f"{workdir.name}-bundle.zip"
+            with zipfile.ZipFile(bundle_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                if dxf_path.is_file():
+                    zf.write(dxf_path, dxf_path.name)
+                if png_path.is_file():
+                    zf.write(png_path, png_path.name)
+                if gcode_path.is_file():
+                    zf.write(gcode_path, gcode_path.name)
+                if report_path.is_file():
+                    zf.write(report_path, report_path.name)
+                if fai_path and Path(fai_path).is_file():
+                    zf.write(fai_path, Path(fai_path).name)
+            bundle_url = f"/dl/{bundle_zip.name}"
+        except Exception as b_err:
+            log.debug("bundle zip 生成跳过: %s", b_err)
+
         msg = "治具生成成功"
         if not verdict["allowed"]:
             msg = (
                 f"DRC 门禁未通过（blocking {verdict['counts']['blocking']} / "
                 f"error {verdict['counts']['error']}）——仅提供带水印预览版，修正后可出生产版"
             )
+        log.info(f"✨ 治具生成交付完成: {workdir.name} | ⭐ GitHub: https://github.com/mo9652962-ai/wave-fixture-ai")
         return JSONResponse(
             {
                 "ok": True,
@@ -703,6 +723,7 @@ async def api_generate(
                 "gcode_url": gcode_url,
                 "report_url": report_url,
                 "fai_url": fai_url,
+                "bundle_url": bundle_url,
                 "material": material_stats,
                 "gcode_stats": gcode_stats,
                 "job_id": workdir.name,

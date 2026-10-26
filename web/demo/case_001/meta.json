@@ -12,6 +12,7 @@
     "fai_url": "demo/case_001/fai.md",
     "stl_url": "demo/case_001/fixture.stl",
     "glb_url": "demo/case_001/fixture.glb",
+    "bundle_url": "demo/case_001/bundle.zip",
     "material": {
       "key": "durostone",
       "name": "Durostone 合成石",

@@ -1136,7 +1136,7 @@ summary:focus-visible {
         <a href="#interfBtn" class="nav-link">干涉分析</a>
         <a href="#adjustInput" class="nav-link">微调</a>
       </nav>
-      <a href="https://github.com/mo9652962-ai/wave-fixture-ai" target="_blank" rel="noopener noreferrer" class="btn btn-ghost" aria-label="访问 GitHub 仓库">GitHub</a>
+      <a href="https://github.com/mo9652962-ai/wave-fixture-ai" target="_blank" rel="noopener noreferrer" class="btn btn-star" aria-label="前往 GitHub 点赞 Star" style="background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.38);color:#facc15;font-weight:600;display:inline-flex;align-items:center;gap:6px;">⭐ Star on GitHub</a>
     </div>
   </header>
 
@@ -1293,6 +1293,7 @@ summary:focus-visible {
         <h4>生成统计</h4>
         <div id="statsBody"></div>
         <div class="download-bar">
+          <a class="btn btn-primary" id="downloadBundle" href="#" download style="display:none;background:linear-gradient(90deg,#2563eb,#1d4ed8);box-shadow:0 0 10px rgba(37,99,235,0.4);font-weight:600;">📦 一键下载交付包 (ZIP)</a>
           <a class="btn btn-primary" id="downloadDxf" href="#" download>⬇️ 下载 DXF</a>
           <a class="btn btn-ghost" id="downloadGcode" href="#" download>⬇️ CNC G 代码</a>
           <a class="btn btn-ghost" id="downloadReport" href="#" download>📋 生产报告</a>
@@ -1621,6 +1622,16 @@ function showResult(data) {
     const glbBtn = document.getElementById('downloadGlb');
     if (glbBtn) { glbBtn.href = data.glb_url; glbBtn.style.display = ''; }
   }
+  // 一键下载交付包 (ZIP)
+  const bundleBtn = document.getElementById('downloadBundle');
+  if (bundleBtn) {
+    if (data.bundle_url) {
+      bundleBtn.href = data.bundle_url;
+      bundleBtn.style.display = '';
+    } else {
+      bundleBtn.style.display = 'none';
+    }
+  }
   // 企业级交付按钮（G 代码 / 生产报告，按可用性显隐）
   const gcodeBtn = document.getElementById('downloadGcode');
   const reportBtn = document.getElementById('downloadReport');
@@ -1686,6 +1697,11 @@ function showResult(data) {
     }
     html += '</div></details></div>';
   }
+  // Star 转化引导卡片
+  html += '<div style="margin-top:14px;padding:10px 12px;background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.25);border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+    + '<span style="font-size:12px;color:var(--text-secondary);">⭐ 喜欢 wave-fixture-ai？如果帮您节省了治具设计工时，点个 Star 支持开源！</span>'
+    + '<a href="https://github.com/mo9652962-ai/wave-fixture-ai" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="padding:4px 10px;font-size:11px;font-weight:bold;background:#eab308;color:#0a0b0e;border-radius:4px;white-space:nowrap;text-decoration:none;">⭐ Star 关注</a>'
+    + '</div>';
   document.getElementById('statsBody').innerHTML = html;
   result.classList.add('show');
   if (drc && !drc.allowed) {

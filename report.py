@@ -235,6 +235,7 @@ def build_report(
     ap("")
     ap("---")
     ap(
+        "⭐ **喜欢 wave-fixture-ai？** 如果此工具为您节省了治具设计与制造工时，欢迎在 [GitHub 点个 Star](https://github.com/mo9652962-ai/wave-fixture-ai) 支持开源工业工程！\n\n"
         "<sub>由 wave-fixture-ai 自动生成 · DRC 规则与材料数据出处见 drc.py / materials.py 头注</sub>"
     )
     ap("")

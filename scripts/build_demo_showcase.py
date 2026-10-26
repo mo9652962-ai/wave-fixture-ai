@@ -262,6 +262,26 @@ def process_case(case_name: str, case_folder: str, title: str, description: str)
             for r in reports
         ]
 
+    # 7.5. Build Deliverables Bundle ZIP Archive
+    import zipfile
+    bundle_path = out_dir / "bundle.zip"
+    with zipfile.ZipFile(bundle_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        if dxf_path.is_file():
+            zf.write(dxf_path, actual_dxf_name)
+        if png_path.is_file():
+            zf.write(png_path, "fixture.png")
+        if gcode_path.is_file():
+            zf.write(gcode_path, "fixture.nc")
+        if report_path.is_file():
+            zf.write(report_path, "report.md")
+        if fai_path.is_file():
+            zf.write(fai_path, "fai.md")
+        if stl_path.is_file():
+            zf.write(stl_path, "fixture.stl")
+        if glb_path.is_file():
+            zf.write(glb_path, "fixture.glb")
+    log.info(f"Built bundle ZIP: {bundle_path} ({bundle_path.stat().st_size} bytes)")
+
     # 8. Package Case Metadata for Frontend Zero-Friction Replay
     stats = {
         "board_size": _safe_str(getattr(result, "outer_poly", None)),
@@ -295,6 +315,7 @@ def process_case(case_name: str, case_folder: str, title: str, description: str)
             "fai_url": f"demo/{case_name}/fai.md",
             "stl_url": f"demo/{case_name}/fixture.stl",
             "glb_url": f"demo/{case_name}/fixture.glb",
+            "bundle_url": f"demo/{case_name}/bundle.zip",
             "material": material_stats,
             "gcode_stats": gcode_stats,
             "stats": stats,

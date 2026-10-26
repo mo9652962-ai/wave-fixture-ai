@@ -12,6 +12,7 @@
     "fai_url": "demo/case_003/fai.md",
     "stl_url": "demo/case_003/fixture.stl",
     "glb_url": "demo/case_003/fixture.glb",
+    "bundle_url": "demo/case_003/bundle.zip",
     "material": {
       "key": "durostone",
       "name": "Durostone 合成石",
@@ -79,12 +80,12 @@
       "allowed": true,
       "counts": {
         "info": 0,
-        "warning": 16,
+        "warning": 17,
         "error": 0,
         "blocking": 0
       },
       "worst": "warning",
-      "total": 16,
+      "total": 17,
       "issues": [
         {
           "code": "MIN_OPENING_WIDTH",
@@ -261,6 +262,17 @@
           "required": "standard ladder",
           "unit": null,
           "source": "Standard Tool Ladder Procurement Practice (End Mill & Drill Inventory)"
+        },
+        {
+          "code": "AOI_CAMERA_FOV_OCCLUSION_RISK",
+          "title": "治具开孔直壁阻挡 3D AOI 侧视相机视场阴影盲区",
+          "detail": "开孔边缘距受检焊点最小间距 0.99mm < 3.5mm，45° 侧视投影遮挡率达 83.5% > 5.0% 允许阈值；阴影盲区将导致焊点润湿角误判假点率暴增，须在开孔四周铣削 45° 逃光倒角斜坡（Koh Young / Omron 3D AOI 规范）。",
+          "severity": "warning",
+          "object_id": null,
+          "current": 83.5,
+          "required": 5.0,
+          "unit": "%",
+          "source": "Koh Young & Omron 3D AOI Camera FOV Inspection Guidelines"
         }
       ]
     },

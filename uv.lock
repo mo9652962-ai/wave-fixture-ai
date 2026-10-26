@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -2263,7 +2263,7 @@ wheels = [
 
 [[package]]
 name = "wave-fixture-ai"
-version = "0.5.2"
+version = "0.5.7"
 source = { editable = "." }
 dependencies = [
     { name = "ezdxf" },

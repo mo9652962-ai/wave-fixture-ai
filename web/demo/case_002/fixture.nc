@@ -1,5 +1,5 @@
 (Wave Fixture AI CNC program: case_002)
-(Generated: 2026-10-19 14:27:19)
+(Generated: 2026-10-26 21:40:28)
 (Material: Durostone [Rochling C253/C151] [key=durostone] rho=1.9g/cm3 Tmax=280.0C)
 (Pallet thickness: 10.0mm  Board pocket depth: 2.1mm)
 (Units: mm [G21]  Abs [G90]  WCS G54  Z0 = pallet top face)

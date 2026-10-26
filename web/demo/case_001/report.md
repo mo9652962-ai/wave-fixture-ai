@@ -1,6 +1,6 @@
 # 波峰焊治具生产工单 · case_001
 
-> 生成时间：2026-10-19 14:27:21  
+> 生成时间：2026-10-26 21:40:30  
 > DRC 门禁：✅ 通过（可生产）  
 > 材料方案：**Durostone 合成石**（Durostone (Rochling C253/C151)），厚度 10.0mm
 
@@ -83,4 +83,6 @@
 - CNC G 代码: demo/case_001/fixture.nc
 
 ---
+⭐ **喜欢 wave-fixture-ai？** 如果此工具为您节省了治具设计与制造工时，欢迎在 [GitHub 点个 Star](https://github.com/mo9652962-ai/wave-fixture-ai) 支持开源工业工程！
+
 <sub>由 wave-fixture-ai 自动生成 · DRC 规则与材料数据出处见 drc.py / materials.py 头注</sub>
