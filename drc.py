@@ -1756,10 +1756,64 @@ def run_drc(
                     f"离波角 {dbp.peel_off_angle_deg:.1f}° < 4°：表面张力无法自然缩颈，"
                     "引脚末端拖锡成冰柱并污染出板滚轮（Sierra Circuits / Bob Willis）。",
                     "warning",
-                    "Sierra Circuits Controlled Board Separation from the Wave",
-                    current=round(dbp.peel_off_angle_deg, 1),
-                    required=4.0,
-                    unit="°",
+                        "Sierra Circuits Controlled Board Separation from the Wave",
+                        current=round(dbp.peel_off_angle_deg, 1),
+                        required=4.0,
+                        unit="°",
+                    )
+                )
+
+    # ── BE. AOI 光学检测相机视场避障与 45° 倒角开窗检查 (Koh Young & Omron)
+    # 开孔立壁至外围引脚必须保持 >= 3.5mm 间距且视场遮挡率 <= 5.0%，防 3D AOI 误判虚焊。
+    aoi_res = getattr(r2, "aoi_vision_window", None)
+    if aoi_res and not getattr(aoi_res, "is_aoi_inspection_safe", True):
+        min_c = getattr(aoi_res, "min_observed_clearance_mm", 0.0)
+        max_o = getattr(aoi_res, "max_observed_occlusion_pct", 0.0)
+        issues.append(
+                _issue(
+                    "AOI_CAMERA_FOV_OCCLUSION_RISK",
+                    "治具开孔直壁阻挡 3D AOI 侧视相机视场阴影盲区",
+                    f"开孔边缘距受检焊点最小间距 {min_c:.2f}mm < 3.5mm，45° 侧视投影遮挡率达 "
+                    f"{max_o:.1f}% > 5.0% 允许阈值；阴影盲区将导致焊点润湿角误判假点率暴增，"
+                    "须在开孔四周铣削 45° 逃光倒角斜坡（Koh Young / Omron 3D AOI 规范）。",
+                    "warning",
+                    "Koh Young & Omron 3D AOI Camera FOV Inspection Guidelines",
+                    current=round(max_o, 1),
+                    required=5.0,
+                    unit="%",
+                )
+            )
+
+    # ── BF. 传送链电机驱动扭矩与链条拉力抗跳齿校核 (Ersa & SEHO) ───────────
+    # 炉内连线多具治具爬坡总拉力必须 <= 650N 且电机扭矩安全系数 SF >= 1.5。
+    cdt = getattr(r2, "conveyor_drag_torque", None)
+    if cdt:
+        if not getattr(cdt, "is_motor_safe", True):
+            sf_val = getattr(cdt, "motor_torque_safety_factor", 1.0)
+            issues.append(
+                _issue(
+                    "CONVEYOR_DRIVE_TORQUE_OVERLOAD",
+                    "传送带驱动电机扭矩储备不足跳齿卡轨风险",
+                    f"波峰焊传送链电机扭矩安全系数 SF={sf_val:.2f} < 1.5 安全底线；"
+                    "重型治具爬坡摩擦阻力过大，将导致传送顿挫引起锡面波纹振动连锡（Ersa/SEHO 传动规范）。",
+                    "warning",
+                    "Ersa & SEHO Wave Conveyor Drive Transmission Standards",
+                    current=round(sf_val, 2),
+                    required=1.5,
+                )
+            )
+        if not getattr(cdt, "is_chain_pull_safe", True):
+            f_pull = getattr(cdt, "total_drag_force_n", 0.0)
+            issues.append(
+                _issue(
+                    "CONVEYOR_DRIVE_TORQUE_OVERLOAD",
+                    "传送链总拖曳拉力超出链爪允许承载上限",
+                    f"在炉治具总拉力达 {f_pull:.1f}N > 650N 链条极限，存在链爪跳齿脱轨与机械卡死高危。",
+                    "warning",
+                    "Conveyor Chain Mechanical Tension Limits (<= 650N)",
+                    current=round(f_pull, 1),
+                    required=650.0,
+                    unit="N",
                 )
             )
 

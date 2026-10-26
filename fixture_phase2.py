@@ -139,6 +139,8 @@ class Phase2Result:
     changeover_kit: Any | None = None  # SMED 快速换型套件规划 (changeover_kit.ChangeoverKitResult)
     selective_nozzle_profile: Any | None = None  # 选焊喷嘴浸润/驻留窗口 (selective_nozzle_profile.NozzleProfileResult)
     dross_bridging_predictor: Any | None = None  # 锡渣桥连/冰柱预测 (dross_bridging_predictor.DrossBridgingResult)
+    aoi_vision_window: Any | None = None  # 3D AOI 逃光倒角窗口 (aoi_vision_window.AOIVisionWindowResult)
+    conveyor_drag_torque: Any | None = None  # 传送带链条拖曳阻力与扭矩 (conveyor_drag_torque.ConveyorDragTorqueResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -464,6 +466,7 @@ LAYER_COLORS2 = {
     "弹簧压针": 21,  # 亮洋红 (浮动弹簧顶针微弹性压紧触点)
     "防热塌托块": 14,  # 橄榄金 (中跨防热塌陷支承托块)
     "RFID追溯": 5,  # 蓝 (耐高温陶瓷 UHF RFID 沉腔)
+    "AOI开窗": 143,  # 蓝绿 (3D AOI 45° 逃光倒角窗口)
 }
 
 
@@ -730,6 +733,13 @@ def export_dxf2(
         from rfid_cavity import export_rfid_cavity_to_dxf
 
         export_rfid_cavity_to_dxf(msp, rfid)
+
+    # 3D AOI 逃光倒角窗口 (Koh Young & Omron)
+    aoi_win = getattr(result, "aoi_vision_window", None)
+    if aoi_win:
+        from aoi_vision_window import export_aoi_vision_windows_to_dxf
+
+        export_aoi_vision_windows_to_dxf(msp, aoi_win)
 
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
@@ -1141,6 +1151,29 @@ def run_phase2(
             wave_type=str(getattr(params2, "wave_type", "laminar")),
         )
 
+    # 3D AOI 逃光倒角窗口 (Koh Young & Omron)——根据上锡开孔规划
+    from aoi_vision_window import plan_aoi_vision_windows
+
+    aoi_res = None
+    if solder:
+        aoi_res = plan_aoi_vision_windows(
+            solder_polys=solder,
+            wall_thickness_mm=float(getattr(params2, "wall_thickness_mm", 6.0)),
+            camera_angle_deg=float(getattr(params2, "aoi_camera_angle_deg", 45.0)),
+        )
+
+    # 传送带链爪拖曳摩擦力与电机驱动扭矩校核 (Ersa & SEHO)
+    from conveyor_drag_torque import ConveyorDragTorqueParams, calculate_conveyor_drag_torque
+
+    cdt_res = calculate_conveyor_drag_torque(
+        pallet_mass_kg=float(getattr(eh_res, "total_mass_kg", 5.5) if eh_res else 5.5),
+        params=ConveyorDragTorqueParams(
+            conveyor_incline_deg=float(getattr(params2, "conveyor_incline_deg", 5.5)),
+            pallets_on_line_count=int(getattr(params2, "pallets_on_line_count", 6)),
+            has_wear_rails=bool(cwr_res and getattr(cwr_res, "rails", None)),
+        ),
+    )
+
     result2 = Phase2Result(
         avoid_polys=avoid,
         solder_polys=solder,
@@ -1187,6 +1220,8 @@ def run_phase2(
         changeover_kit=ck_res,
         selective_nozzle_profile=snp_res,
         dross_bridging_predictor=dbp_res,
+        aoi_vision_window=aoi_res,
+        conveyor_drag_torque=cdt_res,
     )
 
     if out_dxf:
