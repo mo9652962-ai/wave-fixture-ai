@@ -49,12 +49,15 @@ def _resolve_web_dir() -> Path:
     找不到时返回源码路径（让 StaticFiles 在启动时报出清晰的缺目录错误）。
     """
     here = Path(__file__).resolve().parent
-    candidates = [
+    candidates = []
+    if hasattr(sys, "_MEIPASS"):
+        candidates.append(Path(sys._MEIPASS) / "web")
+    candidates.extend([
         here / "web",  # 源码布局
         Path(sys.prefix) / "share" / "wave-fixture-ai",  # venv 安装（实测位置）
         Path(sys.base_prefix) / "share" / "wave-fixture-ai",  # 系统级安装
         here.parent.parent / "share" / "wave-fixture-ai",  # site-packages 上两级（兼容布局）
-    ]
+    ])
     # 最可靠：按发行版元数据定位（pip 安装时 data-files 的相对位置由安装器决定）
     try:
         from importlib.metadata import distribution
@@ -74,7 +77,10 @@ def _resolve_web_dir() -> Path:
 
 
 WEB_DIR = _resolve_web_dir()
-OUTPUT_DIR = Path(__file__).parent / "output"
+if getattr(sys, "frozen", False):
+    OUTPUT_DIR = Path(sys.executable).parent / "output"
+else:
+    OUTPUT_DIR = Path(__file__).parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 REVIEW_DIR = Path(__file__).parent / "reviews-data"
 
@@ -810,13 +816,24 @@ app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
 
 def main() -> None:
     import argparse
+    import threading
+    import webbrowser
 
     ap = argparse.ArgumentParser(description="波峰焊治具 AI Web 服务")
     ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
     args = ap.parse_args()
     import uvicorn
 
     print(f"🚀 波峰焊治具 AI 已启动: http://localhost:{args.port}")
+    if not args.no_browser:
+        def _open():
+            time.sleep(1.2)
+            try:
+                webbrowser.open(f"http://localhost:{args.port}")
+            except Exception as e:
+                log.debug("自动打开浏览器跳过: %s", e)
+        threading.Thread(target=_open, daemon=True).start()
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
 
 

@@ -143,6 +143,7 @@ def build_pcm_package(meta: dict) -> Path:
     log.info(f"    Install Size: {install_size} bytes")
 
     # Step 3: Prepare upstream GitLab addons package tree
+    import shutil
     identifier = meta["identifier"]
     gitlab_pkg_dir = DIST_DIR / "kicad-addons-repo" / "packages" / identifier
     gitlab_pkg_dir.mkdir(parents=True, exist_ok=True)
@@ -150,6 +151,7 @@ def build_pcm_package(meta: dict) -> Path:
         json.dumps(meta, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    shutil.copy2(PLUGINS_DIR / "icon.png", gitlab_pkg_dir / "icon.png")
     log.info(f"[+] Upstream GitLab package tree ready at: {gitlab_pkg_dir}")
 
     return zip_path
