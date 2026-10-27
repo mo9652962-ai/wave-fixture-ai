@@ -141,6 +141,8 @@ class Phase2Result:
     dross_bridging_predictor: Any | None = None  # 锡渣桥连/冰柱预测 (dross_bridging_predictor.DrossBridgingResult)
     aoi_vision_window: Any | None = None  # 3D AOI 逃光倒角窗口 (aoi_vision_window.AOIVisionWindowResult)
     conveyor_drag_torque: Any | None = None  # 传送带链条拖曳阻力与扭矩 (conveyor_drag_torque.ConveyorDragTorqueResult)
+    labyrinth_seal: Any | None = None  # 双阶梯迷宫阻锡槽与毛细断流微槽 (labyrinth_seal.LabyrinthSealResult)
+    pallet_guide_snubbers: Any | None = None  # 传送带防爬轨下凸导向限位条 (pallet_guide_snubbers.PalletGuideSnubberResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -467,6 +469,8 @@ LAYER_COLORS2 = {
     "防热塌托块": 14,  # 橄榄金 (中跨防热塌陷支承托块)
     "RFID追溯": 5,  # 蓝 (耐高温陶瓷 UHF RFID 沉腔)
     "AOI开窗": 143,  # 蓝绿 (3D AOI 45° 逃光倒角窗口)
+    "迷宫阻锡": 151,  # 青 (双阶梯迷宫阻锡毛细断流微槽)
+    "导向防脱": 142,  # 蓝绿 (底面防脱轨下凸导向限位条)
 }
 
 
@@ -740,6 +744,20 @@ def export_dxf2(
         from aoi_vision_window import export_aoi_vision_windows_to_dxf
 
         export_aoi_vision_windows_to_dxf(msp, aoi_win)
+
+    # 双阶梯迷宫阻锡槽 (Macaos & Ersa)
+    lab_seal = getattr(result, "labyrinth_seal", None)
+    if lab_seal:
+        from labyrinth_seal import export_labyrinth_seal_to_dxf
+
+        export_labyrinth_seal_to_dxf(msp, lab_seal)
+
+    # 传送带防爬轨下凸导向限位条 (AGICORP §3.5)
+    g_snub = getattr(result, "pallet_guide_snubbers", None)
+    if g_snub:
+        from pallet_guide_snubbers import export_pallet_guide_snubbers_to_dxf
+
+        export_pallet_guide_snubbers_to_dxf(msp, g_snub)
 
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
@@ -1174,6 +1192,27 @@ def run_phase2(
         ),
     )
 
+    # 双阶梯迷宫阻锡槽与毛细断流微槽 (Macaos & Ersa)
+    from labyrinth_seal import plan_labyrinth_solder_seal
+
+    lab_res = None
+    if _shape_ok(sink):
+        lab_res = plan_labyrinth_solder_seal(
+            sink_poly=sink,
+            outer_poly=outer.outer_poly,
+            has_tight_edge_components=bool(getattr(params2, "has_tight_edge_components", False)),
+        )
+
+    # 传送带防爬轨下凸导向限位条 (AGICORP §3.5 & Ersa)
+    from pallet_guide_snubbers import plan_pallet_guide_snubbers
+
+    gsn_res = None
+    if _shape_ok(outer.outer_poly):
+        gsn_res = plan_pallet_guide_snubbers(
+            outer_poly=outer.outer_poly,
+            pallet_mass_kg=float(getattr(eh_res, "total_mass_kg", 5.0) if eh_res else 5.0),
+        )
+
     result2 = Phase2Result(
         avoid_polys=avoid,
         solder_polys=solder,
@@ -1222,6 +1261,8 @@ def run_phase2(
         dross_bridging_predictor=dbp_res,
         aoi_vision_window=aoi_res,
         conveyor_drag_torque=cdt_res,
+        labyrinth_seal=lab_res,
+        pallet_guide_snubbers=gsn_res,
     )
 
     if out_dxf:

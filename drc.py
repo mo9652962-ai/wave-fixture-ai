@@ -1817,6 +1817,49 @@ def run_drc(
                 )
             )
 
+    # ── BG. 沉板区双阶梯迷宫阻锡槽与毛细断流微槽检查 (Macaos & Ersa) ─────────
+    # PCB 外框与沉板槽壁间的 0.2mm 狭缝构成毛细管通路，液态锡在高压下极易漫顶渗锡；
+    # 板边元器件紧凑 (<3.0mm) 或长时间浸锡时，必须规划 1.2mm 突扩毛细断流微槽切断液桥。
+    lab_seal = getattr(r2, "labyrinth_seal", None)
+    req_seal = getattr(r2, "require_labyrinth_seal", False)
+    has_tight_edge = getattr(r2, "has_tight_edge_components", False)
+    has_groove = bool(lab_seal and getattr(lab_seal, "breaker_groove_poly", None))
+    if (req_seal or has_tight_edge) and not has_groove:
+        issues.append(
+            _issue(
+                "LABYRINTH_CAPILLARY_SEAL_MISSING",
+                "沉板区边缘缺少双阶梯迷宫阻锡槽与毛细断流微槽",
+                "PCB 边缘距贴片元件紧凑 (<3.0mm) 或波峰接触时间长，但沉板台阶外围未规划 1.2mm 宽毛细断流微槽；"
+                "液态锡沿 0.2mm 装配缝隙毛细爬升将漫溢至 PCB 正面造成大面积贴片短路（Macaos & Ersa 治具规范）。",
+                "warning",
+                "Macaos Selective Pallet Guidelines & Ersa Dual-Step Labyrinth Solder Seal Standards",
+            )
+        )
+
+    # ── BH. 传送带防爬轨下凸导向限位条检查 (AGICORP §3.5 & Ersa) ────────────
+    # 重型 (>=4.5kg) 或大跨度 (>=240mm) 治具在 5.5° 坡道波峰冲刷下，
+    # 若底面无 5.0mm 宽下凸导向唇，易横向漂移并跃上链爪尖发生爬轨倾覆。
+    gsn = getattr(r2, "pallet_guide_snubbers", None)
+    req_snubber = getattr(r2, "require_guide_snubbers", False)
+    if _poly_ok(outer):
+        o_span = max(outer.bounds[2] - outer.bounds[0], outer.bounds[3] - outer.bounds[1])
+        has_lips = bool(gsn and getattr(gsn, "total_snubber_count", 0) > 0)
+        p_mass = getattr(r2, "pallet_mass_kg", 5.0)
+        if (o_span >= 240.0 or p_mass >= 4.5 or req_snubber) and not has_lips:
+            issues.append(
+                _issue(
+                    "CONVEYOR_RAIL_SNUBBER_MISSING",
+                    "大跨度重型治具承载边底面缺少防脱轨下凸导向唇",
+                    f"治具跨度 {o_span:.0f}mm ≥ 240mm (或重载质量达标) 底面未铣削 5.0mm 宽下凸防脱导槽；"
+                    "在 5.5° 坡道经受波峰液面动压冲激时，治具易发生横向浮动并爬上链爪齿尖导致脱轨卡死事故（AGICORP §3.5）。",
+                    "warning",
+                    "AGICORP §3.5 & Ersa PowerFlow Pallet Rail-Climb Prevention Standards",
+                    current=round(o_span, 1),
+                    required=240.0,
+                    unit="mm",
+                )
+            )
+
     return issues
 
 
