@@ -143,6 +143,8 @@ class Phase2Result:
     conveyor_drag_torque: Any | None = None  # 传送带链条拖曳阻力与扭矩 (conveyor_drag_torque.ConveyorDragTorqueResult)
     labyrinth_seal: Any | None = None  # 双阶梯迷宫阻锡槽与毛细断流微槽 (labyrinth_seal.LabyrinthSealResult)
     pallet_guide_snubbers: Any | None = None  # 传送带防爬轨下凸导向限位条 (pallet_guide_snubbers.PalletGuideSnubberResult)
+    chip_wave_baffle: Any | None = None  # 双波峰贴片开孔消锡扰流挡板 (chip_wave_baffle.ChipWaveBaffleResult)
+    pallet_lifting_force: Any | None = None  # 治具搬运提升力与人机工程拉手槽 (pallet_lifting_force.PalletLiftingForceResult)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -759,6 +761,20 @@ def export_dxf2(
 
         export_pallet_guide_snubbers_to_dxf(msp, g_snub)
 
+    # 双波峰贴片消锡扰流挡板 (Ersa & SEHO)
+    c_baffle = getattr(result, "chip_wave_baffle", None)
+    if c_baffle:
+        from chip_wave_baffle import export_chip_wave_baffles_to_dxf
+
+        export_chip_wave_baffles_to_dxf(c_baffle, msp)
+
+    # 治具搬运提升人机工程内嵌拉手槽 (ISO 11228-1)
+    p_lift = getattr(result, "pallet_lifting_force", None)
+    if p_lift:
+        from pallet_lifting_force import export_pallet_lifting_grips_to_dxf
+
+        export_pallet_lifting_grips_to_dxf(p_lift, msp)
+
     doc.saveas(out_path)
     log.info(f"✅ DXF 已输出: {out_path}")
 
@@ -1213,6 +1229,33 @@ def run_phase2(
             pallet_mass_kg=float(getattr(eh_res, "total_mass_kg", 5.0) if eh_res else 5.0),
         )
 
+    # 双波峰贴片开孔消锡扰流挡板 (Ersa & SEHO)
+    from chip_wave_baffle import plan_chip_wave_baffles
+
+    cwb_res = None
+    smd_clusters_input = getattr(params2, "smd_clusters", []) or []
+    if smd_clusters_input:
+        cwb_res = plan_chip_wave_baffles(
+            smd_clusters=smd_clusters_input,
+            flow_direction=str(getattr(params2, "flow_direction", "x_positive")),
+            board_thickness_mm=float(getattr(params1, "board_thickness", 1.6)),
+            pallet_thickness_mm=float(getattr(params1, "pallet_thickness", 12.0)),
+        )
+
+    # 治具搬运提升人机工程拉手槽校核 (ISO 11228-1 & NIOSH)
+    from pallet_lifting_force import check_pallet_lifting_force
+
+    plf_res = None
+    if _shape_ok(outer.outer_poly):
+        ox0, oy0, ox1, oy1 = outer.outer_poly.bounds
+        plf_res = check_pallet_lifting_force(
+            pallet_length_mm=ox1 - ox0,
+            pallet_width_mm=oy1 - oy0,
+            pallet_thickness_mm=float(getattr(params1, "pallet_thickness", 12.0)),
+            total_mass_kg=float(getattr(eh_res, "total_mass_kg", 5.0) if eh_res else 5.0),
+            has_recessed_grips=bool(getattr(params2, "has_recessed_grips", True)),
+        )
+
     result2 = Phase2Result(
         avoid_polys=avoid,
         solder_polys=solder,
@@ -1263,6 +1306,8 @@ def run_phase2(
         conveyor_drag_torque=cdt_res,
         labyrinth_seal=lab_res,
         pallet_guide_snubbers=gsn_res,
+        chip_wave_baffle=cwb_res,
+        pallet_lifting_force=plf_res,
     )
 
     if out_dxf:
