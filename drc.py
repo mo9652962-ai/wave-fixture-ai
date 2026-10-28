@@ -1860,6 +1860,72 @@ def run_drc(
                 )
             )
 
+    # ── BI. 双波峰贴片开孔消锡扰流挡板检查 (Ersa / SEHO & SMTA 双波规范) ──
+    # 存在底面 SMD 阻容/IC 的混装波峰焊，开孔出波尾端若未配置 35° 消锡导流挡板，
+    # 湍流射流离开引脚时极易拉出桥连粗液桥，导致细间距引脚严重短路。
+    cwb = getattr(r2, "chip_wave_baffle", None)
+    has_bottom_smd = getattr(r2, "has_bottom_smd_chips", False)
+    req_baffle = getattr(r2, "require_chip_wave_baffles", False)
+    has_baffles = bool(cwb and getattr(cwb, "total_baffles", 0) > 0)
+    if (has_bottom_smd or req_baffle) and not has_baffles:
+        issues.append(
+            _issue(
+                "CHIP_WAVE_BAFFLE_MISSING",
+                "混装贴片波峰开孔脱锡尾端缺少消锡扰流挡板",
+                "底面贴片器件通过双波峰湍流区时，脱锡尾缘未规划 35° 消锡导流挡板；"
+                "熔融焊锡表面张力在脱离引脚时无法骤然撕裂，将造成密集引脚群 (pitch<=1.27mm) 批量连锡短路（Ersa & SMTA 规范）。",
+                "warning",
+                "Ersa & SEHO Dual-Wave Chip Soldering Baffle Specifications",
+            )
+        )
+    elif cwb and not getattr(cwb, "is_debridging_effective", True):
+        issues.append(
+            _issue(
+                "CHIP_WAVE_BAFFLE_MISSING",
+                "贴片消锡扰流挡板几何间隙超差失效",
+                f"消锡挡板规划缺陷: {'; '.join(getattr(cwb, 'violations', []))}；"
+                "无法有效导流脱锡或存在挤碎陶瓷贴片风险（SMTA 双波规范）。",
+                "warning",
+                "Ersa & SEHO Dual-Wave Chip Soldering Baffle Specifications",
+            )
+        )
+
+    # ── BJ. 治具搬运提升负荷与人机工程内嵌拉手槽检查 (ISO 11228-1 & NIOSH) ─
+    # 装配质量 >= 4.5kg 的治具，若未在双侧规划深度 >= 22mm、宽度 >= 105mm 的内嵌指槽，
+    # 操作员依靠指尖捏力抓取，属于不良耦合 (CM=0.70)，极易滑脱碎板并引发肌腱工伤。
+    plf = getattr(r2, "pallet_lifting_force", None)
+    p_mass_kg = getattr(r2, "pallet_mass_kg", None)
+    if plf:
+        if not getattr(plf, "is_ergonomically_acceptable", True):
+            issues.append(
+                _issue(
+                    "PALLET_ERGONOMIC_LIFTING_EXCESSIVE",
+                    "治具搬运负荷过大或内嵌手抓槽不合规工伤风险",
+                    f"治具整备质量 {plf.total_pallet_mass_kg:.1f}kg 搬运人机工程缺陷: "
+                    f"{'; '.join(getattr(plf, 'violations', []))} (NIOSH 抬升指数 LI={plf.lifting_index_niosh:.2f})；"
+                    "指部抓握受力不足易跌落治具砸坏板件（ISO 11228-1 §4.2）。",
+                    "warning",
+                    "ISO 11228-1 Ergonomics & NIOSH Manual Lifting Equation Standards",
+                    current=round(plf.total_pallet_mass_kg, 1),
+                    required=4.5,
+                    unit="kg",
+                )
+            )
+    elif p_mass_kg is not None and p_mass_kg >= 4.5 and getattr(r2, "check_lifting_force", False):
+        issues.append(
+            _issue(
+                "PALLET_ERGONOMIC_LIFTING_EXCESSIVE",
+                "重型治具缺少人机工程学内嵌手指抓槽",
+                f"治具装配整备质量达 {p_mass_kg:.1f}kg ≥ 4.5kg 且未设置内嵌手抓槽 (>=105×22mm)；"
+                "高频反复搬运下操作员指尖疲劳滑脱跌落碎板高危（ISO 11228-1 人体测量学规范）。",
+                "warning",
+                "ISO 11228-1 Ergonomics & NIOSH Manual Lifting Equation Standards",
+                current=round(p_mass_kg, 1),
+                required=4.5,
+                unit="kg",
+            )
+        )
+
     return issues
 
 
