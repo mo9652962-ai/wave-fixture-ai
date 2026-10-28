@@ -30,7 +30,7 @@
     <img src="https://img.shields.io/badge/features-21%20automations-2563EB?style=flat-square" alt="features">
     <img src="https://img.shields.io/badge/DRC-87_Rules-059669?style=flat-square" alt="73 DRC rules">
     <img src="https://img.shields.io/badge/KiCad-10%20兼容-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
-    <img src="https://img.shields.io/badge/tests-425%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/tests-435%20passed-success?style=flat-square" alt="tests">
     <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
     <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
@@ -148,6 +148,33 @@ jobs:
 产出：`fixture.dxf`（通过则为生产版，未过自动带 `PREVIEW` 水印）+ `drc-report.json`
 自动上传为 `fixture-artifacts`。详见 [action.yml](action.yml)。本仓库 CI 每次 push 都在
 用它审计自己的真实板用例（dogfood）。
+
+## 🧩 MCP 服务（Claude Desktop / Cursor 等 AI 客户端）
+
+内置 [Model Context Protocol](https://modelcontextprotocol.io) 服务（stdio 传输），让 AI 助手直接调用治具能力：
+Gerber 解析、治具 DXF + DRC 门禁 + CNC G 代码生成、狗骨头清角、波峰导流倒角、热膨胀间隙校核、
+量产报价、工艺窗口、预热曲线与锡渣/桥连预测，共 10 个工具（除治具生成会写入指定输出目录外，其余均为只读）。
+
+```bash
+pip install "git+https://github.com/mo9652962-ai/wave-fixture-ai"   # PyPI 下个版本起含 MCP；或仓库内 pip install -e .
+wave-fixture-ai-mcp                # stdio 启动（一般由 AI 客户端自动拉起）
+# 也可用 Docker：docker build -t wave-fixture-ai-mcp . && docker run -i --rm wave-fixture-ai-mcp
+```
+
+Claude Desktop（`claude_desktop_config.json`）或 Cursor（`~/.cursor/mcp.json`）配置示例：
+
+```json
+{
+  "mcpServers": {
+    "wave-fixture-ai": {
+      "command": "wave-fixture-ai-mcp"
+    }
+  }
+}
+```
+
+未全局安装时可用 uv 直接从仓库运行：`"command": "uvx"`，
+`"args": ["--from", "git+https://github.com/mo9652962-ai/wave-fixture-ai", "wave-fixture-ai-mcp"]`。
 
 ## ⌨️ 命令行方式
 

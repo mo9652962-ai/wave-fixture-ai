@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+.hermes
+**/__pycache__
+*.egg-info
+build
+dist
+output
+fixture-out
+.pytest_cache
+.ruff_cache

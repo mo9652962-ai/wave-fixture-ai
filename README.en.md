@@ -30,7 +30,7 @@
     <img src="https://img.shields.io/badge/features-21%20automations-2563EB?style=flat-square" alt="features">
     <img src="https://img.shields.io/badge/DRC-87_Rules-059669?style=flat-square" alt="73 DRC rules">
     <img src="https://img.shields.io/badge/KiCad-10%20compatible-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
-    <img src="https://img.shields.io/badge/tests-425%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/tests-435%20passed-success?style=flat-square" alt="tests">
     <img src="https://img.shields.io/badge/coverage-85%25-success?style=flat-square" alt="coverage">
     <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
@@ -114,6 +114,34 @@ jobs:
 ```
 
 Outputs `fixture.dxf` (production ready, or watermarked with `PREVIEW` if gates fail) + `drc-report.json`.
+
+## 🧩 MCP server (Claude Desktop / Cursor and other AI clients)
+
+A built-in [Model Context Protocol](https://modelcontextprotocol.io) server (stdio transport) lets AI assistants call the
+fixture toolkit directly: Gerber analysis, fixture DXF + DRC gate + CNC G-code generation, dogbone corner relief,
+wave-flow chamfers, thermal expansion clearance, quotation, process windows, preheat profile and dross/bridging
+prediction — 10 tools, all read-only except fixture generation, which writes into the output directory you give it.
+
+```bash
+pip install "git+https://github.com/mo9652962-ai/wave-fixture-ai"   # included on PyPI from the next release; or `pip install -e .`
+wave-fixture-ai-mcp                # starts on stdio (normally launched by the AI client)
+# Docker: docker build -t wave-fixture-ai-mcp . && docker run -i --rm wave-fixture-ai-mcp
+```
+
+Claude Desktop (`claude_desktop_config.json`) or Cursor (`~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "wave-fixture-ai": {
+      "command": "wave-fixture-ai-mcp"
+    }
+  }
+}
+```
+
+Without a global install, run it from the repo with uv: `"command": "uvx"`,
+`"args": ["--from", "git+https://github.com/mo9652962-ai/wave-fixture-ai", "wave-fixture-ai-mcp"]`.
 
 ## Command-line equivalents
 
