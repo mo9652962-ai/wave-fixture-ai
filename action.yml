@@ -18,7 +18,7 @@ inputs:
   version:
     description: 'wave-fixture-ai 的 PyPI 版本（显式锁定，防缓存漂移）'
     required: false
-    default: '0.2.1'
+    default: '0.5.7'
   output-dir:
     description: '产物与报告输出目录'
     required: false
