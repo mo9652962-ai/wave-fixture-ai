@@ -16,6 +16,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal, overload
 
 import ezdxf
 from gerbonara import ExcellonFile, LayerStack
@@ -236,7 +237,7 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
             stack = None
 
     # 外形：从 outline 图形对象构建 shapely 多边形
-    board_polys = []
+    board_polys: list[Polygon] = []
     outline_objs = []
     if stack is None:
         log.warning("  ⚠️ stack 解析失败（可能目录无 Gerber 文件或格式不支持），跳过外形")
@@ -370,6 +371,14 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
 # ─────────────────────────────────────────────────────────────
 # 步骤 2: 沉板区（外形外扩 0.2mm + 狗骨头 Dogbone 清角）
 # ─────────────────────────────────────────────────────────────
+@overload
+def make_sink_region(board_poly: Polygon, p: FixtureParams, *, return_corners: Literal[False] = False) -> Polygon: ...
+
+
+@overload
+def make_sink_region(board_poly: Polygon, p: FixtureParams, *, return_corners: Literal[True]) -> tuple[Polygon, list]: ...
+
+
 def make_sink_region(
     board_poly: Polygon,
     p: FixtureParams,

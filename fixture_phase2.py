@@ -12,11 +12,14 @@ import math
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 import ezdxf
 from shapely.geometry import Point, Polygon, box
 from shapely.ops import unary_union
+
+if TYPE_CHECKING:
+    from shapely.geometry.base import BaseGeometry
 
 
 def layer_pts_from_files(gerber_dir: str, key: str) -> list[tuple[float, float, float]]:
@@ -784,7 +787,7 @@ def export_dxf2(
 # ─────────────────────────────────────────────────────────────
 def run_phase2(
     gerber_dir: str,
-    out_dxf: str,
+    out_dxf: str | None,
     phase1_result=None,
     params1_override: dict | None = None,
     params2_override: dict | None = None,
@@ -892,7 +895,7 @@ def run_phase2(
     # CNC 刀路特征采集（孔/腔/轮廓/清角）与分组最短空程优化 (ISO 6983 / RS-274)
     from cnc_toolpath_opt import CNCOp, optimize_cnc_toolpath
 
-    def _shape_ok(poly) -> bool:
+    def _shape_ok(poly: BaseGeometry | None) -> TypeGuard[BaseGeometry]:
         try:
             return poly is not None and (not poly.is_empty) and poly.is_valid
         except Exception:
@@ -1023,10 +1026,10 @@ def run_phase2(
     from rfid_cavity import plan_rfid_embedded_cavity
 
     metal_blocks: list[Any] = []
-    if stiffener and getattr(stiffener, "poly", None):
-        metal_blocks.append(stiffener.poly)
-    if ti_res and getattr(ti_res, "blade_polys", None):
-        metal_blocks.extend(ti_res.blade_polys)
+    if stiffener and getattr(stiffener, "bar_polys", None):
+        metal_blocks.extend(stiffener.bar_polys)
+    if ti_res and getattr(ti_res, "blades", None):
+        metal_blocks.extend(b.boundary_poly for b in ti_res.blades if b.boundary_poly is not None)
 
     rfid_res = (
         plan_rfid_embedded_cavity(outer.outer_poly, metal_keepouts=metal_blocks)
@@ -1160,9 +1163,10 @@ def run_phase2(
     from selective_nozzle_profile import optimize_selective_nozzle_profile
 
     snp_res = None
-    if getattr(params2, "selective_nozzle_dia_mm", None):
+    snp_dia = getattr(params2, "selective_nozzle_dia_mm", None)
+    if snp_dia:
         snp_res = optimize_selective_nozzle_profile(
-            nozzle_inner_dia_mm=float(params2.selective_nozzle_dia_mm),
+            nozzle_inner_dia_mm=float(snp_dia),
             pump_speed_pct=float(getattr(params2, "selective_pump_speed_pct", 60.0)),
             pcb_thickness_mm=float(getattr(params1, "pcb_thickness_mm", 1.6) or 1.6),
             plated_hole_dia_mm=float(getattr(params2, "selective_hole_dia_mm", 0.9)),
