@@ -17,6 +17,10 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import asdict, dataclass
+from typing import TYPE_CHECKING, TypeGuard
+
+if TYPE_CHECKING:
+    from shapely.geometry.base import BaseGeometry
 
 log = logging.getLogger("fixture-drc")
 
@@ -82,7 +86,7 @@ def _pt_in(geom, x: float, y: float) -> bool:
         return False
 
 
-def _poly_ok(poly) -> bool:
+def _poly_ok(poly: BaseGeometry | None) -> TypeGuard[BaseGeometry]:
     try:
         return poly is not None and (not poly.is_empty) and poly.is_valid
     except Exception:
@@ -561,23 +565,23 @@ def run_drc(
             from materials import estimate_weight as _est_weight
             from materials import get_material as _get_material
 
-            _m = _get_machine(mkey)
+            _machine = _get_machine(mkey)
             if _poly_ok(outer):
                 ox0, oy0, ox1, oy1 = outer.bounds
                 short_side = min(ox1 - ox0, oy1 - oy0)
                 # H1. 轨距：治具短边须放得进机台前后导轨之间
-                if short_side > _m.process_width_max_mm:
+                if short_side > _machine.process_width_max_mm:
                     issues.append(
                         _issue(
                             "MACHINE_WIDTH_MISMATCH",
                             "治具超出机台轨距",
-                            f"治具短边 {short_side:.1f}mm 超出 {_m.name_cn} "
-                            f"轨距上限 {_m.process_width_max_mm:.0f}mm——请改机台、"
+                            f"治具短边 {short_side:.1f}mm 超出 {_machine.name_cn} "
+                            f"轨距上限 {_machine.process_width_max_mm:.0f}mm——请改机台、"
                             "减小拼版或分板。",
                             "error",
-                            _m.source,
+                            _machine.source,
                             current=round(short_side, 1),
-                            required=float(_m.process_width_max_mm),
+                            required=float(_machine.process_width_max_mm),
                             unit="mm",
                         )
                     )
@@ -585,23 +589,23 @@ def run_drc(
                 blank_w = _est_weight(
                     (ox1 - ox0) * (oy1 - oy0), float(pallet_thickness), _get_material(material_key)
                 )
-                if blank_w > _m.conveyor_load_kg:
+                if blank_w > _machine.conveyor_load_kg:
                     issues.append(
                         _issue(
                             "MACHINE_OVERLOAD",
                             "治具超出传送链载荷",
-                            f"治具毛坯估重 {blank_w:.2f}kg 超出 {_m.name_cn} 传送链"
-                            f"载荷 {_m.conveyor_load_kg}kg——请减薄板厚/改材料"
+                            f"治具毛坯估重 {blank_w:.2f}kg 超出 {_machine.name_cn} 传送链"
+                            f"载荷 {_machine.conveyor_load_kg}kg——请减薄板厚/改材料"
                             "（如 Durostone→FR-4）/减小治具。",
                             "error",
-                            _m.source,
+                            _machine.source,
                             current=round(blank_w, 2),
-                            required=float(_m.conveyor_load_kg),
+                            required=float(_machine.conveyor_load_kg),
                             unit="kg",
                         )
                     )
                 # H3. SMEMA 高度兼容（info）：治具垫高 PCB，板底高度须兼容上下游
-                if not _m.official:
+                if not _machine.official:
                     pass  # 非官方画像不产生 info 噪音
                 issues.append(
                     _issue(
@@ -609,7 +613,7 @@ def run_drc(
                         "SMEMA 传送高度确认",
                         f"治具板厚 {pallet_thickness}mm 会垫高 PCB 底面——"
                         f"确认与上下游设备（IPC-SMEMA-9851 高度窗口 940-965mm）兼容；"
-                        f"{_m.rail_arrangement}。",
+                        f"{_machine.rail_arrangement}。",
                         "info",
                         "IPC-SMEMA-9851 Standard",
                     )
@@ -1129,20 +1133,20 @@ def run_drc(
             from thermal_expansion import compute_expansion_gap
 
             mat_key = material_key or "durostone"
-            gap = compute_expansion_gap(pallet_len_mm=s_len, pcb_len_mm=s_len * 0.98, material_key=mat_key)
-            if gap.at_risk and getattr(r2, "check_cte_gap", True):
+            cte_gap = compute_expansion_gap(pallet_len_mm=s_len, pcb_len_mm=s_len * 0.98, material_key=mat_key)
+            if cte_gap.at_risk and getattr(r2, "check_cte_gap", True):
                 issues.append(
                     _issue(
                         "SINK_CTE_CLEARANCE_INSUFFICIENT",
                         "波峰温度下沉板间隙将被热膨胀差吃掉",
                         f"{s_len:.0f}mm 沉板跨度在 ΔT≈235K 下治具-PCB 线膨胀差 "
-                        f"{gap.differential_mm:.2f}mm 超过常温设计间隙 {gap.design_clearance_mm}mm；"
+                        f"{cte_gap.differential_mm:.2f}mm 超过常温设计间隙 {cte_gap.design_clearance_mm}mm；"
                         "PCB 高温被槽壁顶死将拱起渗锡、冷却卡板。建议常温沉板间隙外扩至 "
-                        f"{gap.differential_mm + 0.1:.2f}mm（Röchling Durostone CTE datasheet）。",
+                        f"{cte_gap.differential_mm + 0.1:.2f}mm（Röchling Durostone CTE datasheet）。",
                         "warning",
                         "Röchling Durostone CTE Datasheet & IPC-2141A Thermal Mechanics",
-                        current=gap.differential_mm,
-                        required=gap.design_clearance_mm,
+                        current=cte_gap.differential_mm,
+                        required=cte_gap.design_clearance_mm,
                     )
                 )
 
