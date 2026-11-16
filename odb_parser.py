@@ -129,7 +129,7 @@ def extract_odb_archive(archive_path: str | Path, target_dir: str | Path) -> Pat
 def parse_odb_matrix(odb_root: Path) -> dict[str, str]:
     """解析 matrix/matrix 提取层名与类型映射。"""
     mat_file = odb_root / "matrix" / "matrix"
-    layers = {}
+    layers: dict[str, str] = {}
     if not mat_file.is_file():
         return layers
 

@@ -28,15 +28,18 @@ class ReviewItem:
 
 def geometry_sha(r1, r2) -> str:
     """几何指纹——几何一变，已确认的 review 自动过期。"""
+    board_poly = getattr(r1, "board_poly", None)
+    sink_poly = getattr(r1, "sink_poly", None)
+    outer_poly = getattr(r2, "outer_poly", None)
     payload = json.dumps({
-        "board": getattr(r1, "board_poly", None).wkt if getattr(r1, "board_poly", None) is not None else None,
-        "sink": getattr(r1, "sink_poly", None).wkt if getattr(r1, "sink_poly", None) is not None else None,
-        "outer": getattr(r2, "outer_poly", None).wkt if getattr(r2, "outer_poly", None) is not None else None,
+        "board": board_poly.wkt if board_poly is not None else None,
+        "sink": sink_poly.wkt if sink_poly is not None else None,
+        "outer": outer_poly.wkt if outer_poly is not None else None,
     }, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def collect_review_items(parsed: dict, r1, r2) -> list[dict]:
+def collect_review_items(parsed: dict, r1, r2) -> list[ReviewItem]:
     """根据解析摘要收集需要人工确认的 review 项。
 
     parsed: {"has_bottom_mask": bool, "has_top_mask": bool, "has_drills": bool,

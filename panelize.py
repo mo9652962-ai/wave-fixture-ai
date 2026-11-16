@@ -131,16 +131,14 @@ def panelize_geometry(
             list(dogbone_corners),
         )
 
-    sinks, avoids, solders, caps, new_pins, new_handles, new_screws, new_corners = (
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-    )
+    sinks: list[Any] = []
+    avoids: list[Any] = []
+    solders: list[Any] = []
+    caps: list[tuple[float, float, float]] = []
+    new_pins: list[tuple[float, float, float]] = []
+    new_handles: list[Any] = []
+    new_screws: list[tuple[float, float]] = []
+    new_corners: list[Any] = []
     for dx, dy in grid.offsets:
         sinks.append(_apply_translation(sink, dx, dy))
         avoids.extend(_apply_translation(a, dx, dy) for a in avoid_polys)

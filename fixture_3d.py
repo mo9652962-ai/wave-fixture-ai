@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import trimesh
@@ -36,7 +37,7 @@ class Fixture3DParams:
     solder_depth: float = 8.0         # 上锡区通孔深度（贯穿）
 
 
-def polygon_to_extrude(poly: Polygon, z_bottom: float, z_top: float) -> trimesh.Trimesh:
+def polygon_to_extrude(poly: Polygon, z_bottom: float, z_top: float) -> trimesh.Trimesh | None:
     """2D 多边形 → 3D 拉伸体（沿 Z 轴）。支持 Polygon / MultiPolygon"""
     if poly is None or poly.is_empty:
         return None
@@ -47,7 +48,7 @@ def polygon_to_extrude(poly: Polygon, z_bottom: float, z_top: float) -> trimesh.
         parts = [p for p in parts if p is not None]
         if not parts:
             return None
-        return trimesh.util.concatenate(parts)
+        return cast(trimesh.Trimesh, trimesh.util.concatenate(parts))
     # 简化顶点（减少三角面）
     poly = poly.simplify(0.05, preserve_topology=True)
     exterior = np.array(poly.exterior.coords)[:, :2]
@@ -65,7 +66,7 @@ def build_fixture_3d(
     avoid_polys: list[Polygon],
     solder_polys: list[Polygon],
     outer_poly: Polygon,
-    p: Fixture3DParams = None,
+    p: Fixture3DParams | None = None,
 ) -> trimesh.Trimesh:
     """构建治具 3D 实体：底板 + 挖沉板区 + 挖避位区 + 挖上锡区"""
     p = p or Fixture3DParams()
