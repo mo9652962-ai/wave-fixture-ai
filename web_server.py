@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import re
@@ -17,8 +18,9 @@ import traceback
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+cast(io.TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8", errors="replace")
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("fixture-web")
@@ -237,8 +239,8 @@ async def api_interference(
 
             grid = build_grid(
                 board.bounds,
-                params2_override["panel_cols"],
-                params2_override["panel_rows"],
+                int(params2_override["panel_cols"]),
+                int(params2_override["panel_rows"]),
                 params2_override["panel_gap"],
             )
             comps = replicate_components(comps, grid)

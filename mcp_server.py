@@ -30,7 +30,7 @@ from pydantic import Field
 try:  # MCP Python SDK v2: FastMCP was renamed to MCPServer
     from mcp.server.mcpserver import MCPServer as _ServerClass
 except ImportError:  # MCP Python SDK v1
-    from mcp.server.fastmcp import FastMCP as _ServerClass
+    from mcp.server.fastmcp import FastMCP as _ServerClass  # type: ignore[attr-defined,no-redef]
 
 try:
     from mcp.types import ToolAnnotations
@@ -70,7 +70,7 @@ def _tool(title: str, *, read_only: bool, idempotent: bool = True, destructive: 
     """Register a tool with MCP annotations when the installed SDK supports them."""
     kwargs: dict[str, Any] = {}
     if ToolAnnotations is not None and _TOOL_SUPPORTS_ANNOTATIONS:
-        kwargs["annotations"] = ToolAnnotations(
+        kwargs["annotations"] = ToolAnnotations(  # type: ignore[call-arg]
             title=title,
             readOnlyHint=read_only,
             destructiveHint=destructive,

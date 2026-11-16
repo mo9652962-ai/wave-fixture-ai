@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
+from typing import cast
 
 import trimesh
 
@@ -192,7 +193,7 @@ FOOTPRINT_DIMS = {
 }
 
 
-def _fp_key(footprint_name: str) -> str:
+def _fp_key(footprint_name: str) -> str | None:
     """封装名 → 查表 key（提取关键型号，兼容 _/- 分隔）"""
     name = footprint_name.lower().replace("_", "-")
     # 优先精确匹配子串（key 也统一为连字符形式）
@@ -432,14 +433,14 @@ def compute_sink_depth(
     }
 
 
-def build_component_meshes(components: list[dict], pcb_thickness: float = 1.6) -> trimesh.Trimesh:
+def build_component_meshes(components: list[dict], pcb_thickness: float = 1.6) -> trimesh.Trimesh | None:
     meshes = []
     for c in components:
         box = trimesh.creation.box(extents=[c["w"], c["h"], c["height"]])
         # 元件中心在 PCB 表面 + 高度一半
         box.apply_translation([c["x"], c["y"], pcb_thickness + c["height"] / 2])
         meshes.append(box)
-    return trimesh.util.concatenate(meshes) if meshes else None
+    return cast(trimesh.Trimesh, trimesh.util.concatenate(meshes)) if meshes else None
 
 
 def _is_through_hole(footprint_name: str) -> bool:
@@ -518,7 +519,7 @@ def analyze_interference(
         comp.apply_translation([tx, ty, pcb_thickness + c["height"] / 2])
         vol = 0.0
         try:
-            inter = fixture.intersection(comp, engine="manifold")
+            inter = cast(trimesh.Trimesh, fixture).intersection(comp, engine="manifold")
             vol = inter.volume if inter is not None else 0.0
         except Exception as e:
             log.warning(f"  干涉检测 {c['ref']} 失败: {e}")

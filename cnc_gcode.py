@@ -92,7 +92,7 @@ class GCodeBuilder:
             dx, dy = x - self._pos[0], y - self._pos[1]
             dz = (z if z is not None else self._pos[2]) - self._pos[2]
             self.rapid_len += math.sqrt(dx * dx + dy * dy + dz * dz)
-        self._pos = (x, y, z if z is not None else (self._pos[2] if self._pos else z))
+        self._pos = (x, y, z if z is not None else (self._pos[2] if self._pos else 0.0))
 
     def feed_to(
         self, x: float, y: float, z: float | None = None, feed: float | None = None
@@ -111,7 +111,7 @@ class GCodeBuilder:
             self.path_len += dist
             effective_feed = f if f > 0 else 600.0
             self.feed_time_min += dist / effective_feed
-        self._pos = (x, y, z if z is not None else (self._pos[2] if self._pos else z))
+        self._pos = (x, y, z if z is not None else (self._pos[2] if self._pos else 0.0))
         if feed:
             self._feed = feed
 
