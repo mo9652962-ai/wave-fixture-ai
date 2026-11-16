@@ -4,8 +4,8 @@ authors:
   - name: "sora"
     alias: "mo9652962-ai"
 title: "WaveFixture AI: Automated Wave-Soldering Pallet Design and DRC Verification Assistant"
-version: 1.0.0
-date-released: 2026-10-02
+version: 0.5.9
+date-released: 2026-10-28
 url: "https://github.com/mo9652962-ai/wave-fixture-ai"
 repository-code: "https://github.com/mo9652962-ai/wave-fixture-ai"
 keywords:
