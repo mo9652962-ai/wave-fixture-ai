@@ -88,6 +88,12 @@ class Phase2Params:
     # 步骤13: 治具底部热平衡减重开槽 (SMTA 热剖面平衡规范)
     enable_lightening: bool = True  # 开启底部减重散热沉槽
     lightening_depth_mm: float = 5.0  # 减重开槽深度 (mm)
+    # 步骤14: 选择焊喷嘴浸润/驻留窗口 (AllPCB & ERSA/SEHO)——可选挂载
+    selective_nozzle_dia_mm: float | None = None  # 喷嘴内径 (mm)；None 表示不启用选焊喷嘴核算
+    selective_pump_speed_pct: float = 60.0  # 锡泵转速百分比 (0~100)
+    selective_hole_dia_mm: float = 0.9  # 镀覆孔直径 (mm)
+    selective_measured_dwell_s: float | None = None  # 实测驻留时间 (s)；None 按模型估算
+    selective_nozzle_cycles: int = 0  # 喷嘴累计过炉周期（磨损评估）
 
 
 @dataclass
@@ -1163,15 +1169,15 @@ def run_phase2(
     from selective_nozzle_profile import optimize_selective_nozzle_profile
 
     snp_res = None
-    snp_dia = getattr(params2, "selective_nozzle_dia_mm", None)
+    snp_dia = params2.selective_nozzle_dia_mm
     if snp_dia:
         snp_res = optimize_selective_nozzle_profile(
             nozzle_inner_dia_mm=float(snp_dia),
-            pump_speed_pct=float(getattr(params2, "selective_pump_speed_pct", 60.0)),
+            pump_speed_pct=float(params2.selective_pump_speed_pct),
             pcb_thickness_mm=float(getattr(params1, "pcb_thickness_mm", 1.6) or 1.6),
-            plated_hole_dia_mm=float(getattr(params2, "selective_hole_dia_mm", 0.9)),
-            measured_dwell_s=getattr(params2, "selective_measured_dwell_s", None),
-            nozzle_age_cycles=int(getattr(params2, "selective_nozzle_cycles", 0)),
+            plated_hole_dia_mm=float(params2.selective_hole_dia_mm),
+            measured_dwell_s=params2.selective_measured_dwell_s,
+            nozzle_age_cycles=int(params2.selective_nozzle_cycles),
             has_nitrogen=bool(getattr(params2, "enable_nitrogen", True)),
         )
 

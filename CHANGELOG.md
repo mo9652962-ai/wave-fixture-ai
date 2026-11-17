@@ -31,6 +31,28 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   side as machine-readable JSON, each with its source. The profiles are
   parallel references, not interchangeable; `drc.py` does not consume
   them yet.
+- **Selective-solder nozzle profile is now reachable.** `Phase2Params`
+  declares the `selective_*` parameter family (`selective_nozzle_dia_mm`,
+  default `None` = disabled, plus pump speed / hole diameter / measured
+  dwell / nozzle age). Previously the trigger existed only as a
+  `getattr` read, so the hasattr-gated parameter override silently
+  dropped it and `Phase2Result.selective_nozzle_profile` was always
+  `None`, leaving DRC section BC without input. New integration tests
+  pin the default-off behavior, the mounted result, and the BC
+  violation end to end.
+
+### Changed
+
+- **`drc.py` split: `run_drc` is no longer a single ~1,840-line
+  function.** The 62 check sections (A-BJ) are now module-level
+  `_check_*` functions sharing state through a `_DrcContext` dataclass
+  (extracted geometry, source constants, the findings list, and the
+  eight cross-section hand-off values). `run_drc` itself only
+  assembles the context, calls the sections in the original order,
+  and returns the findings. No rule code, threshold or message
+  changed; equivalence was verified by diffing the full findings
+  lists of the old and new implementations on all three golden cases
+  (plain, with material/machine profiles, and with a nozzle profile).
 
 ### Fixed
 

@@ -30,7 +30,7 @@
     <img src="https://img.shields.io/badge/features-21%20automations-2563EB?style=flat-square" alt="features">
     <img src="https://img.shields.io/badge/DRC-87_Rules-059669?style=flat-square" alt="87 DRC rules">
     <img src="https://img.shields.io/badge/KiCad-10%20兼容-314CE0?style=flat-square&logo=kicad&logoColor=white" alt="KiCad 10">
-    <img src="https://img.shields.io/badge/tests-435%20passed-success?style=flat-square" alt="tests">
+    <img src="https://img.shields.io/badge/tests-438%20passed-success?style=flat-square" alt="tests">
     <img src="https://img.shields.io/badge/coverage-89%25-success?style=flat-square" alt="coverage">
     <a href="VALIDATION.md"><img src="https://img.shields.io/badge/real--world-16%20defects%20fixed-gold?style=flat-square" alt="16 defects fixed"></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/mo9652962-ai/wave-fixture-ai?style=flat-square" alt="MIT"></a>
@@ -292,7 +292,7 @@ DRC 结论 → 干涉汇总 → 交付物清单，每项带数据出处。
 | `case_003_stm32_4layer` | **circuit-agent 生成的 4 层板**（跨仓/跨工具素材） | 37×37mm · 12 钻孔 · 含 3.2mm 安装孔 | **跨 AI-EDA 工具兼容性**、合格销径走打分正常路径、DRC 全绿正例 |
 
 ```bash
-uv run pytest -q --cov --cov-fail-under=80    # 435 测试 · 覆盖率 89%（CI 棘轮 80）
+uv run pytest -q --cov --cov-fail-under=80    # 438 测试 · 覆盖率 89%（CI 棘轮 80）
 uv run pytest tests/test_golden_case*.py -v    # 25 项真实板黄金断言
 ```
 
