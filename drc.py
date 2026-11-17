@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, TypeGuard
+from dataclasses import asdict, dataclass, field
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 if TYPE_CHECKING:
     from shapely.geometry.base import BaseGeometry
@@ -93,37 +93,58 @@ def _poly_ok(poly: BaseGeometry | None) -> TypeGuard[BaseGeometry]:
         return False
 
 
-def run_drc(
-    r1,
-    r2,
-    material_key: str | None = None,
-    machine_key: str | None = None,
-    pallet_thickness: float = 10.0,
-) -> list[dict]:
-    """对 phase1/phase2 结果跑全部 DRC 规则，返回发现列表（含 severity 与出处）。
 
-    material_key: 可选治具材料 key（materials.MATERIALS）——提供时启用
-    材料-工艺交叉校验（G5 MATERIAL_TEMP_WINDOW，如 FR-4 vs 无铅波峰）。
-    machine_key: 可选波峰焊机台画像（equipment.MACHINES）——提供时启用
-    真机合规校验（H 组：轨距/载荷/SMEMA 高度）。
-    pallet_thickness: 治具板厚（H2 载荷估算用）。
+
+@dataclass
+class _DrcContext:
+    """run_drc 各检查段共享的输入、常量与累积输出。
+
+    拆分前这些都是 run_drc 的函数局部量：提取自 phase1/phase2 结果的
+    几何与清单（只读）、三条出处常量、待合发现列表，以及 8 个跨段交接
+    值（生产段写入、同名局部量供后续段读取）。各段函数按需解包读取，
+    交接值在段尾写回。
     """
-    issues: list[dict] = []
-    SRC_STRUCT = "竞品逆向框架（wave-soldering-fixture-designer）"
-    SRC_SIZE = "PCBSync / MB Manufacturing（传送带 20×30in）"
-    SRC_DFM = "Macaos / AGICORP / APTPCB DFM 指南"
 
-    board = getattr(r1, "board_poly", None)
-    sink = getattr(r1, "sink_poly", None)
-    outer = getattr(r2, "outer_poly", None)
-    handles = getattr(r1, "handles", []) or []
-    screws = getattr(r1, "screws", []) or []
-    pins = getattr(r1, "pins", []) or []
-    avoids = getattr(r2, "avoid_polys", []) or []
-    solders = getattr(r2, "solder_polys", []) or []
-    tin_holes = getattr(r2, "tin_holes", []) or []
-    tin_strips = getattr(r2, "tin_strip_lines", []) or []
-    dogbones = getattr(r1, "dogbone_corners", []) or getattr(r2, "dogbone_corners", []) or []
+    r1: Any
+    r2: Any
+    material_key: str | None = None
+    machine_key: str | None = None
+    pallet_thickness: float = 10.0
+    board: Any = None
+    sink: Any = None
+    outer: Any = None
+    handles: Any = None
+    screws: Any = None
+    pins: Any = None
+    avoids: Any = None
+    solders: Any = None
+    tin_holes: Any = None
+    tin_strips: Any = None
+    dogbones: Any = None
+    SRC_STRUCT: str = "竞品逆向框架（wave-soldering-fixture-designer）"
+    SRC_SIZE: str = "PCBSync / MB Manufacturing（传送带 20×30in）"
+    SRC_DFM: str = "Macaos / AGICORP / APTPCB DFM 指南"
+    issues: list = field(default_factory=list)
+    # 跨段交接（生产段 -> 消费段）：Q->R tp、S->T bt、U->V sd、W->X hdc、
+    # Y->Z ti、AA->AB/AC tpo、AK->AL fd 与 req_drain
+    tp: Any = None
+    bt: Any = None
+    sd: Any = None
+    hdc: Any = None
+    ti: Any = None
+    tpo: Any = None
+    fd: Any = None
+    req_drain: Any = None
+
+def _check_a_structure(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    board = ctx.board
+    sink = ctx.sink
+    outer = ctx.outer
+    avoids = ctx.avoids
+    solders = ctx.solders
+    SRC_STRUCT = ctx.SRC_STRUCT
+    SRC_SIZE = ctx.SRC_SIZE
 
     # ── A. 结构边界 ──────────────────────────────────────────────
     if not _poly_ok(board):
@@ -211,6 +232,15 @@ def run_drc(
                 )
             )
 
+
+
+def _check_b_locating_pins(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    pins = ctx.pins
+    avoids = ctx.avoids
+    SRC_STRUCT = ctx.SRC_STRUCT
+    SRC_DFM = ctx.SRC_DFM
+
     # ── B. 定位销 ────────────────────────────────────────────────
     if len(pins) < 2:
         issues.append(
@@ -255,6 +285,15 @@ def run_drc(
                     )
                 )
 
+
+
+def _check_c_hold_down_holes(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    sink = ctx.sink
+    screws = ctx.screws
+    avoids = ctx.avoids
+    SRC_STRUCT = ctx.SRC_STRUCT
+
     # ── C. 压扣孔 ────────────────────────────────────────────────
     if len(screws) < 2:
         issues.append(
@@ -294,6 +333,15 @@ def run_drc(
                     )
                 )
 
+
+
+def _check_d_tin_strips(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    sink = ctx.sink
+    tin_holes = ctx.tin_holes
+    tin_strips = ctx.tin_strips
+    SRC_STRUCT = ctx.SRC_STRUCT
+
     # ── D. 挡锡条 ────────────────────────────────────────────────
     for bi, strip in enumerate(tin_strips):
         try:
@@ -324,6 +372,17 @@ def run_drc(
                     object_id=f"tin-hole-{hi + 1}",
                 )
             )
+
+
+
+def _check_e_avoid_solder_handles(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    outer = ctx.outer
+    handles = ctx.handles
+    avoids = ctx.avoids
+    solders = ctx.solders
+    SRC_STRUCT = ctx.SRC_STRUCT
+    SRC_DFM = ctx.SRC_DFM
 
     # ── E. 避位 / 上锡 / 取手 ────────────────────────────────────
     for ai, av in enumerate(avoids):
@@ -378,6 +437,16 @@ def run_drc(
                     log.debug("取手/避位交集判定跳过: %s", e)
                     continue
 
+
+
+def _check_f_dogbone(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    outer = ctx.outer
+    screws = ctx.screws
+    pins = ctx.pins
+    dogbones = ctx.dogbones
+    SRC_STRUCT = ctx.SRC_STRUCT
+
     # ── F. 狗骨头减隙刀路检查 ──────────────────────────────────────────
     from shapely.geometry import Point as _Pt
 
@@ -420,6 +489,19 @@ def run_drc(
                         object_id=f"dogbone-{di + 1}/pin-{pi + 1}",
                     )
                 )
+
+
+
+def _check_g_industrial(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    material_key = ctx.material_key
+    sink = ctx.sink
+    outer = ctx.outer
+    avoids = ctx.avoids
+    solders = ctx.solders
+    SRC_SIZE = ctx.SRC_SIZE
+    SRC_DFM = ctx.SRC_DFM
 
     # ── G. 工业合规（企业级新增，出处见头注）─────────────────────────
     # G1. 轨道限宽：治具短边（横跨轨道方向）不得超过波峰焊轨距上限
@@ -557,6 +639,16 @@ def run_drc(
                 )
             )
 
+
+
+def _check_h_machine(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    material_key = ctx.material_key
+    machine_key = ctx.machine_key
+    pallet_thickness = ctx.pallet_thickness
+    outer = ctx.outer
+
     # ── H. 真机合规（企业级：治具必须放进某台具体机台过波）─────────────
     mkey = machine_key or getattr(r2, "machine_key", None)
     if mkey:
@@ -621,6 +713,13 @@ def run_drc(
         except Exception as e:  # 机台库异常不阻塞 DRC 主流程
             log.debug("真机合规校验跳过: %s", e)
 
+
+
+def _check_i_top_hat(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    outer = ctx.outer
+
     # ── I. 铰链式上盖防翘曲机构检查 (Top Hat Cover DFM) ────────────────
     tophat = getattr(r2, "top_hat", None)
     if tophat:
@@ -651,6 +750,13 @@ def run_drc(
                     )
                 )
 
+
+
+def _check_j_nozzle_clearance(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    avoids = ctx.avoids
+    solders = ctx.solders
+
     # ── J. 选择焊喷嘴避障几何校验 (Selective Soldering Nozzle DFM) ────────
     if solders:
         try:
@@ -674,6 +780,13 @@ def run_drc(
         except Exception as e:
             log.debug("选择焊喷嘴避障校验跳过: %s", e)
 
+
+
+def _check_k_sag(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    outer = ctx.outer
+
     # ── K. 大跨度重力热下垂变形风险检查 (AGICORP & MB-MFG 规范) ─────────
     if _poly_ok(outer):
         ox0, oy0, ox1, oy1 = outer.bounds
@@ -695,6 +808,13 @@ def run_drc(
                     unit="mm",
                 )
             )
+
+
+
+def _check_l_capillary(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    pallet_thickness = ctx.pallet_thickness
+    solders = ctx.solders
 
     # ── L. 上锡开孔深宽比毛细流动检查 (AGICORP & SMTA 规范) ─────────────
     # 当开孔垂直深度与最小开口尺寸比例 > 1.2 时，表面张力易形成阻滞
@@ -722,6 +842,12 @@ def run_drc(
                 )
             )
 
+
+
+def _check_m_gold_finger(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+
     # ── M. 边缘金手指接触防爬锡检查 (IPC-A-610G §7.1.4 & AGICORP §5.0) ──
     # 若存在板边金手指且未配置遮罩压条，警告焊料毛细沾污报废风险
     gold_shields = getattr(r2, "gold_shields", []) or []
@@ -737,6 +863,13 @@ def run_drc(
                 "IPC-A-610G §7.1.4 & AGICORP §5.0",
             )
         )
+
+
+
+def _check_n_thermal_balance(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    outer = ctx.outer
 
     # ── N. 治具底部热容与减重散热平衡检查 (SMTA 热剖面平衡准则) ─────────
     # 治具外框面积大且未开设减重槽时，过大热容易导致整板温差失衡
@@ -757,6 +890,12 @@ def run_drc(
                     unit="%",
                 )
             )
+
+
+
+def _check_o_smd_shadow(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    avoids = ctx.avoids
 
     # ── O. 贴片波峰阴影区防范检查 (IPC-7351 & SMTA 波峰焊规范) ─────────
     # 两个相邻密集避位/上锡区在过板方向间距过小 (<1.0mm) 时，迎锡面元器件会阻挡熔融波峰，
@@ -784,6 +923,12 @@ def run_drc(
                 )
                 break
 
+
+
+def _check_p_cnc_tool_reach(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    pallet_thickness = ctx.pallet_thickness
+
     # ── P. CNC 机加工刀具长径比与深腔可达性检查 (CNC 加工工艺守则) ─────────
     # 开孔深度与铣刀直径比例 (L/D) 若 > 3.0，铣刀悬伸过长会导致振刀、侧壁斜度超差甚至断刀
     endmill_dia = 3.7  # 标配 Φ3.7mm 铣刀
@@ -803,6 +948,15 @@ def run_drc(
             )
         )
 
+
+
+def _check_q_thermocouple(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    outer = ctx.outer
+    solders = ctx.solders
+    tp = ctx.tp
+
     # ── Q. 测温板热电偶孔道与量产曲线调校检查 (SMTA Thermal Profiling 规范) ──
     # 当上锡区复杂 (>=3处) 且治具属于中大尺寸 (>=20000mm²)，若未设测温热电偶通道，
     # 提示无法通过标准 KIC/ECD 测温仪进行量产首件温度曲线校准。
@@ -820,6 +974,15 @@ def run_drc(
             )
         )
 
+    ctx.tp = tp
+
+
+def _check_r_sensor_notch(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    outer = ctx.outer
+    tp = ctx.tp
+
     # ── R. 自动化产线光电传感器感应切角避让检查 (IPC-SMEMA-9851 规范) ──
     # 检查导轨边与传感器感应倒角是否受阻
     sensor_notches = getattr(tp, "sensor_notches", []) if tp else []
@@ -833,6 +996,14 @@ def run_drc(
                 "IPC-SMEMA-9851 Mechanical Interface Specification",
             )
         )
+
+
+
+def _check_s_barcode(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    outer = ctx.outer
+    bt = ctx.bt
 
     # ── S. 工业 4.0 MES 追溯条码/二维码沉槽检查 (IPC-1782 追溯规范) ────
     # 面积 >= 20000mm² 的自动化量产治具，若未规划条码/二维码沉槽，
@@ -854,6 +1025,14 @@ def run_drc(
                 "IPC-1782 Component and Carrier Traceability Standard",
             )
         )
+
+    ctx.bt = bt
+
+
+def _check_t_poka_yoke(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    sink = ctx.sink
+    bt = ctx.bt
 
     # ── T. 丰田精益生产防呆防反向倒角检查 (Poka-Yoke 规则) ─────────────
     # 对称或长宽比接近 1.0 (0.85 ~ 1.15) 的近正方形板，沉板区若未设第一引脚防呆切角，
@@ -878,6 +1057,14 @@ def run_drc(
                 )
             )
 
+
+
+def _check_u_solder_dam(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    outer = ctx.outer
+    sd = ctx.sd
+
     # ── U. 波峰焊迎锡前缘防浮渣扰流槽与撇渣切刀检查 (Ersa / SEHO 规范) ──
     # 量产大型治具 (进板长 >= 240mm 或面积 >= 40000mm²)，若迎锡侧前缘未开 8mm 防渣槽，
     # 锡槽表面漂浮的氧化锡渣极易直接冲入沉板开孔污染通孔引脚。
@@ -900,6 +1087,15 @@ def run_drc(
             )
         )
 
+    ctx.sd = sd
+
+
+def _check_v_incline(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    sink = ctx.sink
+    sd = ctx.sd
+
     # ── V. 传送带 5.5° 爬坡倾角动态浸锡间隙检查 (IPC-A-610G §7.5) ──────
     # 在 4°~7° 爬坡倾角下，治具尾端相对前缘具有 Δz = L * tan(θ) 的抬升高度，
     # 若尾端避位开槽深度未充分补偿，易导致尾部元件离锡间隙不足 (<0.8mm) 或擦碰锡波。
@@ -920,6 +1116,14 @@ def run_drc(
                     required=0.8,
                 )
             )
+
+
+
+def _check_w_buoyancy(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    sink = ctx.sink
+    hdc = ctx.hdc
 
     # ── W. 液态锡浮力与边缘压扣压紧力校核 (AGICORP §3.0 / Macaos) ──────
     hdc = getattr(r2, "hold_down_clamps", None)
@@ -944,6 +1148,14 @@ def run_drc(
             )
         )
 
+    ctx.hdc = hdc
+
+
+def _check_x_clamp_interference(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    avoids = ctx.avoids
+    hdc = ctx.hdc
+
     # ── X. 边缘压扣压舌与板边贴片器件干涉检查 (IPC-A-610G) ─────────────
     clamp_polys = getattr(hdc, "clamp_polys", []) if hdc else []
     for ci, c_poly in enumerate(clamp_polys):
@@ -961,6 +1173,13 @@ def run_drc(
                         object_id=f"clamp-{ci + 1}/avoid-{ai + 1}",
                     )
                 )
+
+
+
+def _check_y_contact_time(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    ti = ctx.ti
 
     # ── Y. 波峰焊接触时间窗口合规性校核 (SMTA / IPC J-STD-001) ─────────
     ti = getattr(r2, "titanium_inserts", None)
@@ -981,6 +1200,14 @@ def run_drc(
             )
         )
 
+    ctx.ti = ti
+
+
+def _check_z_titanium_inserts(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    ti = ctx.ti
+
     # ── Z. 上锡开孔薄壁/刀刃隔墙钛合金嵌件检查 (AGICORP §5.0) ───────────
     thin_walls = getattr(ti, "thin_walls_detected", 0) if ti else 0
     blades = getattr(ti, "blades", []) if ti else []
@@ -997,6 +1224,13 @@ def run_drc(
                 required=0,
             )
         )
+
+
+
+def _check_aa_tool_changes(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    tpo = ctx.tpo
 
     # ── AA. CNC 换刀次数经济性检查 (ISO 6983 / RS-274 加工惯例) ─────────
     # 每次自动换刀 (ATC) 耗时 5~10s 且引入对刀误差累积；同直径刀具特征必须成组加工。
@@ -1016,6 +1250,13 @@ def run_drc(
             )
         )
 
+    ctx.tpo = tpo
+
+
+def _check_ab_machining_time(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    tpo = ctx.tpo
+
     # ── AB. CNC 单件加工工时预算检查 (Macaos 报价工艺库工时基线) ────────
     # 单件治具加工 > 45min 触发产能预警：影响批量交付节拍与设备摊销成本。
     total_min = getattr(tpo, "total_time_min", 0.0) if tpo else 0.0
@@ -1032,6 +1273,12 @@ def run_drc(
                 required=45.0,
             )
         )
+
+
+
+def _check_ac_nonstandard_tools(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    tpo = ctx.tpo
 
     # ── AC. 非标准刀具直径检查 (标准刀具梯采购惯例) ─────────────────────
     # 使用标准梯 {1.0,1.5,2.0,2.5,3.175,3.5,4.0,5.0,6.0} 之外的刀径需定制采购，
@@ -1055,6 +1302,13 @@ def run_drc(
             )
         )
 
+
+
+def _check_ad_stock_clamping(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    outer = ctx.outer
+
     # ── AD. 毛料下料尺寸装夹校核 (机加工车间装夹规范) ───────────────────
     # 毛料边长必须 >= 治具外形 + 四周 10mm 夹持余量，否则虎钳/压板无处可夹。
     sw = getattr(r2, "stock_width_mm", None)
@@ -1075,6 +1329,13 @@ def run_drc(
                     required=f"{need_w:.1f}x{need_h:.1f}",
                 )
             )
+
+
+
+def _check_ae_flatness(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    outer = ctx.outer
 
     # ── AE. 大型治具密封面平面度规范检查 (AGICORP §6.0) ─────────────────
     # 对角线 >= 300mm 的治具，沉板密封面必须标注平面度公差 <= 0.2mm；
@@ -1097,6 +1358,13 @@ def run_drc(
                     required="<=0.2mm",
                 )
             )
+
+
+
+def _check_af_keying(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    outer = ctx.outer
 
     # ── AF. 近对称治具防反向装载方向键检查 (Ersa / SEHO 上下板防错) ─────
     # 长宽比 0.85~1.15 的近对称治具若无非对称方向键切角，装板工/上板机
@@ -1121,6 +1389,14 @@ def run_drc(
                     required="keying chamfer",
                 )
             )
+
+
+
+def _check_ag_thermal_expansion(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    material_key = ctx.material_key
+    sink = ctx.sink
 
     # ── AG. 治具-PCB 热膨胀失配间隙校核 (Röchling CTE datasheet) ────────
     # 波峰温度下治具与 PCB 线膨胀差 ΔL = L × ΔCTE × ΔT；差值超过常温沉板
@@ -1150,6 +1426,13 @@ def run_drc(
                     )
                 )
 
+
+
+def _check_ah_thread_inserts(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    screws = ctx.screws
+
     # ── AH. 合成石螺纹孔黄铜埋植嵌件检查 (紧固寿命惯例) ─────────────────
     # 合成石/FR-4 直接攻丝的螺纹 ~50 次装拆即滑丝；盖板/铰链/压扣反复装拆
     # 必须压入黄铜埋植嵌件 (>500 次装拆寿命)。
@@ -1170,6 +1453,14 @@ def run_drc(
                 required=n_screws,
             )
         )
+
+
+
+def _check_ai_scuppers(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    sink = ctx.sink
+    outer = ctx.outer
 
     # ── AI. 出板尾端沥锡引流槽与防拖锡回流校核 (AGICORP §4.4) ────────────
     # 传送方向跨度 >= 180mm 的量产治具，出板尾梁若无沥锡泄锡槽，
@@ -1209,6 +1500,12 @@ def run_drc(
                 )
             )
 
+
+
+def _check_aj_red_glue(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+
     # ── AJ. 底面贴片波峰焊红胶点胶与防污染门禁 (IPC-A-610G §7.1.3) ──────
     rgs = getattr(r2, "red_glue_stencil", None)
     has_bottom_smd = getattr(r2, "has_bottom_smd_components", False)
@@ -1241,6 +1538,14 @@ def run_drc(
             )
         )
 
+
+
+def _check_ak_flux_drainage(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    fd = ctx.fd
+    req_drain = ctx.req_drain
+
     # ── AK. 助焊剂防积液排液槽检查 (AGICORP §4.3 & SMTA 规范) ───────────
     # 面积 >= 50mm² 的深避位腔，若未开凿 45° 倒坡排液泄槽，
     # 积聚的液体助焊剂在预热/浸锡时瞬间沸腾炸锡，产生大面积飞溅锡珠 (IPC-A-610G §5.2.7.1)。
@@ -1261,6 +1566,16 @@ def run_drc(
             )
         )
 
+    ctx.fd = fd
+    ctx.req_drain = req_drain
+
+
+def _check_al_pressure_vents(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    fd = ctx.fd
+    req_drain = ctx.req_drain
+
     # ── AL. 高温密闭气腔泄压排气呼吸孔检查 (SMTA 气体膨胀防爆) ─────────
     # 封闭或半封闭避位腔室未开通大气的呼吸排气孔 (Φ2.0~2.5mm)，
     # 260°C 熔锡高温下腔内气体急剧膨胀 (~79%) 将把锡波吹散吹空导致大面积虚焊。
@@ -1278,6 +1593,13 @@ def run_drc(
                 required=req_drain,
             )
         )
+
+
+
+def _check_am_thermal_scaling(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    sink = ctx.sink
 
     # ── AM. 大尺寸沉板 CAM 热补偿各向异性缩放校核 (Macaos & Röchling) ────
     # 沉板跨度 >= 200mm 的合成石治具，若未在 CAM 阶段施加热补偿各向异性缩放 (k ≈ 1.0016)，
@@ -1299,6 +1621,12 @@ def run_drc(
                 )
             )
 
+
+
+def _check_an_manifest(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+
     # ── AN. 工厂制造交付包密码学防篡改校验清单检查 (IATF 16949 / ISO 9001) ──
     # 送厂量产交付必须随附包含全文件 SHA-256 哈希的 MANIFEST.sha256 账本，确保车间数控加工与质检无误。
     manifest_verified = getattr(r2, "manifest_sha256_verified", True)
@@ -1313,6 +1641,13 @@ def run_drc(
                 "IATF 16949 & ISO 9001 Manufacturing Release Traceability",
             )
         )
+
+
+
+def _check_ao_wear_rails(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    sink = ctx.sink
 
     # ── AO. 传送带链爪耐磨导轨与沉板避位安全净距检查 (AGICORP §3.2) ──────
     # 耐磨导轨条与链爪咬合区必须与沉板边缘保持 ≥ 8.0mm 安全绝缘与机械间隙，严防链爪刮碰 PCB。
@@ -1332,6 +1667,12 @@ def run_drc(
                     required=8.0,
                 )
             )
+
+
+
+def _check_ap_esd(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
 
     # ── AP. 工业防静电 ESD 接地端子与对地回路检查 (ANSI/ESD S20.20-2021) ─
     # 电子制造车间对静电放电敏感器件强制要求对地电阻 Rg < 1.0×10⁹ Ω 且具有首尾冗余接地触点。
@@ -1355,6 +1696,12 @@ def run_drc(
                 )
             )
 
+
+
+def _check_aq_nitrogen_shroud(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+
     # ── AQ. 氮气保护微环境导流罩边框气密性检查 (SMTA & Ersa N2 Guidelines) ─
     # 氮气保护气罩外围距治具边框与导轨陆地宽度必须 >= 5.0mm，防止高纯氮气泄漏逸散。
     ns = getattr(r2, "nitrogen_shroud", None)
@@ -1373,6 +1720,12 @@ def run_drc(
                 required=5.0,
             )
         )
+
+
+
+def _check_ar_ergonomics(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
 
     # ── AR. 人机工程学重量与双手舒适握把门禁 (ISO 11228-1 & OSHA 1910) ─────
     # 治具装配整备质量 > 5.0kg 时必须配置双侧人体工学握持把手；> 8.0kg 严禁单人搬运。
@@ -1408,6 +1761,13 @@ def run_drc(
                 )
             )
 
+
+
+def _check_as_cleaning_drainage(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    avoids = ctx.avoids
+
     # ── AS. 超声波清洗重力自排液死角防炸锡检查 (AGICORP §4.5) ─────────────
     # 深度 >= 4.0mm 且面积 >= 80mm² 的深避位死腔若无自流排液斜槽与贯通泄水孔，
     # 清洗水剂残留遇 260°C 熔锡将瞬间剧烈汽化爆炸导致猛烈溅锡。
@@ -1429,6 +1789,12 @@ def run_drc(
                     required=len(deep_pockets),
                 )
             )
+
+
+
+def _check_at_spring_plungers(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
 
     # ── AT. 上盖浮动弹簧顶针微弹性缓冲压紧检查 (AGICORP §2.3 & SMTA) ─────
     # 在上盖对元器件压紧时，若存在刚性机械压柱固定且缺少不锈钢浮动弹簧微弹性缓冲，
@@ -1452,6 +1818,13 @@ def run_drc(
                 )
             )
 
+
+
+def _check_au_sag_support(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    sink = ctx.sink
+
     # ── AU. 薄板与大跨度 PCB 防热塌陷托块检查 (SMTA & Ersa Anti-Sag) ─────
     # PCB 跨度 >= 160mm 或板厚 <= 1.2mm 时，若未在中跨规划防塌陷支承托块，
     # 260°C 高温下 FR-4 弹性模量跌落导致热塌下垂 (>1.5mm)，引发正面漫锡短路。
@@ -1474,6 +1847,12 @@ def run_drc(
                 )
             )
 
+
+
+def _check_av_rfid(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+
     # ── AV. 工业 RFID 电子标签金属抗失谐间隙检查 (IPC-1782A & ISO 18000-6C)
     # 陶瓷超高频 RFID 标签沉腔与金属构件间距必须 >= 8.0mm，防止涡流失谐导致读距归零。
     rfid = getattr(r2, "rfid_cavity", None)
@@ -1492,6 +1871,12 @@ def run_drc(
                     required=8.0,
                 )
             )
+
+
+
+def _check_aw_solder_pot(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
 
     # ── AW. 锡炉熔锡杂质超标与维护节拍失控检查 (IPC J-STD-001 §5.2) ────────
     # 无铅 SAC305 锡炉铜含量 > 0.85 wt% 或铁/锌/镉超标时，焊料润湿特性劣化，
@@ -1524,6 +1909,12 @@ def run_drc(
                 "IPC J-STD-001 §5.2 Solder Pot Purity & Assay Scheduling",
             )
         )
+
+
+
+def _check_ax_flux_coating(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
 
     # ── AX. 助焊剂喷雾涂覆量与比重窗口检查 (SMTA & Flux Vendor Window) ─────
     # 涂覆量须处于 300~1200 μg/cm² 窗口：不足则顶端爬锡不良批量虚焊，
@@ -1559,6 +1950,12 @@ def run_drc(
                     required="0.995~1.015 g/cm³",
                 )
             )
+
+
+
+def _check_ay_preheat(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
 
     # ── AY. 预热区升温斜率/出口温度/浸润时间窗口检查 (J-STD-001E §4.4) ──────
     # 斜率 1~4°C/s、出口 100~130°C (水基 105~125°C)、浸润 60~120s、板-波温差 <=130°C。
@@ -1604,6 +2001,12 @@ def run_drc(
                 )
             )
 
+
+
+def _check_az_cooldown(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+
     # ── AZ. 出板冷却速率与冷却区长度检查 (J-STD-001E §4.5) ─────────────────
     # 冷却速率 <=4°C/s 防枝晶粗化冻结与板翘；冷却区须使出板 <=60°C 安全下板。
     cdc = getattr(r2, "cooldown_control", None)
@@ -1635,6 +2038,12 @@ def run_drc(
                 )
             )
 
+
+
+def _check_ba_storage(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+
     # ── BA. 库房存储堆叠与防静电环境检查 (AGICORP §6.2 & ESD S20.20) ────────
     # 堆叠超限压坏密封面、无隔垫互磨、非 EPA 区静电、温湿度超限受潮。
     srk = getattr(r2, "pallet_storage_rack", None)
@@ -1661,6 +2070,12 @@ def run_drc(
                 )
             )
 
+
+
+def _check_bb_smed(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+
     # ── BB. SMED 快速换型套件架构检查 (Shingo SMED) ─────────────────────────
     # 混线 >=3 品种仍用整具换型 (无通用基板) 时，每次换型损失 25~45min 纯产能。
     ck = getattr(r2, "changeover_kit", None)
@@ -1678,6 +2093,12 @@ def run_drc(
                 unit="min",
             )
         )
+
+
+
+def _check_bc_nozzle_window(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
 
     # ── BC. 选择焊喷嘴浸润深度/驻留时间窗口检查 (AllPCB 2026 & ERSA/SEHO) ────
     # 浸润深度 <60% 板厚孔填充不足；驻留 <1s/>5s 分别虚焊与锡渣拉尖。
@@ -1720,6 +2141,12 @@ def run_drc(
                     "ERSA Select Wave Nozzle Re-Tinning Procedure",
                 )
             )
+
+
+
+def _check_bd_dross(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
 
     # ── BD. 锡渣桥连/拖锡冰柱预测检查 (Macaos §2 & Sierra Circuits) ─────────
     # 开孔暴露比 >60% 放大拖锡；引脚间距 <0.8mm 桥连；离波角 <4° 冰柱。
@@ -1767,6 +2194,12 @@ def run_drc(
                     )
                 )
 
+
+
+def _check_be_aoi(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+
     # ── BE. AOI 光学检测相机视场避障与 45° 倒角开窗检查 (Koh Young & Omron)
     # 开孔立壁至外围引脚必须保持 >= 3.5mm 间距且视场遮挡率 <= 5.0%，防 3D AOI 误判虚焊。
     aoi_res = getattr(r2, "aoi_vision_window", None)
@@ -1787,6 +2220,12 @@ def run_drc(
                     unit="%",
                 )
             )
+
+
+
+def _check_bf_conveyor_torque(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
 
     # ── BF. 传送链电机驱动扭矩与链条拉力抗跳齿校核 (Ersa & SEHO) ───────────
     # 炉内连线多具治具爬坡总拉力必须 <= 650N 且电机扭矩安全系数 SF >= 1.5。
@@ -1821,6 +2260,12 @@ def run_drc(
                 )
             )
 
+
+
+def _check_bg_labyrinth_seal(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+
     # ── BG. 沉板区双阶梯迷宫阻锡槽与毛细断流微槽检查 (Macaos & Ersa) ─────────
     # PCB 外框与沉板槽壁间的 0.2mm 狭缝构成毛细管通路，液态锡在高压下极易漫顶渗锡；
     # 板边元器件紧凑 (<3.0mm) 或长时间浸锡时，必须规划 1.2mm 突扩毛细断流微槽切断液桥。
@@ -1839,6 +2284,13 @@ def run_drc(
                 "Macaos Selective Pallet Guidelines & Ersa Dual-Step Labyrinth Solder Seal Standards",
             )
         )
+
+
+
+def _check_bh_guide_strips(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
+    outer = ctx.outer
 
     # ── BH. 传送带防爬轨下凸导向限位条检查 (AGICORP §3.5 & Ersa) ────────────
     # 重型 (>=4.5kg) 或大跨度 (>=240mm) 治具在 5.5° 坡道波峰冲刷下，
@@ -1863,6 +2315,12 @@ def run_drc(
                     unit="mm",
                 )
             )
+
+
+
+def _check_bi_wave_baffles(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
 
     # ── BI. 双波峰贴片开孔消锡扰流挡板检查 (Ersa / SEHO & SMTA 双波规范) ──
     # 存在底面 SMD 阻容/IC 的混装波峰焊，开孔出波尾端若未配置 35° 消锡导流挡板，
@@ -1893,6 +2351,12 @@ def run_drc(
                 "Ersa & SEHO Dual-Wave Chip Soldering Baffle Specifications",
             )
         )
+
+
+
+def _check_bj_lifting(ctx: _DrcContext) -> None:
+    issues = ctx.issues
+    r2 = ctx.r2
 
     # ── BJ. 治具搬运提升负荷与人机工程内嵌拉手槽检查 (ISO 11228-1 & NIOSH) ─
     # 装配质量 >= 4.5kg 的治具，若未在双侧规划深度 >= 22mm、宽度 >= 105mm 的内嵌指槽，
@@ -1930,7 +2394,107 @@ def run_drc(
             )
         )
 
-    return issues
+
+
+def run_drc(
+    r1,
+    r2,
+    material_key: str | None = None,
+    machine_key: str | None = None,
+    pallet_thickness: float = 10.0,
+) -> list[dict]:
+    """对 phase1/phase2 结果跑全部 DRC 规则，返回发现列表（含 severity 与出处）。
+
+    material_key: 可选治具材料 key（materials.MATERIALS）——提供时启用
+    材料-工艺交叉校验（G5 MATERIAL_TEMP_WINDOW，如 FR-4 vs 无铅波峰）。
+    machine_key: 可选波峰焊机台画像（equipment.MACHINES）——提供时启用
+    真机合规校验（H 组：轨距/载荷/SMEMA 高度）。
+    pallet_thickness: 治具板厚（H2 载荷估算用）。
+
+    实现按检查段（A–BJ）拆为模块级 _check_* 函数，共享状态收在
+    _DrcContext；本函数只负责组装上下文、按原顺序调用各段、返回发现。
+    """
+    ctx = _DrcContext(
+        r1=r1,
+        r2=r2,
+        material_key=material_key,
+        machine_key=machine_key,
+        pallet_thickness=pallet_thickness,
+        board=getattr(r1, "board_poly", None),
+        sink=getattr(r1, "sink_poly", None),
+        outer=getattr(r2, "outer_poly", None),
+        handles=getattr(r1, "handles", []) or [],
+        screws=getattr(r1, "screws", []) or [],
+        pins=getattr(r1, "pins", []) or [],
+        avoids=getattr(r2, "avoid_polys", []) or [],
+        solders=getattr(r2, "solder_polys", []) or [],
+        tin_holes=getattr(r2, "tin_holes", []) or [],
+        tin_strips=getattr(r2, "tin_strip_lines", []) or [],
+        dogbones=getattr(r1, "dogbone_corners", []) or getattr(r2, "dogbone_corners", []) or [],
+    )
+    _check_a_structure(ctx)
+    _check_b_locating_pins(ctx)
+    _check_c_hold_down_holes(ctx)
+    _check_d_tin_strips(ctx)
+    _check_e_avoid_solder_handles(ctx)
+    _check_f_dogbone(ctx)
+    _check_g_industrial(ctx)
+    _check_h_machine(ctx)
+    _check_i_top_hat(ctx)
+    _check_j_nozzle_clearance(ctx)
+    _check_k_sag(ctx)
+    _check_l_capillary(ctx)
+    _check_m_gold_finger(ctx)
+    _check_n_thermal_balance(ctx)
+    _check_o_smd_shadow(ctx)
+    _check_p_cnc_tool_reach(ctx)
+    _check_q_thermocouple(ctx)
+    _check_r_sensor_notch(ctx)
+    _check_s_barcode(ctx)
+    _check_t_poka_yoke(ctx)
+    _check_u_solder_dam(ctx)
+    _check_v_incline(ctx)
+    _check_w_buoyancy(ctx)
+    _check_x_clamp_interference(ctx)
+    _check_y_contact_time(ctx)
+    _check_z_titanium_inserts(ctx)
+    _check_aa_tool_changes(ctx)
+    _check_ab_machining_time(ctx)
+    _check_ac_nonstandard_tools(ctx)
+    _check_ad_stock_clamping(ctx)
+    _check_ae_flatness(ctx)
+    _check_af_keying(ctx)
+    _check_ag_thermal_expansion(ctx)
+    _check_ah_thread_inserts(ctx)
+    _check_ai_scuppers(ctx)
+    _check_aj_red_glue(ctx)
+    _check_ak_flux_drainage(ctx)
+    _check_al_pressure_vents(ctx)
+    _check_am_thermal_scaling(ctx)
+    _check_an_manifest(ctx)
+    _check_ao_wear_rails(ctx)
+    _check_ap_esd(ctx)
+    _check_aq_nitrogen_shroud(ctx)
+    _check_ar_ergonomics(ctx)
+    _check_as_cleaning_drainage(ctx)
+    _check_at_spring_plungers(ctx)
+    _check_au_sag_support(ctx)
+    _check_av_rfid(ctx)
+    _check_aw_solder_pot(ctx)
+    _check_ax_flux_coating(ctx)
+    _check_ay_preheat(ctx)
+    _check_az_cooldown(ctx)
+    _check_ba_storage(ctx)
+    _check_bb_smed(ctx)
+    _check_bc_nozzle_window(ctx)
+    _check_bd_dross(ctx)
+    _check_be_aoi(ctx)
+    _check_bf_conveyor_torque(ctx)
+    _check_bg_labyrinth_seal(ctx)
+    _check_bh_guide_strips(ctx)
+    _check_bi_wave_baffles(ctx)
+    _check_bj_lifting(ctx)
+    return ctx.issues
 
 
 def counts(issues: list[dict]) -> dict:
