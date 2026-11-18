@@ -12,7 +12,7 @@ import math
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
 import ezdxf
 from shapely.geometry import Point, Polygon, box
@@ -20,6 +20,8 @@ from shapely.ops import unary_union
 
 if TYPE_CHECKING:
     from shapely.geometry.base import BaseGeometry
+
+_GeomT = TypeVar("_GeomT", bound="BaseGeometry")
 
 
 def layer_pts_from_files(gerber_dir: str, key: str) -> list[tuple[float, float, float]]:
@@ -865,13 +867,17 @@ def run_phase2(
         panel_grid = grid.to_dict()
 
     outer = make_outer(sink, params2)
+    outer_poly = outer.outer_poly
+    if outer_poly is None:
+        log.error("❌ 未生成治具外形")
+        return
     vents = make_vent_holes(avoid, solder, params2)
 
     tophat_res = None
     if getattr(params2, "enable_top_hat", False):
         from top_hat import generate_top_hat
 
-        tophat_res = generate_top_hat(outer.outer_poly, sink, board, caps)
+        tophat_res = generate_top_hat(outer_poly, sink, board, caps)
 
     from barcode_tag import generate_traceability_and_poka_yoke
     from fixture_dimensioning import generate_fixture_dimensions
@@ -884,14 +890,14 @@ def run_phase2(
     from titanium_inserts import detect_knife_edge_walls_and_inserts
     from wave_chamfer import generate_wave_flow_chamfers
 
-    dims = generate_fixture_dimensions(outer.outer_poly, sink_poly=sink, pins=pins)
+    dims = generate_fixture_dimensions(outer_poly, sink_poly=sink, pins=pins)
     chamfers = generate_wave_flow_chamfers(solder)
-    stiffener = generate_stiffener_bars(outer.outer_poly, sink_poly=sink)
-    tp_res = generate_thermocouple_channels(solder, outer.outer_poly, sink_poly=sink)
+    stiffener = generate_stiffener_bars(outer_poly, sink_poly=sink)
+    tp_res = generate_thermocouple_channels(solder, outer_poly, sink_poly=sink)
     bt_res = generate_traceability_and_poka_yoke(
-        outer.outer_poly, sink_poly=sink, job_name=Path(gerber_dir).name
+        outer_poly, sink_poly=sink, job_name=Path(gerber_dir).name
     )
-    sd_res = generate_solder_dam_and_incline(outer.outer_poly, sink_poly=sink)
+    sd_res = generate_solder_dam_and_incline(outer_poly, sink_poly=sink)
     hdc_res = generate_hold_down_clamps(sink, outer.outer_poly)
     ti_res = detect_knife_edge_walls_and_inserts(solder)
 
@@ -901,7 +907,7 @@ def run_phase2(
     # CNC 刀路特征采集（孔/腔/轮廓/清角）与分组最短空程优化 (ISO 6983 / RS-274)
     from cnc_toolpath_opt import CNCOp, optimize_cnc_toolpath
 
-    def _shape_ok(poly: BaseGeometry | None) -> TypeGuard[BaseGeometry]:
+    def _shape_ok(poly: _GeomT | None) -> TypeGuard[_GeomT]:
         try:
             return poly is not None and (not poly.is_empty) and poly.is_valid
         except Exception:
@@ -1046,7 +1052,7 @@ def run_phase2(
     lightening_res = None
     if getattr(params2, "enable_lightening", True):
         lightening_res = generate_lightening_pockets(
-            outer.outer_poly,
+            outer_poly,
             sink_poly=sink,
             keepouts=avoid + solder,
             pocket_depth_mm=getattr(params2, "lightening_depth_mm", 5.0),
