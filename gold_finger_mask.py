@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from shapely.geometry import Polygon, box
+from shapely.geometry.base import BaseGeometry
 
 log = logging.getLogger("fixture-mask")
 
@@ -40,7 +41,7 @@ class GoldFingerShield:
 
 
 def detect_edge_connectors_and_fingers(
-    board_poly: Polygon,
+    board_poly: BaseGeometry,
     components: list[dict[str, Any]] | None = None,
     edge_margin_mm: float = 6.0,
 ) -> list[Polygon]:
@@ -71,7 +72,7 @@ def detect_edge_connectors_and_fingers(
 
 
 def generate_gold_finger_masks(
-    board_poly: Polygon,
+    board_poly: BaseGeometry,
     finger_regions: list[Polygon] | None = None,
     barrier_margin_mm: float = 4.0,
 ) -> list[GoldFingerShield]:

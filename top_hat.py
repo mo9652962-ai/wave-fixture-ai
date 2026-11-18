@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from shapely.geometry import Polygon, box
+from shapely.geometry.base import BaseGeometry
 
 log = logging.getLogger("fixture-tophat")
 
@@ -67,7 +68,7 @@ class TopHatResult:
 def generate_top_hat(
     outer_poly: Polygon,
     sink_poly: Polygon,
-    board_poly: Polygon,
+    board_poly: BaseGeometry,
     cap_holes: list[tuple[float, float, float]] | None = None,
     params: TopHatParams | None = None,
 ) -> TopHatResult:

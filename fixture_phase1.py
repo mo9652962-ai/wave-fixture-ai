@@ -21,6 +21,7 @@ from typing import Literal, overload
 import ezdxf
 from gerbonara import ExcellonFile, LayerStack
 from shapely.geometry import Polygon, box
+from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -53,7 +54,7 @@ class FixtureParams:
 
 @dataclass
 class FixtureResult:
-    board_poly: Polygon | None = None  # 原始外形
+    board_poly: BaseGeometry | None = None  # 原始外形（unary_union 结果，可为 MultiPolygon）
     sink_poly: Polygon | None = None  # 沉板区（外扩+狗骨头清角）
     handles: list[Polygon] = field(default_factory=list)  # 取手位
     screws: list[tuple[float, float]] = field(default_factory=list)  # 压扣孔 (x,y)
@@ -158,7 +159,7 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
 
     if is_odb_archive(d):
         odb = parse_odb_package(d)
-        if odb.has_outline:
+        if odb.has_outline and odb.board_poly is not None:
             drills = [(x, y, dia / 2.0) for x, y, dia in odb.drills]
             return [odb.board_poly], drills
 
@@ -372,15 +373,15 @@ def parse_gerber(gerber_dir: str) -> tuple[list[Polygon], list[tuple[float, floa
 # 步骤 2: 沉板区（外形外扩 0.2mm + 狗骨头 Dogbone 清角）
 # ─────────────────────────────────────────────────────────────
 @overload
-def make_sink_region(board_poly: Polygon, p: FixtureParams, *, return_corners: Literal[False] = False) -> Polygon: ...
+def make_sink_region(board_poly: BaseGeometry, p: FixtureParams, *, return_corners: Literal[False] = False) -> Polygon: ...
 
 
 @overload
-def make_sink_region(board_poly: Polygon, p: FixtureParams, *, return_corners: Literal[True]) -> tuple[Polygon, list]: ...
+def make_sink_region(board_poly: BaseGeometry, p: FixtureParams, *, return_corners: Literal[True]) -> tuple[Polygon, list]: ...
 
 
 def make_sink_region(
-    board_poly: Polygon,
+    board_poly: BaseGeometry,
     p: FixtureParams,
     *,
     return_corners: bool = False,

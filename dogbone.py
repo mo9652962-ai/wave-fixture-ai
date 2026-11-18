@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from shapely.geometry import MultiPolygon, Point, Polygon
+from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
 
@@ -68,7 +69,7 @@ class DogboneCorner:
 
 
 def detect_concave_corners(
-    poly: Polygon,
+    poly: BaseGeometry,
     params: DogboneParams | None = None,
 ) -> list[DogboneCorner]:
     """
@@ -82,8 +83,10 @@ def detect_concave_corners(
     # 若为 MultiPolygon，取最大外圈
     if isinstance(poly, MultiPolygon):
         poly = max(poly.geoms, key=lambda g: g.area)
+    if not isinstance(poly, Polygon):
+        return []
 
-    coords = list(poly.exterior.coords)[:-1]
+    coords = [(c[0], c[1]) for c in list(poly.exterior.coords)[:-1]]
     n = len(coords)
     if n < 3:
         return []
@@ -200,14 +203,16 @@ def apply_dogbone_relief(
         combined = unary_union([base_poly] + relief_circles)
         if isinstance(combined, MultiPolygon):
             combined = max(combined.geoms, key=lambda g: g.area)
-        return combined
+        if isinstance(combined, Polygon):
+            return combined
+        return base_poly
     except Exception:
         # 几何容错退回
         return base_poly
 
 
 def generate_dogbone_relief(
-    board_poly: Polygon,
+    board_poly: BaseGeometry,
     expand_mm: float = 0.2,
     params: DogboneParams | None = None,
 ) -> tuple[Polygon, list[DogboneCorner]]:
@@ -224,7 +229,7 @@ def generate_dogbone_relief(
     """
     params = params or DogboneParams()
     if board_poly is None or board_poly.is_empty:
-        return board_poly, []
+        return Polygon(), []
 
     # 先在 PCB 原始尖锐角上检测内凹拐角（避免外扩后圆角打碎顶点）
     corners = detect_concave_corners(board_poly, params)
