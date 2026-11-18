@@ -2547,6 +2547,19 @@ wheels = [
 ]
 
 [[package]]
+name = "types-shapely"
+version = "2.2.0.20261117"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6e/ef/f7f8ef36907b105490684a713fa9b7c9cb51b8e9997953555b3bbc31a3af/types_shapely-2.2.0.20261117.tar.gz", hash = "sha256:4156656f46ac90a4b247a894ac4c8ab587d88de15162075831bb2014c05fa9ce", size = 28441, upload-time = "2026-11-17T09:50:56.633Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/70/d2/58d75cb1173bd4ba0e29483605f6c08ab46fafba3445f7229c6f6aa3dc13/types_shapely-2.2.0.20261117-py3-none-any.whl", hash = "sha256:4df7c5234fe82fdc78f344f621f2c0d65c05cd72e01082290e8535f1d89a1e06", size = 39048, upload-time = "2026-11-17T09:50:55.584Z" },
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2608,6 +2621,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "types-shapely" },
 ]
 
 [package.metadata]
@@ -2628,6 +2642,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },
     { name = "shapely", specifier = ">=2.0" },
     { name = "trimesh", specifier = ">=4.0" },
+    { name = "types-shapely", marker = "extra == 'dev'", specifier = ">=2.2.0" },
     { name = "uvicorn", specifier = ">=0.29" },
 ]
 provides-extras = ["dev"]
