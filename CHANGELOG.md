@@ -53,6 +53,26 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   changed; equivalence was verified by diffing the full findings
   lists of the old and new implementations on all three golden cases
   (plain, with material/machine profiles, and with a nozzle profile).
+- **Geometry layer is strictly typed; the type gate's shapely `Any`
+  exception is removed.** `types-shapely` (version-matched to the
+  shapely runtime) joins the dev extra, the `shapely` override is gone
+  from the `mypy` config, and the 43 findings that surfaced across 13
+  files are fixed. Signatures that genuinely flow union/boolean
+  results (`make_sink_region`, the dogbone relief chain,
+  `FixtureResult.board_poly`, the labyrinth groove field, the
+  `board_poly` parameters of the top-hat and gold-finger generators)
+  are annotated `BaseGeometry`; Polygon-only APIs are reached only
+  behind the existing guards (`_shape_ok` is now generic over the
+  geometry type it narrows; the DRC thin-wall check and the 3D
+  extrusion path narrow with `isinstance`); the dogbone and
+  wave-chamfer coordinate lists are normalised to `(x, y)` pairs where
+  they are built. No rule code, threshold, message or geometry result
+  changed — equivalence was verified by diffing the full DRC findings
+  lists (338 findings) and the board/sink/outer WKT of the old and new
+  implementations on all three golden cases (plain, with
+  material/machine profiles, and with a nozzle profile) plus
+  degenerate empty inputs. Only the stub-less libraries (gerbonara,
+  mpl_toolkits, yaml) remain treated as Any.
 
 ### Fixed
 

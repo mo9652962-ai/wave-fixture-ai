@@ -95,7 +95,7 @@ def generate_wave_flow_chamfers(
         toolpath_poly = sp.buffer(p.chamfer_width_mm / 2.0, join_style="round")
         toolpath_lines = []
         if isinstance(toolpath_poly, Polygon) and not toolpath_poly.is_empty:
-            pts = list(toolpath_poly.exterior.coords)
+            pts = [(c[0], c[1]) for c in toolpath_poly.exterior.coords]
             for j in range(len(pts) - 1):
                 toolpath_lines.append((pts[j], pts[j + 1]))
 

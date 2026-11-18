@@ -18,7 +18,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, Polygon
 from shapely.ops import unary_union
 
 log = logging.getLogger("nitrogen-shroud")
@@ -109,9 +109,9 @@ def generate_nitrogen_shroud(
         return NitrogenShroudResult()
 
     polys: list[Polygon] = []
-    if clipped_shroud.geom_type == "Polygon":
+    if isinstance(clipped_shroud, Polygon):
         polys.append(clipped_shroud)
-    elif clipped_shroud.geom_type == "MultiPolygon":
+    elif isinstance(clipped_shroud, MultiPolygon):
         polys.extend(clipped_shroud.geoms)
 
     total_area = sum(p.area for p in polys)

@@ -23,7 +23,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, Polygon
+from shapely.geometry.base import BaseGeometry
 
 log = logging.getLogger("labyrinth-seal")
 
@@ -49,7 +50,7 @@ class LabyrinthSealResult:
     """迷宫阻锡槽几何多边形与毛细防爬锡合规核算结果。"""
 
     shelf_poly: Polygon | None = None
-    breaker_groove_poly: Polygon | None = None
+    breaker_groove_poly: BaseGeometry | None = None
     groove_width_mm: float = DEFAULT_BREAKER_GROOVE_WIDTH_MM
     groove_depth_mm: float = DEFAULT_BREAKER_GROOVE_DEPTH_MM
     is_capillary_break_effective: bool = True
@@ -141,9 +142,9 @@ def export_labyrinth_seal_to_dxf(msp, result: LabyrinthSealResult) -> None:
 
     if result.breaker_groove_poly and not result.breaker_groove_poly.is_empty:
         poly = result.breaker_groove_poly
-        if poly.geom_type == "Polygon":
+        if isinstance(poly, Polygon):
             polys = [poly]
-        elif poly.geom_type == "MultiPolygon":
+        elif isinstance(poly, MultiPolygon):
             polys = list(poly.geoms)
         else:
             polys = []

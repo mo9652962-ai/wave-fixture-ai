@@ -50,7 +50,10 @@ def polygon_to_extrude(poly: Polygon, z_bottom: float, z_top: float) -> trimesh.
             return None
         return cast(trimesh.Trimesh, trimesh.util.concatenate(parts))
     # 简化顶点（减少三角面）
-    poly = poly.simplify(0.05, preserve_topology=True)
+    simplified = poly.simplify(0.05, preserve_topology=True)
+    if not isinstance(simplified, Polygon):
+        return None
+    poly = simplified
     exterior = np.array(poly.exterior.coords)[:, :2]
     # 用 trimesh 的 extrusion
     path = np.zeros((len(exterior), 3))

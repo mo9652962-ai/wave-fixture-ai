@@ -38,7 +38,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.8", "httpx>=0.27", "mypy>=1.10"]  # httpx: TestClient 依赖
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.8", "httpx>=0.27", "mypy>=1.10", "types-shapely>=2.2.0"]  # httpx: TestClient 依赖；types-shapely 与 shapely 运行时同版本线
 
 [project.scripts]
 wave-fixture-ai = "web_server:main"
@@ -144,13 +144,13 @@ ignore = ["E501", "BLE001"]
 
 # Type checking gate: `mypy` (repo root) must report no errors.
 # Scope: the shipped modules; tests/, web/ and community/ are excluded.
-# The geometry layer is duck-typed by design — helpers accept any shapely
-# geometry and guard at runtime (_poly_ok/_shape_ok, try/except) — while
-# types-shapely models operations as returning BaseGeometry, which
-# conflicts with the codebase's Polygon-annotated signatures at ~40
-# sites. shapely (plus gerbonara / mpl_toolkits / yaml, which ship no
-# stubs at all) is therefore treated as Any here; typing the geometry
-# layer strictly is a separate, dedicated change. Everything else —
+# shapely is checked strictly against types-shapely (dev dependency,
+# version-matched to the shapely runtime): geometry signatures are
+# annotated at their true width — BaseGeometry where unions and boolean
+# results flow, Polygon where the runtime guards (_poly_ok/_shape_ok,
+# isinstance) narrow — and Polygon-only APIs (.exterior) are only used
+# behind those guards. Only gerbonara / mpl_toolkits / yaml, which ship
+# no stubs at all, are still treated as Any here. Everything else —
 # the repo's own dataclasses, return contracts and call sites — is
 # checked strictly, which is where the gate earns its keep.
 [tool.mypy]
@@ -159,6 +159,6 @@ files = "."
 exclude = "(tests/|web/|community/|\\.venv)"
 
 [[tool.mypy.overrides]]
-module = ["shapely", "shapely.*", "gerbonara", "gerbonara.*", "mpl_toolkits", "mpl_toolkits.*", "yaml"]
+module = ["gerbonara", "gerbonara.*", "mpl_toolkits", "mpl_toolkits.*", "yaml"]
 ignore_missing_imports = true
 follow_imports = "skip"
