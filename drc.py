@@ -493,6 +493,8 @@ def _check_f_dogbone(ctx: _DrcContext) -> None:
 
 
 def _check_g_industrial(ctx: _DrcContext) -> None:
+    from shapely.geometry import Polygon
+
     issues = ctx.issues
     r2 = ctx.r2
     material_key = ctx.material_key
@@ -546,10 +548,10 @@ def _check_g_industrial(ctx: _DrcContext) -> None:
                     )
                 )
     # G3. 薄壁：沉板区与避位/上锡之间壁厚 < 推荐值（APTPCB 肋墙 ≥0.8，推荐 1.5）
-    if _poly_ok(sink):
+    if _poly_ok(sink) and isinstance(sink, Polygon):
         for group_name, group in (("avoid", avoids), ("solder", solders)):
             for gi, g in enumerate(group):
-                if not _poly_ok(g):
+                if not _poly_ok(g) or not isinstance(g, Polygon):
                     continue
                 try:
                     d = sink.exterior.distance(g.exterior)
