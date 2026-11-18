@@ -49,6 +49,19 @@ jobs:
       - name: Ruff
         run: uv run ruff check .
 
+  # 类型检查门禁：pyproject 约定 `mypy`（仓库根）必须零错误；此前只在本地跑，这里补进 CI
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+      - name: Sync dependencies
+        run: uv sync --extra dev
+      - name: Mypy
+        run: uv run mypy
+
   # 自吃狗粮：用本仓的 action.yml 跑真实板门禁（case_003 4 层板），自验 Action 完整链路
   action-dogfood:
     runs-on: ubuntu-latest
