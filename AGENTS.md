@@ -8,7 +8,7 @@ WaveFixture AI is an open-source, automated wave-soldering pallet (fixture) desi
 
 ## Toolchain & Verification
 
-- **Runtime**: Python 3.10+ (Dependencies managed via `pyproject.toml` / `uv.lock`)
+- **Runtime**: Python 3.11+ (Dependencies managed via `pyproject.toml` / `uv.lock`)
 - **Test Runner**: `pytest tests/ -q` (438 tests)
 - **Type Check**: `mypy` (Must report no errors; config and stub overrides live in `pyproject.toml`)
 - **Doc Consistency Guard**: `pytest tests/test_doc_consistency.py -q` (Strictly guards DRC count [26], parameter count [28], and material presets)

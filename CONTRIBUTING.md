@@ -7,7 +7,7 @@
 ## 快速开始 (Quickstart)
 
 ```bash
-# 推荐使用 Python 3.10+
+# 推荐使用 Python 3.11+
 git clone https://github.com/mo9652962-ai/wave-fixture-ai.git
 cd wave-fixture-ai
 
